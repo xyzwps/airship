@@ -1,0 +1,470 @@
+/* 飞船壳的全局样式。全部走 CSS 变量，应用侧直接复用，不各自配色。 */
+
+:root {
+  --titlebar-h: 38px;
+  --radius: 8px;
+  --radius-sm: 5px;
+  --font: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui,
+    sans-serif;
+  --mono: 'Cascadia Mono', 'Consolas', 'Microsoft YaHei UI', monospace;
+}
+
+html[data-theme='light'] {
+  --bg: #f5f4f1;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #ebe9e4;
+  --bg-hover: rgba(0, 0, 0, 0.045);
+  --bg-active: rgba(0, 0, 0, 0.075);
+  --fg: #23252b;
+  --fg-dim: #6b6f78;
+  --fg-faint: #9a9ea7;
+  --border: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.18);
+  --accent: #4a6fa5;
+  --danger: #b3564e;
+  --ok: #4d7a5e;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+html[data-theme='dark'] {
+  --bg: #1b1d23;
+  --bg-elev: #23262e;
+  --bg-sidebar: #191b20;
+  --bg-hover: rgba(255, 255, 255, 0.055);
+  --bg-active: rgba(255, 255, 255, 0.09);
+  --fg: #e6e4df;
+  --fg-dim: #a2a6ae;
+  --fg-faint: #6f737b;
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.17);
+  --accent: #7fa8d8;
+  --danger: #d98a80;
+  --ok: #83b395;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg);
+  background: var(--bg);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* 阅读器正文需要能选中复制 */
+.selectable {
+  user-select: text;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* ---------- 标题栏（每个窗口一条） ---------- */
+
+.titlebar {
+  height: var(--titlebar-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 12px;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border);
+  /* 无边框窗口：这一条是可拖拽区 */
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+.titlebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+}
+
+.titlebar__app-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.titlebar__here {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.titlebar__spacer {
+  flex: 1;
+}
+
+.titlebar__controls {
+  display: flex;
+  height: 100%;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.titlebar__btn {
+  width: 44px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--fg-dim);
+  cursor: default;
+}
+
+.titlebar__btn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.titlebar__btn--close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+/* ---------- 启动器 ---------- */
+
+.launcher {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.launcher__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 28px 40px;
+}
+
+.launcher__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.launcher__title {
+  margin: 0 0 3px;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.launcher__sub {
+  margin: 0;
+  color: var(--fg-dim);
+}
+
+.launcher__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.launcher__status {
+  margin-top: 22px;
+  max-width: 860px;
+}
+
+/* ---------- 应用窗口 ---------- */
+
+.app-window {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-window__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 22px 26px;
+}
+
+.app-window__body--flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* ---------- 通用控件 ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+  color: var(--fg);
+  font-size: 12.5px;
+  cursor: default;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn--primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--accent);
+}
+
+.btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--fg-dim);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.btn--danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.input,
+.select {
+  padding: 6px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.input:focus,
+.select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  padding: 15px 17px;
+}
+
+.card__title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.row--wrap {
+  flex-wrap: wrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.hint {
+  color: var(--fg-faint);
+  font-size: 12px;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--fg-dim);
+  background: var(--bg-elev);
+}
+
+.chip--ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+
+.chip--bad {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+}
+
+/* 表单排版：标签在控件左边同一行；同组字段共用一个星号列，不写死宽度 */
+.field-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px 14px;
+}
+
+.field-grid > label {
+  justify-self: end;
+  color: var(--fg-dim);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* ---------- 应用卡片（启动器主界面） ---------- */
+
+.appcard {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 15px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  text-align: left;
+  cursor: default;
+}
+
+.appcard:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+
+.appcard__head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.appcard__icon {
+  width: 22px;
+  height: 22px;
+  color: var(--nav-accent, var(--accent));
+}
+
+.appcard__name {
+  font-size: 14.5px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.appcard__desc {
+  color: var(--fg-dim);
+  font-size: 12.5px;
+}
+
+.appcard__caps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.cap {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  color: var(--fg-faint);
+  font-family: var(--mono);
+  font-size: 10.5px;
+}
+
+/* ---------- 占位 / 加载 ---------- */
+
+.placeholder {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  flex: 1;
+  width: 100%;
+  gap: 10px;
+  color: var(--fg-faint);
+}
+
+.spinner {
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- 滚动条 ---------- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-faint);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -10,8 +10,19 @@
  * 变的只是执行方式（进程内调用 → 跨进程 RPC），这也是为什么它值得现在就写死。
  */
 
-export const APP_IDS = ['vcp', 'books', 'pdf', 'dagogo'] as const
-export type AppId = (typeof APP_IDS)[number]
+import type { AppMeta } from './app'
+
+/**
+ * 应用 id。
+ *
+ * 值来自各应用自己的清单（`apps/<id>/app.ts`），由壳在构建时发现并收集。
+ * 这里刻意**不**维护一份 id 名单——那样每加一个应用就得回来改契约文件，
+ * 违反不变量 I-5（加应用不改壳侧任何文件）。
+ *
+ * 代价是 TS 不再穷举 id，改成运行时校验（主进程 `appRegistry.isKnownApp`）。
+ * 可以接受：应用代码从不传自己的 id，id 由壳绑定注入（见 shell/api）。
+ */
+export type AppId = string
 
 /**
  * 设置作用域：应用各自的命名空间，外加壳自己的 'shell'。
@@ -21,15 +32,15 @@ export type AppId = (typeof APP_IDS)[number]
 export type SettingsScope = AppId | 'shell'
 
 /**
- * 壳级共享命名空间。
+ * 壳托管的共享命名空间登记表。
+ *
+ * 与应用 id 不同，这份名单**属于壳**：目录由壳创建、由壳托管，
+ * 新增一个共享数据区是壳的功能变更，不是应用变更。
+ * 应用只能在清单里声明自己要访问哪个，声明了不存在的直接拒。
  *
  * 为什么需要它：books（EPUB/MOBI/TXT）和 pdf 是两个独立应用入口，
  * 但书架、导入记录、封面、阅读进度是同一套数据。
- * 各自存一份就会出现"同一本书在两个入口里各有一本"的重复，
- * 所以书库落在壳的共享区，两个应用都声明 library 命名空间来访问。
- *
- * 这也是插件系统迟早要有的东西——应用之间要共享数据，
- * 必须由壳托管，不能让它们互相摸对方的私有目录。
+ * 各自存一份就会出现"同一本书在两个入口里各有一本"的重复。
  */
 export const SHARED_NAMESPACES = ['library'] as const
 export type SharedNamespace = (typeof SHARED_NAMESPACES)[number]
@@ -146,79 +157,100 @@ export interface NotifyOptions {
 }
 
 /** 壳 → 渲染进程的事件频道 */
+/** 主题快照：mode 是用户选的档，resolved 是实际生效的亮/暗 */
+export interface ThemeSnapshot {
+  mode: 'light' | 'dark' | 'system'
+  resolved: 'light' | 'dark'
+}
+
 export type ShellEvent =
   | { kind: 'proc:chunk'; jobId: string; stream: 'stdout' | 'stderr'; text: string }
   | { kind: 'proc:exit'; jobId: string; result: ProcResult }
   | { kind: 'tray:click' }
   | { kind: 'window:maximized'; value: boolean }
+  /** 壳级广播：启动器改了主题，所有窗口跟着换 */
+  | { kind: 'theme:changed'; value: ThemeSnapshot }
 
 export type ShellEventListener = (event: ShellEvent) => void
 
-/** preload 挂到 window.airship 上的全部东西。
+/**
+ * 应用侧看到的表面（`window.airship`）。
  *
- * 所有涉及权限的方法都以 app 打头：主进程据此查能力表并做路径授权。
- * 应用侧不用自己传——壳给每个应用注入一份已绑定的 api（见 shell/useAppApi.ts），
- * 写起来就是 api.fs.read(path)。
+ * **没有 app 参数**：身份由该窗口的 preload 从启动参数里注入，主进程再用
+ * `event.sender` 反查归属二次确认。应用既看不到"传 id"这个动作，
+ * 也就没法冒充别的应用。
+ *
+ * 线格式（preload ↔ 主进程）仍然带 id，那是实现细节，不进契约。
  */
 export interface AirshipBridge {
-  paths(app: AppId): Promise<AppPaths>
+  paths(): Promise<AppPaths>
+
+  /** 读当前主题。应用侧只读，改主题在启动器 */
+  theme(): Promise<ThemeSnapshot>
 
   settings: {
-    get<T>(scope: SettingsScope, key: string, fallback: T): Promise<T>
-    set<T>(scope: SettingsScope, key: string, value: T): Promise<void>
+    get<T>(key: string, fallback: T): Promise<T>
+    set<T>(key: string, value: T): Promise<void>
     /** 一次拿全，避免逐键往返 */
-    dump(scope: SettingsScope): Promise<Record<string, unknown>>
+    dump(): Promise<Record<string, unknown>>
   }
 
   dialog: {
-    openFiles(app: AppId, options?: OpenFilesOptions): Promise<string[] | null>
-    openDirectory(app: AppId, options?: { title?: string }): Promise<string | null>
-    saveFile(app: AppId, options?: SaveFileOptions): Promise<string | null>
+    openFiles(options?: OpenFilesOptions): Promise<string[] | null>
+    openDirectory(options?: { title?: string }): Promise<string | null>
+    saveFile(options?: SaveFileOptions): Promise<string | null>
   }
 
   fs: {
-    read(app: AppId, path: string): Promise<Uint8Array>
+    read(path: string): Promise<Uint8Array>
     /** 范围读：EPUB/MOBI 的 zip 随机访问走这里，避免整本搬进内存 */
-    readRange(app: AppId, path: string, start: number, length: number): Promise<Uint8Array>
-    write(app: AppId, path: string, data: Uint8Array | string): Promise<void>
-    stat(app: AppId, path: string): Promise<FileStat | null>
-    list(app: AppId, dir: string): Promise<DirEntry[]>
-    ensureDir(app: AppId, dir: string): Promise<void>
-    remove(app: AppId, path: string): Promise<void>
-    copy(app: AppId, src: string, dest: string): Promise<void>
+    readRange(path: string, start: number, length: number): Promise<Uint8Array>
+    write(path: string, data: Uint8Array | string): Promise<void>
+    stat(path: string): Promise<FileStat | null>
+    list(dir: string): Promise<DirEntry[]>
+    ensureDir(dir: string): Promise<void>
+    remove(path: string): Promise<void>
+    copy(src: string, dest: string): Promise<void>
     /** 把路径解析到应用数据目录下，返回绝对路径；越界直接抛错 */
-    resolveInData(app: AppId, ...segments: string[]): Promise<string>
+    resolveInData(...segments: string[]): Promise<string>
     /**
      * 把路径解析到壳级共享命名空间下。
-     * 应用必须在 manifest 里声明了该命名空间，否则主进程拒绝。
+     * 应用必须在自己的清单里声明了该命名空间，否则主进程拒绝。
      */
-    resolveInShared(app: AppId, ns: SharedNamespace, ...segments: string[]): Promise<string>
+    resolveInShared(ns: SharedNamespace, ...segments: string[]): Promise<string>
   }
 
   proc: {
     /** 一次性跑完拿结果（探测类短命令） */
-    run(app: AppId, request: Omit<ProcRequest, 'jobId'>): Promise<ProcResult>
-    /** 后台跑，进度通过 proc:chunk / proc:exit 事件回流 */
-    start(app: AppId, request: ProcRequest): Promise<void>
-    kill(app: AppId, jobId: string): Promise<boolean>
-    list(app: AppId): Promise<string[]>
+    run(request: Omit<ProcRequest, 'jobId'>): Promise<ProcResult>
+    /** 后台跑，进度通过 proc:chunk / proc:exit 事件回流到本窗口 */
+    start(request: ProcRequest): Promise<void>
+    kill(jobId: string): Promise<boolean>
+    list(): Promise<string[]>
   }
+
+  /**
+   * 壳已发现的外部工具。需要 proc 能力——
+   * 应用只能跑壳找到并放进白名单的东西，不能自己找一个来跑。
+   */
+  tools: { ffmpegPath(): Promise<string | null> }
 
   tray: {
-    set(app: AppId, state: TrayState): Promise<void>
-    clear(app: AppId): Promise<void>
+    set(state: TrayState): Promise<void>
+    clear(): Promise<void>
   }
 
-  notify: { show(app: AppId, options: NotifyOptions): Promise<void> }
+  notify: { show(options: NotifyOptions): Promise<void> }
 
   clipboard: { writeText(text: string): Promise<void>; readText(): Promise<string> }
 
   log: {
-    info(app: AppId, message: string, detail?: unknown): Promise<void>
-    warn(app: AppId, message: string, detail?: unknown): Promise<void>
-    error(app: AppId, message: string, detail?: unknown): Promise<void>
+    info(message: string, detail?: unknown): Promise<void>
+    warn(message: string, detail?: unknown): Promise<void>
+    error(message: string, detail?: unknown): Promise<void>
   }
 
+  /** 作用于本窗口 */
   window: {
     minimize(): Promise<void>
     toggleMaximize(): Promise<void>
@@ -226,12 +258,62 @@ export interface AirshipBridge {
     isMaximized(): Promise<boolean>
   }
 
-  /** 订阅壳事件，返回退订函数 */
+  /** 订阅壳事件（只收本窗口该收到的），返回退订函数 */
+  on(listener: ShellEventListener): () => void
+}
+
+/**
+ * 应用拿到的 API：契约 + 自己的 id。
+ *
+ * 放在契约层而不是壳的 UI 层，是因为共享包也要用它——共享包属于依赖图的下层，
+ * 反过来依赖壳的界面代码就破了自己定的规则。
+ * id 只用于显示与日志，不参与任何权限判定（身份在 preload 与 event.sender 那里）。
+ */
+export type AppApi = AirshipBridge & { id: AppId }
+
+/**
+ * 启动器窗口专用的面（`window.airshipShell`）。
+ *
+ * 启动器是壳自己，不是应用，所以它要的东西和应用的完全不同：
+ * 列应用、开应用、改主题、看诊断。反过来应用拿不到这些，
+ * 免得某个应用能把别的窗口关掉。
+ */
+export interface ShellBridge {
+  /** 已注册应用的清单（主进程从 apps/<id>/app.ts 发现） */
+  apps(): Promise<AppMeta[]>
+  /** 打开（或聚焦）某个应用的独立窗口 */
+  openApp(id: string): Promise<void>
+  /** 当前开着哪些应用窗口 */
+  openApps(): Promise<string[]>
+  /**
+   * 改主题并广播给所有窗口。
+   * mode 是 'system' 时，实际亮暗由启动器用 matchMedia 算好传进来——
+   * 主进程没有 matchMedia，不该去猜。
+   */
+  setTheme(mode: ThemeSnapshot['mode'], resolvedHint?: 'light' | 'dark'): Promise<ThemeSnapshot>
+  theme(): Promise<ThemeSnapshot>
+  /** 壳级设置读写（主题、窗口状态、ffmpeg 路径、上次应用） */
+  settings: {
+    get<T>(key: string, fallback: T): Promise<T>
+    set<T>(key: string, value: T): Promise<void>
+  }
+  /** 壳自己的目录（诊断页显示数据落在哪） */
+  rootPaths(): Promise<AppPaths>
+  ffmpegPath(): Promise<string | null>
+  setFfmpegPath(exe: string): Promise<{ ok: boolean; error?: string }>
+  /** 某应用当前被授权的路径数，诊断用 */
+  grants(app: string): Promise<{ read: number; write: number }>
+  /** 打开系统浏览器（只放行 http/https） */
+  openExternal(url: string): Promise<void>
+  /** 每个窗口的内存，诊断用 */
+  metrics(): Promise<{ label: string; workingSetKB: number }[]>
+  window: AirshipBridge['window']
   on(listener: ShellEventListener): () => void
 }
 
 declare global {
   interface Window {
     airship: AirshipBridge
+    airshipShell: ShellBridge
   }
 }
