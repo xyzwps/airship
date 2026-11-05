@@ -279,9 +279,10 @@ describe('导入把元数据交给书库，读不出来就退化成文件名', (
     expect(book!.author).toBe('书里的作者')
     expect(book!.cover).toBe(`covers/${book!.id}.png`)
     expect(fake.text(`${SHARED}/covers/${book!.id}.png`)).toBe('封面字节')
-    // 卡片上真画出了一张封面图，地址指向共享区那个文件
+    // 卡片上真画出了一张封面图：地址必须是应用窗口 CSP 放行图片来源（blob:），
+    // 内容就是上面断言过的那个共享区文件
     const img = m.container.querySelector('.book-card__cover img') as HTMLImageElement
-    expect(img.src).toBe(`file://${SHARED}/covers/${book!.id}.png`)
+    expect(img.src.startsWith('blob:'), `封面地址用的是别的来源：${img.src}`).toBe(true)
     m.unmount()
   })
 
@@ -470,7 +471,7 @@ describe('TXT 交出去的是排好的书，EPUB 交出去的是取字节的文�
     seed(fake, [record({ cover: 'covers/b1.jpg' })], { 'covers/b1.jpg': 'JPG' })
     const m = await mount(fake)
     const img = m.container.querySelector('.book-card__cover img') as HTMLImageElement
-    expect(img.src).toBe(`file://${SHARED}/covers/b1.jpg`)
+    expect(img.src.startsWith('blob:')).toBe(true)
     m.unmount()
 
     const bare = shelf()

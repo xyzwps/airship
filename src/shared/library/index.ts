@@ -123,12 +123,37 @@ export function bookPath(api: AppApi, book: BookRecord): Promise<string> {
   return api.fs.resolveInShared('library', book.file)
 }
 
-/** 封面转成能直接给 <img> 用的 file:// URL */
+/**
+ * 封面转成能直接给 `<img>` 用的地址。
+ *
+ * 走"经壳读字节 → blob: URL"而不是拼一个 `file:///` 地址：应用窗口的 CSP 只放行
+ * `'self' blob: data:`，而页面本身是 `file://` 加载的——Chromium 不把 `file:` 子资源算作
+ * `'self'`，拼出来的地址会被拦下来，书架上就是一座破图。
+ * 走 blob 也就不用为了显示封面去放宽渲染侧的文件访问，数据仍然只由壳递出来。
+ *
+ * 同一张图按共享区里的位置缓存：书架每次刷新都重新取一遍地址，不该每次都读盘。
+ */
+const coverCache = new Map<string, string>()
+
+const COVER_MIME: Record<string, string> = {
+  png: 'image/png',
+  webp: 'image/webp',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif'
+}
+
 export async function coverUrl(api: AppApi, book: BookRecord): Promise<string | null> {
   if (!book.cover) return null
+  const cached = coverCache.get(book.cover)
+  if (cached) return cached
+
   const path = await api.fs.resolveInShared('library', book.cover)
-  const normalized = path.replace(/\\/g, '/')
-  return `file:///${normalized.replace(/^\/+/, '')}`
+  const bytes = await api.fs.read(path)
+  const ext = book.cover.split('.').pop()?.toLowerCase() ?? 'jpg'
+  const url = URL.createObjectURL(new Blob([bytes.slice()], { type: COVER_MIME[ext] ?? 'image/jpeg' }))
+  coverCache.set(book.cover, url)
+  return url
 }
 
 export interface AddBookInput {
@@ -205,6 +230,12 @@ export async function removeBook(api: AppApi, id: string): Promise<void> {
   await api.fs.remove(fileDest).catch(() => undefined)
   if (target.cover) {
     const coverDest = await api.fs.resolveInShared('library', target.cover)
+    // 地址缓存跟着文件一起作废，否则同名重建的那本会拿到一个指向已释放内容的地址
+    const stale = coverCache.get(target.cover)
+    if (stale) {
+      coverCache.delete(target.cover)
+      URL.revokeObjectURL(stale)
+    }
     await api.fs.remove(coverDest).catch(() => undefined)
   }
 }

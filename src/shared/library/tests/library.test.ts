@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   addBook,
@@ -20,6 +22,20 @@ import { FakeAirship } from '@tests/helpers/fakeAirship'
 
 const SHARED = '/fake/userData/shared/library'
 const INDEX = `${SHARED}/library.json`
+
+/**
+ * 应用窗口那条 CSP 里 `img-src` 明确允许的图片来源。
+ * 封面能不能画出来由它决定，所以这条契约要对着真策略判，不是对着记忆判。
+ */
+function appImgSchemes(): string[] {
+  const html = readFileSync(join(__dirname, '..', '..', '..', 'shell', 'app.html'), 'utf8')
+  const m = /img-src\s+([^;]+);/.exec(html.replace(/\s+/g, ' '))
+  if (!m) throw new Error('src/shell/app.html 里找不到 img-src，这条判据没依据了')
+  return m[1]!
+    .split(/\s+/)
+    .filter((s) => s !== "'self'")
+    .map((s) => s.replace(/:$/, ''))
+}
 
 function shelf(id: string): FakeAirship {
   return new FakeAirship({
@@ -177,7 +193,7 @@ describe('封面由导入方交进来', () => {
     expect((await loadBooks(fake.api)).length).toBe(2)
   })
 
-  it('LB-009 封面位置能直接交给图片用，没封面的得到空值', async () => {
+  it('LB-009 封面地址交给图片就能真画出来，没封面的得到空值', async () => {
     const fake = shelf('books')
     const src = '/fake/media/c.epub'
     fake.seed(src, 'z'.repeat(9))
@@ -190,8 +206,15 @@ describe('封面由导入方交进来', () => {
       coverBytes: new TextEncoder().encode('IMG')
     })
     const url = await coverUrl(fake.api, withCover)
-    expect(url).toBe('file:///fake/userData/shared/library/covers/' + withCover.id + '.jpg')
-    expect(url!.startsWith('file:///')).toBe(true)
+    expect(url, '有封面的书该拿得到一个能画出来的地址').not.toBeNull()
+
+    // 判据是"界面画得出来"，不是"地址指得到文件"：
+    // 应用窗口那条 CSP 的 img-src 没列上的 scheme，<img> 会被直接拦掉变成破图。
+    // 'self' 在这里不算数——页面是 file:// 加载的，Chromium 不把 file: 子资源认作同源。
+    const allowed = appImgSchemes()
+    const scheme = url!.slice(0, url!.indexOf(':'))
+    expect(allowed, `封面地址用的是 ${scheme}:，而应用窗口的 img-src 只允许 ${allowed.join(' / ')}`)
+      .toContain(scheme)
 
     const bare: BookRecord = { ...withCover, cover: null }
     expect(await coverUrl(fake.api, bare)).toBeNull()
