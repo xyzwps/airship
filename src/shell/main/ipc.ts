@@ -49,7 +49,6 @@ import {
   openAppIds,
   openAppWindow,
   ownerOfContents,
-  registeredApps,
   setCachedTheme,
   themeSnapshotCache,
   windowMetrics
@@ -502,10 +501,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   /* ---------- 启动器专用面 ---------- */
 
-  handle('launcher:apps', (event) => {
-    requireShell(event)
-    return registeredApps()
-  })
 
   handle('launcher:openApp', (event, appId: unknown) => {
     requireShell(event)

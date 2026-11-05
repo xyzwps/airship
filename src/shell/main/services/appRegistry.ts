@@ -51,11 +51,9 @@ export function appIds(): string[] {
   return [...collected.keys()]
 }
 
-/** 按清单里的 order 排好序的元数据；壳侧要展示顺序时用这个 */
+/** 按名字典序排好的元数据；顺序是壳的表现决定，不由应用自己声明 */
 export function appsInOrder(): AppMeta[] {
-  return [...collected.values()].sort(
-    (a, b) => (a.order ?? 1000) - (b.order ?? 1000) || a.name.localeCompare(b.name, 'zh')
-  )
+  return [...collected.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh'))
 }
 
 export function isKnownApp(value: unknown): value is string {

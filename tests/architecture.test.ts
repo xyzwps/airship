@@ -96,6 +96,9 @@ describe('应用注册', () => {
     for (const dir of dirs) {
       expect(existsSync(join(APPS_DIR, dir, 'app.ts')), `${dir}/app.ts 必须存在`).toBe(true)
       expect(existsSync(join(APPS_DIR, dir, 'index.tsx')), `${dir}/index.tsx 必须存在`).toBe(true)
+      // 图标是文件约定：apps/<id>/icon.svg|png|jpg|jpeg|webp，而且只能有一张
+      const icons = readdirSync(join(APPS_DIR, dir)).filter((n) => /^icon\.(svg|png|jpe?g|webp)$/.test(n))
+      expect(icons.length, `${dir}/ 必须有且只有一张 icon.* 文件`).toBe(1)
       const meta = readFileSync(join(APPS_DIR, dir, 'app.ts'), 'utf8')
       expect(meta, `${dir}/app.ts 的 id 必须等于目录名`).toContain(`id: '${dir}'`)
     }

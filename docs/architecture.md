@@ -220,6 +220,7 @@ preload 用 `contextBridge.exposeInMainWorld('airship', bridge)` 挂一个对象
 ```
 apps/vcp/
   app.ts          ← 纯数据清单：这个应用对外形状的全部
+  icon.svg        ← 图标文件（png/jpg/jpeg/webp 也行，只能有一张）
   index.tsx       ← 组件入口（默认导出），壳按目录约定解析
   VcpApp.tsx      ← 组件本体
   state.ts command.ts probe.ts jobs.ts runner.ts   ← 应用私有，壳不知道
@@ -239,14 +240,26 @@ export interface AppMeta {
   id: string                    // 唯一，必须等于目录名；同时是数据目录名
   name: string                  // 界面显示名
   description: string           // 一句话
-  iconPath: string              // 24x24 SVG path 数据
   accent: string                // 强调色
   capabilities: Capability[]    // 声明式权限
   sharedNamespaces?: SharedNamespace[]
   flush?: boolean               // 内容区是否去掉壳给的内边距
-  order?: number                // 侧栏顺序，小的在前；不写排最后按名字
 }
 ```
+
+清单里**没有**图标字段，也**没有**顺序字段：
+
+- 图标是**文件约定**：往 `apps/<id>/` 扔一张 `icon.svg`（也接受 png / jpg / jpeg / webp），
+  有且只能有一张，缺了或多张都在注册期直接报错。壳不解析它的内部结构，
+  也不规定它是几条 path、有没有 circle/渐变、甚至是不是位图。
+  清单里写 `iconPath: string` 那种做法等于假定"图标必须是单条 path 的 SVG"，两个假定都错。
+  图标单独成文件而不是跟组件同处 `index.tsx`，是因为启动器要给四个应用画图标，
+  同 chunk 就得把 pdf 那 800KB 一起拉进来，懒加载白做。
+  代价：文件图标拿不到 `currentColor`，颜色得烘进图里，所以 `accent` 只用于图标底板掺色，
+  两处颜色各自成立。小于 4KB 的 SVG 会被 Vite 内联成 `data:` URL（CSP 的 `img-src` 已允许），
+  大图则作为文件走 `'self'`。
+- 顺序是应用之间的**关系**，任何单个应用都不可能"自己决定"自己的排位。
+  壳按名字典序排（`localeCompare(…, 'zh')`）。
 
 组件入口不在清单里，由约定解析：`apps/<id>/index.tsx` 默认导出 `ComponentType<{ api: AppApi }>`。
 
@@ -256,12 +269,12 @@ export interface AppMeta {
 
 两侧抓的是**同一批清单文件**，不存在两份名单对不齐：
 
-- 渲染侧 `apps/index.ts`：`import.meta.glob('./*/app.ts', { eager: true })` 拿清单，`import.meta.glob('./*/index.tsx')` 拿组件（lazy，每应用一个 chunk）。
+- 渲染侧 `apps/index.ts`：三个 glob——`app.ts` 拿清单（急切）、`icon.{svg,png,jpg,jpeg,webp}` 拿图标 URL（急切，`?url`）、`index.tsx` 拿组件（懒，每应用一个 chunk）。
 - 主进程 `services/appRegistry.ts`：`import.meta.glob('../../../apps/*/app.ts', { eager: true })` 派生能力表、目录布局、共享命名空间授权。
 
-壳从清单派生：侧栏列表、能力校验、数据目录、显示顺序、懒加载入口。目录名与清单 id 不一致、缺组件入口、id 重复——注册表构建期直接抛错，不留"注册了一半"的应用。
+壳从清单派生：应用列表、能力校验、数据目录、懒加载入口；显示顺序由壳按名字典序定。目录名与清单 id 不一致、缺图标或多张图标、缺组件入口、id 重复——注册表构建期直接抛错，不留"注册了一半"的应用。
 
-**加一个应用 = 新建 `apps/<id>/` 写 `app.ts` 和 `index.tsx`，壳侧零改动。**（不变量 I-5；已用临时 `apps/hello/` 演练证实——只加两个文件就出现在侧栏并能打开，随后删除）
+**加一个应用 = 新建 `apps/<id>/` 写 `app.ts`、`icon.svg`、`index.tsx` 三个文件，壳侧零改动。**（不变量 I-5；已用临时 `apps/hello/` 演练证实——只加新目录就出现在启动器并能打开，随后删除）
 
 代价：应用 id 的类型从 `as const` 联合降级为 `string` + 运行时校验（`isKnownApp`），因为清单成了唯一真源。可接受——应用从不传自己的 id，id 由壳绑定注入。
 

@@ -167,7 +167,6 @@ contextBridge.exposeInMainWorld('airship', bridge)
 
 if (IS_SHELL) {
   const shellBridge: ShellBridge = {
-    apps: () => call('launcher:apps'),
     openApp: (id: string) => call('launcher:openApp', id),
     openApps: () => call('launcher:openApps'),
     setTheme: (mode, resolvedHint) => call('launcher:setTheme', mode, resolvedHint),

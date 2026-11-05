@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState, type JSX } from 'react'
-import type { AppMeta, } from '@shared/app'
-import { AppIcon } from './AppIcon'
+import { type JSX } from 'react'
+import { APP_ENTRIES } from '../apps'
 import { Titlebar } from './Titlebar'
 import { useTheme, THEME_MODES, type ThemeMode } from './theme'
 import { useReportShotReady } from './shot'
@@ -8,141 +7,53 @@ import { useReportShotReady } from './shot'
 /**
  * 启动器。
  *
- * 窗口化之后壳自己只剩这一件事：列出应用、点开一个独立窗口、给壳级诊断。
- * 它不再承载任何应用内容，所以也没有侧栏——应用列表就是主界面。
+ * 就是一张应用格子：图标 + 名字，点开各自独立窗口。
+ * 说明文字、能力标签、壳状态这些一概不放——要看的东西在应用自己里看。
+ *
+ * 应用列表直接读渲染侧的注册表（它已经急切加载了各应用的图标模块），
+ * 不再绕一趟主进程。
  */
 export function Launcher(): JSX.Element {
   const { mode, setMode } = useTheme()
-  const [apps, setApps] = useState<AppMeta[]>([])
-  const [open, setOpen] = useState<string[]>([])
-  const [ffmpeg, setFfmpeg] = useState<string | null | undefined>(undefined)
-  const [root, setRoot] = useState('')
-  const [version, setVersion] = useState('')
+  const entries = Object.values(APP_ENTRIES)
 
-  const refreshOpen = useCallback(() => {
-    void window.airshipShell.openApps().then(setOpen).catch(() => undefined)
-  }, [])
-
-  useEffect(() => {
-    let alive = true
-    void window.airshipShell.apps().then((list) => alive && setApps(list)).catch(() => undefined)
-    void window.airshipShell.ffmpegPath().then((p) => alive && setFfmpeg(p)).catch(() => undefined)
-    void window.airshipShell.rootPaths().then((p) => {
-      if (!alive) return
-      setRoot(p.root)
-      setVersion(p.shellVersion)
-    }).catch(() => undefined)
-    refreshOpen()
-    return () => {
-      alive = false
-    }
-  }, [refreshOpen])
-
-  // 应用窗口关掉后，"在跑"标记要跟着掉
-  useEffect(() => {
-    const off = window.airshipShell.on(() => refreshOpen())
-    const t = setInterval(refreshOpen, 2000)
-    return () => {
-      off()
-      clearInterval(t)
-    }
-  }, [refreshOpen])
-
-  useReportShotReady([apps.length])
-
-  const openApp = (id: string): void => {
-    void window.airshipShell.openApp(id).then(refreshOpen).catch(() => undefined)
-  }
+  useReportShotReady([entries.length])
 
   return (
     <div className="launcher">
       <Titlebar />
 
       <div className="launcher__body">
-        <header className="launcher__head">
-          <div>
-            <h1 className="launcher__title">飞船</h1>
-            <p className="launcher__sub">一个壳，里面装着自用的几个应用。点开各自独立窗口，互不影响。</p>
-          </div>
-          <div className="row">
-            <span className="hint">主题</span>
-            <select
-              className="select"
-              value={mode}
-              onChange={(e) => setMode?.(e.target.value as ThemeMode)}
-            >
-              {THEME_MODES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </header>
-
-        <div className="launcher__grid">
-          {apps.map((meta) => {
-            const running = open.includes(meta.id)
-            return (
-              <button
-                key={meta.id}
-                type="button"
-                className="appcard"
-                style={{ ['--nav-accent' as string]: meta.accent }}
-                onClick={() => openApp(meta.id)}
-              >
-                <div className="appcard__head">
-                  <AppIcon meta={meta} className="appcard__icon" />
-                  <span className="appcard__name">{meta.name}</span>
-                  {running && <span className="chip chip--ok">在跑</span>}
-                </div>
-                <span className="appcard__desc">{meta.description}</span>
-                <div className="appcard__caps">
-                  {meta.capabilities.map((c) => (
-                    <span key={c} className="cap">
-                      {c}
-                    </span>
-                  ))}
-                  {meta.sharedNamespaces?.map((ns) => (
-                    <span key={ns} className="cap">
-                      shared:{ns}
-                    </span>
-                  ))}
-                </div>
-              </button>
-            )
-          })}
+        <div className="launcher__bar">
+          <select
+            className="select launcher__theme"
+            value={mode}
+            onChange={(e) => setMode?.(e.target.value as ThemeMode)}
+            aria-label="主题"
+          >
+            {THEME_MODES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="card launcher__status">
-          <h2 className="card__title">壳状态</h2>
-          <div className="field-grid">
-            <label>ffmpeg</label>
-            <div className="row">
-              {ffmpeg === undefined ? (
-                <span className="hint">探测中…</span>
-              ) : ffmpeg ? (
-                <>
-                  <span className="chip chip--ok">可用</span>
-                  <span className="mono hint" title={ffmpeg}>{ffmpeg.split(/[\\/]/).pop()}</span>
-                </>
-              ) : (
-                <>
-                  <span className="chip chip--bad">没找到</span>
-                  <span className="hint">vcp 不可用</span>
-                </>
-              )}
-            </div>
-
-            <label>数据目录</label>
-            <span className="mono hint selectable" title={root}>{root}</span>
-
-            <label>应用</label>
-            <span className="hint">{apps.length} 个注册，{open.length} 个开着</span>
-
-            <label>版本</label>
-            <span className="mono hint">{version}</span>
-          </div>
+        <div className="tiles">
+          {entries.map(({ meta, iconUrl }) => (
+            <button
+              key={meta.id}
+              type="button"
+              className="tile"
+              style={{ ['--tile-accent' as string]: meta.accent }}
+              onClick={() => void window.airshipShell.openApp(meta.id).catch(() => undefined)}
+            >
+              <span className="tile__icon">
+                <img src={iconUrl} alt="" className="tile__glyph" />
+              </span>
+              <span className="tile__name">{meta.name}</span>
+            </button>
+          ))}
         </div>
       </div>
     </div>

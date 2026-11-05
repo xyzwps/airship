@@ -1,10 +1,9 @@
 import { BrowserWindow, app } from 'electron'
 import { join } from 'node:path'
-import { APP_MAP, appsInOrder } from './services/appRegistry'
+import { APP_MAP } from './services/appRegistry'
 import { targetsFor, type WindowRef } from './services/routing'
 import { settings } from './services/settings'
 import { log } from './services/logging'
-import type { AppMeta } from '@shared/app'
 import type { ShellEvent, ThemeSnapshot } from '@shared/protocol'
 
 /**
@@ -256,10 +255,6 @@ export function windowMetrics(): { label: string; workingSetKB: number }[] {
     if (!window.isDestroyed()) push(APP_MAP.get(id)?.name ?? id, window.webContents.getOSProcessId())
   }
   return out
-}
-
-export function registeredApps(): AppMeta[] {
-  return appsInOrder()
 }
 
 export function isRegistered(appId: string): boolean {

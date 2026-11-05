@@ -7,9 +7,12 @@ import type { Capability, SharedNamespace } from './protocol'
  * 目录布局，而主进程不该 import 任何渲染侧代码。所以约定是——
  *
  *   apps/<id>/app.ts     导出 `app: AppMeta`（纯数据，两侧都能读）
- *   apps/<id>/index.tsx  默认导出组件（只有渲染进程读）
+ *   apps/<id>/index.tsx  默认导出组件，并导出 `icon`（只有渲染进程读）
  *
- * 组件不进清单类型：它由壳按目录约定去解析，应用不用在清单里写路径。
+ * 图标**不在这里**：它是表现层的东西，而且形式不该被限死——
+ * 可能是多条 path，可能是 circle/rect/渐变，也可能就是一张位图。
+ * 清单里写 `iconPath: string` 等于假定"图标必须是单条 path 的 SVG"，两个假定都错。
+ * 图标跟着组件住在 index.tsx，应用爱怎么画怎么画。
  */
 export interface AppMeta {
   /** 唯一 id，同时是它在 userData 下的数据目录名 */
@@ -18,9 +21,7 @@ export interface AppMeta {
   name: string
   /** 一句话说清它是干什么的 */
   description: string
-  /** 侧栏/卡片图标：24x24 视图框内的 SVG path 数据 */
-  iconPath: string
-  /** 强调色，用于侧栏选中态与图标着色 */
+  /** 强调色，用于图标底板着色与侧栏选中态 */
   accent: string
   /** 声明式权限。没写的一律拒绝，且抛可读原因 */
   capabilities: Capability[]
@@ -28,6 +29,5 @@ export interface AppMeta {
   sharedNamespaces?: SharedNamespace[]
   /** 内容区是否去掉壳给的默认内边距（要自己控制版心的应用用） */
   flush?: boolean
-  /** 侧栏显示顺序，小的在前；不写就排在最后按名字。壳不维护顺序表 */
-  order?: number
+
 }

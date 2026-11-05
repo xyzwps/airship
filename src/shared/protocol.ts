@@ -10,8 +10,6 @@
  * 变的只是执行方式（进程内调用 → 跨进程 RPC），这也是为什么它值得现在就写死。
  */
 
-import type { AppMeta } from './app'
-
 /**
  * 应用 id。
  *
@@ -279,8 +277,6 @@ export type AppApi = AirshipBridge & { id: AppId }
  * 免得某个应用能把别的窗口关掉。
  */
 export interface ShellBridge {
-  /** 已注册应用的清单（主进程从 apps/<id>/app.ts 发现） */
-  apps(): Promise<AppMeta[]>
   /** 打开（或聚焦）某个应用的独立窗口 */
   openApp(id: string): Promise<void>
   /** 当前开着哪些应用窗口 */

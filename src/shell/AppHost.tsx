@@ -2,7 +2,6 @@ import { Suspense, useEffect, useState, type JSX } from 'react'
 import { entryFor, isKnownApp } from '../apps'
 import { makeAppApi } from './api'
 import type { AppApi } from '@shared/protocol'
-import { AppIcon } from './AppIcon'
 import { Titlebar } from './Titlebar'
 import { useTheme } from './theme'
 import { useReportShotReady } from './shot'
@@ -54,7 +53,10 @@ export function AppHost({ appId }: { appId: string }): JSX.Element {
 
   return (
     <div className="app-window">
-      <Titlebar here={entry.meta.name} icon={<AppIcon meta={entry.meta} className="titlebar__app-icon" />} />
+      <Titlebar
+        here={entry.meta.name}
+        icon={<img src={entry.iconUrl} alt="" className="titlebar__app-glyph" />}
+      />
       <div className={`app-window__body${entry.flush ? ' app-window__body--flush' : ''}`}>
         <Suspense
           fallback={

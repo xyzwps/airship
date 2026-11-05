@@ -28,6 +28,17 @@ import type { ThemeSnapshot } from '@shared/protocol'
 
 const SHOT_MODE = process.env.AIRSHIP_SHOT === '1' && process.argv.includes('--shot')
 
+/**
+ * 截图模式用独立的 userData，且不参与单实例。
+ *
+ * 否则你正开着飞船看界面时，我跑一次截图会静默退出（抢不到锁），
+ * 还会跟你的实例抢同一份 Chromium 缓存目录、刷一堆"Unable to move the cache"。
+ * 验证工装不该踩在正在使用的人身上。
+ */
+if (SHOT_MODE) {
+  app.setPath('userData', join(app.getPath('userData'), '..', 'airship-shot-profile'))
+}
+
 /* ---------------- 截图模式 ---------------- */
 
 interface Autotest {
@@ -176,12 +187,15 @@ app.whenReady().then(() => {
 
 // 单实例：第二次启动把启动器唤到前台。
 // 抢不到锁必须说清楚——否则第二次跑截图模式会静默退出，看着像卡死。
-const gotLock = app.requestSingleInstanceLock()
-if (!gotLock) {
-  console.error('[airship] 已有一个飞船在运行（单实例锁被占）。关掉它再启动。')
-  app.quit()
-} else {
-  app.on('second-instance', () => bringLauncherToFront())
+// 截图模式自己有独立 userData，不参与这把锁。
+if (!SHOT_MODE) {
+  const gotLock = app.requestSingleInstanceLock()
+  if (!gotLock) {
+    console.error('[airship] 已有一个飞船在运行（单实例锁被占）。关掉它再启动。')
+    app.quit()
+  } else {
+    app.on('second-instance', () => bringLauncherToFront())
+  }
 }
 
 app.on('window-all-closed', () => {
