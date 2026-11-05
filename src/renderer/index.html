@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>飞船</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      CSP 说明：
+      - style-src 'unsafe-inline'：foliate-js 会往 iframe 里注入内联样式，禁掉书就没了排版
+      - img-src blob: data:：EPUB 内嵌图片与封面走 blob
+      - frame-src blob:：foliate-js 用 blob URL 建 iframe 渲染章节
+      - script-src 'self'：不放行任何远程脚本，应用全部打包在本地
+      - connect-src 'self' ipc:：ipc 是 Electron 的渲染进程↔主进程通道
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; frame-src 'self' blob:; connect-src 'self' ipc: blob:; worker-src 'self' blob:;"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

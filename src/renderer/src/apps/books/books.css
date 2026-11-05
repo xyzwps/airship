@@ -1,0 +1,239 @@
+/* 墨读：书架 + 阅读器 */
+
+.books-shelf {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 28px 40px;
+}
+
+.books-shelf__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.books-shelf__title {
+  margin: 0 0 2px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.books-shelf__error,
+.books-reader__error {
+  padding: 7px 11px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+  font-size: 12.5px;
+  margin-bottom: 14px;
+}
+
+.books-shelf__empty {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--fg-faint);
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+}
+
+.books-shelf__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 20px 16px;
+}
+
+.book-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.book-card__cover {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-elev);
+  padding: 0;
+  cursor: default;
+}
+
+.book-card__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.book-card__no-cover {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fg-faint);
+  background: linear-gradient(160deg, var(--bg-elev), var(--bg-hover));
+}
+
+.book-card__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.book-card__progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.book-card__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.book-card__title {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.book-card__title:hover {
+  text-decoration: underline;
+}
+
+.book-card__sub {
+  color: var(--fg-faint);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.book-card__del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.book-card:hover .book-card__del {
+  opacity: 1;
+}
+
+/* ---------- 阅读器 ---------- */
+
+.books-reader {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.books-reader__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-sidebar);
+  color: var(--fg);
+}
+
+.books-reader__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.books-reader__author {
+  color: var(--fg-faint);
+  font-weight: 400;
+}
+
+.books-reader__scale {
+  font-size: 11.5px;
+  color: var(--fg-dim);
+  min-width: 34px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.books-reader__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.books-reader__toc {
+  width: 250px;
+  flex: none;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg-sidebar);
+  color: var(--fg);
+  padding: 8px 0;
+}
+
+.books-reader__toc-item {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  text-align: left;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: default;
+}
+
+.books-reader__toc-item:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.reader-view {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.reader-view > * {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.books-reader__hint {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: var(--fg-faint);
+  background: var(--bg-sidebar);
+  border-top: 1px solid var(--border);
+}

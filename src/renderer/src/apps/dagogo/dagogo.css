@@ -1,0 +1,257 @@
+/* 打勾勾：暖色纸感，亮暗两套，跟随壳的主题切换。 */
+
+.dagogo {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  --dg-bg: #f4eee4;
+  --dg-surface: #fffcf7;
+  --dg-ink: #241f1a;
+  --dg-muted: #8e8577;
+  --dg-faint: #b4aa99;
+  --dg-line: #e7ddce;
+  --dg-accent: #da5a3d;
+  --dg-on-accent: #faf4e8;
+  --dg-check-border: #c8bcaa;
+  --dg-row-pressed: #faf5ec;
+  background: var(--dg-bg);
+  color: var(--dg-ink);
+}
+
+.dagogo[data-mode='dark'] {
+  --dg-bg: #201c18;
+  --dg-surface: #2a2521;
+  --dg-ink: #ece5da;
+  --dg-muted: #a2988a;
+  --dg-faint: #6f675c;
+  --dg-line: #3a342d;
+  --dg-accent: #e0704f;
+  --dg-on-accent: #241f1a;
+  --dg-check-border: #57503f;
+  --dg-row-pressed: #332d27;
+}
+
+.dagogo__bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+.dagogo__inner {
+  position: relative;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 26px 26px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dagogo__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.dagogo__date {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.dagogo__enc {
+  margin-top: 4px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--dg-muted);
+  font-size: 13px;
+  text-align: left;
+  cursor: default;
+}
+
+.dagogo__enc:hover {
+  color: var(--dg-ink);
+  text-decoration: underline dotted;
+}
+
+.dagogo__enc-input {
+  width: 240px;
+}
+
+.dagogo__count {
+  font-size: 12.5px;
+  color: var(--dg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dagogo__panel {
+  background: color-mix(in srgb, var(--dg-surface) 88%, transparent);
+  border-color: var(--dg-line);
+}
+
+.dagogo__notice {
+  padding: 7px 11px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--dg-accent) 14%, transparent);
+  color: var(--dg-ink);
+  font-size: 12.5px;
+}
+
+.dagogo__notice--bad {
+  background: color-mix(in srgb, #b3564e 18%, transparent);
+}
+
+.dagogo__add-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--dg-surface);
+  border-color: var(--dg-line);
+  color: var(--dg-ink);
+  padding: 9px 12px;
+}
+
+.dagogo__empty {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--dg-faint);
+  border: 1px dashed var(--dg-check-border);
+  border-radius: 10px;
+}
+
+.dagogo__lists {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dagogo__section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.dagogo__section-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--dg-muted);
+}
+
+.dagogo__rule {
+  flex: 1;
+  height: 1px;
+  background: var(--dg-line);
+}
+
+.dagogo__section-count {
+  font-size: 11.5px;
+  color: var(--dg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.dagogo__card {
+  border: 1px solid var(--dg-line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dg-surface) 92%, transparent);
+  overflow: hidden;
+}
+
+.dagogo__row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 13px;
+}
+
+.dagogo__row--divided {
+  border-top: 1px solid var(--dg-line);
+}
+
+.dagogo__row:hover {
+  background: var(--dg-row-pressed);
+}
+
+.dagogo__check {
+  flex: none;
+  width: 21px;
+  height: 21px;
+  border: 1.5px solid var(--dg-check-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dg-on-accent);
+  font-size: 13px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: default;
+}
+
+.dagogo__check--done {
+  background: var(--dg-accent);
+  border-color: var(--dg-accent);
+}
+
+.dagogo__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.dagogo__title {
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dagogo__title--done {
+  color: var(--dg-muted);
+  text-decoration: line-through;
+}
+
+.dagogo__meta {
+  font-size: 11.5px;
+  color: var(--dg-faint);
+}
+
+.dagogo__actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.dagogo__row:hover .dagogo__actions,
+.dagogo__actions:focus-within {
+  opacity: 1;
+}
+
+.dagogo__del:hover {
+  color: #b3564e;
+}
+
+.dagogo__modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 40;
+}
+
+.dagogo__modal-card {
+  width: 420px;
+  max-width: calc(100vw - 60px);
+  padding: 18px 20px;
+  border-radius: 10px;
+  background: var(--dg-surface);
+  border: 1px solid var(--dg-line);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  color: var(--dg-ink);
+}
