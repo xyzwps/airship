@@ -1,6 +1,8 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import type { AppMeta } from '@shared/app'
-import type { AppApi } from '@shared/protocol'
+import { platformIssue } from '@shared/errors'
+import { componentProblem, iconProblems, manifestProblems } from '@shared/registryRules'
+import type { AppApi, PlatformId } from '@shared/protocol'
 
 /**
  * 应用发现。
@@ -50,26 +52,23 @@ const problems: string[] = []
 for (const [path, mod] of Object.entries(metaModules)) {
   const id = idOfPath(path)
   const meta = mod.app
-  if (!meta || meta.id !== id) {
-    // 目录名和清单 id 必须一致：数据目录、能力校验、组件解析全靠这个对应关系
-    problems.push(`${path}: 清单 id "${meta?.id ?? '(缺失)'}" 与目录名 "${id}" 不一致`)
+  const problemsHere = manifestProblems(path, id, meta, collected.map((e) => e.meta.id))
+  if (problemsHere.length > 0) {
+    problems.push(...problemsHere)
     continue
   }
 
   // 图标：一个应用只该有一张，多了不知道用哪个
   const iconKeys = Object.keys(iconModules).filter((k) => k.startsWith(`./${id}/icon.`))
-  if (iconKeys.length === 0) {
-    problems.push(`${id}: 缺图标 apps/${id}/icon.svg（也接受 png / jpg / jpeg / webp）`)
-    continue
-  }
-  if (iconKeys.length > 1) {
-    problems.push(`${id}: 图标有多张，只留一张：${iconKeys.join(', ')}`)
+  const iconIssues = iconProblems(id, iconKeys)
+  if (iconIssues.length > 0) {
+    problems.push(...iconIssues)
     continue
   }
 
   const loader = componentModules[`./${id}/index.tsx`]
   if (!loader) {
-    problems.push(`${id}: 缺组件入口 ./apps/${id}/index.tsx`)
+    problems.push(componentProblem(id))
     continue
   }
 
@@ -109,4 +108,13 @@ export function isKnownApp(value: string | null | undefined): value is string {
 /** 应用宿主按 id 取入口；取不到就是没注册 */
 export function entryFor(id: string): AppEntry | null {
   return APP_ENTRIES[id] ?? null
+}
+
+/**
+ * 当前平台用得了的入口，按名字典序。
+ * 清单没写 platforms = 全平台可用；写了就只在列出的平台上出现。
+ * 判定用的是 shared/errors 那一份，所以"格子里没有"和"硬要开被拒"念的是同一句原因。
+ */
+export function entriesAvailableOn(platform: PlatformId | 'unknown'): AppEntry[] {
+  return collected.filter((e) => platformIssue(e.meta, platform) === null)
 }

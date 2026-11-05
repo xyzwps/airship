@@ -1,0 +1,3 @@
+找不到容器 'nosuchcontainer'。
+错误代码： WSLC_E_CONTAINER_NOT_FOUND
+如果此错误是意外错误，请考虑搜索现有问题或在 https://github.com/microsoft/WSL/issues 提交新问题。

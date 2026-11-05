@@ -1,0 +1,4 @@
+latest: Pulling from library/busybox
+Digest: sha256:fd7dc98638c8e305f4dc34e979f1c0fdfdcaeb0fbf8fcff77ae834b6da3d7e6e
+Status: Image is up to date for docker.1ms.run/library/busybox:latest
+docker.1ms.run/library/busybox:latest

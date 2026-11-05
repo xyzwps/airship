@@ -1,9 +1,20 @@
 import { BrowserWindow, app } from 'electron'
 import { join } from 'node:path'
-import { APP_MAP } from './services/appRegistry'
+import { APP_MAP, unavailableReason } from './services/appRegistry'
+import { platformIdOf } from '@shared/protocol'
+import { notRegistered, platformUnsupported } from '@shared/errors'
 import { targetsFor, type WindowRef } from './services/routing'
+import {
+  WindowLedger,
+  appUserModelIdFor,
+  boundsForRestore,
+  boundsKeyFor,
+  boundsToSave
+} from './services/windowLedger'
 import { settings } from './services/settings'
 import { log } from './services/logging'
+import { proc } from './services/proc'
+import { trayService } from './services/tray'
 import type { ShellEvent, ThemeSnapshot } from '@shared/protocol'
 
 /**
@@ -14,6 +25,9 @@ import type { ShellEvent, ThemeSnapshot } from '@shared/protocol'
  *   2. 窗口的 preload 被注入 `--airship-app=<id>`，应用侧拿到的 bridge 身份是壳给的，改不了；
  *   3. 主进程按 `event.sender` 反查归属，传上来的 id 与归属不符就拒——
  *      所以 A 应用既收不到 B 应用的事件，也冒充不了 B 应用。
+ *
+ * "哪个应用现在有活窗口"这件事由 services/windowLedger.ts 那份纯逻辑管，
+ * 这里只负责把它接到 BrowserWindow 上。
  */
 
 export type Owner = string | 'shell'
@@ -24,9 +38,8 @@ const APP_SIZE = { width: 1100, height: 740 }
 let launcher: BrowserWindow | null = null
 const appWindows = new Map<string, BrowserWindow>()
 
-/** webContents → 归属，主进程所有权限判定都从这里出发。
- *  用普通 Map 而不是 WeakMap：键是 webContents.id（数字），窗口 closed 时显式删掉。 */
-const owners = new Map<number, Owner>()
+/** 归属 ↔ webContents.id 的台账，主进程所有权限判定都从这里出发 */
+const ledger = new WindowLedger()
 
 function preloadPath(): string {
   return join(__dirname, '../preload/index.js')
@@ -45,7 +58,12 @@ function baseWebPreferences(owner: Owner): Electron.WebPreferences {
 }
 
 export function ownerOfContents(webContentsId: number): Owner | null {
-  return owners.get(webContentsId) ?? null
+  return ledger.ownerOf(webContentsId)
+}
+
+/** 当前平台名，清单的 platforms 就按它判定 */
+export function currentPlatform(): ReturnType<typeof platformIdOf> {
+  return platformIdOf(process.platform)
 }
 
 /** 渲染根是 src/，两个 html 在 shell/ 下，产物也带这一层目录 */
@@ -63,43 +81,36 @@ function loadEntry(window: BrowserWindow, entry: 'launcher' | 'app', query?: Rec
   })
 }
 
-function boundsFor(key: string, fallback: { width: number; height: number }): {
-  width: number
-  height: number
-  x?: number
-  y?: number
-  maximized: boolean
-} {
-  return settings.get('shell', key, { ...fallback, maximized: false })
+/** 恢复某归属上次的位置与尺寸（一应用一份） */
+function boundsFor(owner: Owner, fallback: { width: number; height: number }) {
+  const saved = settings.get<ReturnType<typeof boundsForRestore> | null>('shell', boundsKeyFor(owner), null)
+  return boundsForRestore(saved, fallback)
 }
 
-function persistBounds(key: string, window: BrowserWindow): void {
+function persistBounds(owner: Owner, window: BrowserWindow): void {
   if (window.isDestroyed()) return
-  const maximized = window.isMaximized()
-  const b = window.getBounds()
-  settings.set('shell', key, { width: b.width, height: b.height, x: b.x, y: b.y, maximized })
+  settings.set('shell', boundsKeyFor(owner), boundsToSave(window.getBounds(), window.isMaximized()))
 }
 
-function wireWindow(
-  window: BrowserWindow,
-  owner: Owner,
-  boundsKey: string,
-  title: string,
-  saved: { maximized: boolean }
-): void {
+function wireWindow(window: BrowserWindow, owner: Owner, title: string, saved: { maximized: boolean }): void {
   // closed 事件里 window.webContents 已经销毁，摸它会抛 "Object has been destroyed"，
   // 所以先把 id 记下来
   const contentsId = window.webContents.id
-  owners.set(contentsId, owner)
+  ledger.open(owner, contentsId)
   window.setTitle(title)
 
   window.once('ready-to-show', () => window.show())
   window.on('maximize', () => sendTo(owner, { kind: 'window:maximized', value: true }))
   window.on('unmaximize', () => sendTo(owner, { kind: 'window:maximized', value: false }))
-  window.on('close', () => persistBounds(boundsKey, window))
+  window.on('close', () => persistBounds(owner, window))
   window.on('closed', () => {
-    owners.delete(contentsId)
-    if (owner !== 'shell') appWindows.delete(owner)
+    ledger.close(contentsId)
+    if (owner !== 'shell') {
+      appWindows.delete(owner)
+      // 应用窗口没了，它名下的摊子要收干净：还在跑的转码/容器命令、它占着的托盘
+      proc.killApp(owner)
+      trayService.clear(owner)
+    }
     if (window === launcher) launcher = null
   })
 
@@ -124,7 +135,7 @@ export function createLauncher(): BrowserWindow {
     return launcher
   }
 
-  const saved = boundsFor('launcherWindow', LAUNCHER_SIZE)
+  const saved = boundsFor('shell', LAUNCHER_SIZE)
   const window = new BrowserWindow({
     ...saved,
     show: false,
@@ -136,25 +147,31 @@ export function createLauncher(): BrowserWindow {
   })
 
   launcher = window
-  wireWindow(window, 'shell', 'launcherWindow', '飞船', saved)
+  wireWindow(window, 'shell', '飞船', saved)
   loadEntry(window, 'launcher')
   return window
 }
 
 /** 打开（或聚焦）某应用的独立窗口 */
 export function openAppWindow(appId: string): BrowserWindow {
-  const existing = appWindows.get(appId)
-  if (existing && !existing.isDestroyed()) {
-    if (existing.isMinimized()) existing.restore()
-    existing.show()
-    existing.focus()
-    return existing
+  const meta = APP_MAP.get(appId)
+  if (!meta) throw new Error(notRegistered(appId))
+
+  // 清单里声明了只跑在某些平台的应用，在这台机器上根本不开窗口
+  const blocked = unavailableReason(appId, currentPlatform())
+  if (blocked) throw new Error(platformUnsupported(meta.name, blocked))
+
+  if (ledger.decision(appId) === 'focus') {
+    const existing = appWindows.get(appId)
+    if (existing && !existing.isDestroyed()) {
+      if (existing.isMinimized()) existing.restore()
+      existing.show()
+      existing.focus()
+      return existing
+    }
   }
 
-  const meta = APP_MAP.get(appId)
-  if (!meta) throw new Error(`没有注册这个应用：${appId}`)
-
-  const saved = boundsFor(`appWindow:${appId}`, APP_SIZE)
+  const saved = boundsFor(appId, APP_SIZE)
   const window = new BrowserWindow({
     ...saved,
     show: false,
@@ -168,20 +185,17 @@ export function openAppWindow(appId: string): BrowserWindow {
   // 独立任务栏条目：能单独固定、单独预览，看起来就是个独立应用。
   // Windows 专有、且不在 BrowserWindow 的类型定义里，所以按可选方法调用。
   const withModelId = window as unknown as { setAppUserModelId?: (id: string) => void }
-  withModelId.setAppUserModelId?.(`dev.xyzwp.airship.${appId}`)
+  withModelId.setAppUserModelId?.(appUserModelIdFor(appId))
 
   appWindows.set(appId, window)
-  wireWindow(window, appId, `appWindow:${appId}`, meta.name, saved)
+  wireWindow(window, appId, meta.name, saved)
   loadEntry(window, 'app', { app: appId })
   log.info(appId, '应用窗口已打开')
   return window
 }
 
 export function openAppIds(): string[] {
-  return [...appWindows.keys()].filter((id) => {
-    const w = appWindows.get(id)
-    return w && !w.isDestroyed()
-  })
+  return ledger.openAppIds()
 }
 
 export function windowFor(owner: Owner): BrowserWindow | null {

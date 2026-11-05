@@ -4,10 +4,9 @@
  * 这是 airship 唯一重要的文件：应用能做什么，全部由这里声明，
  * 其余一概拿不到。preload 只按这张表暴露，主进程只按这张表实现。
  *
- * 注意边界性质：现在四个应用和壳跑在同一个渲染进程里，
- * 所以 capabilities 是**设计边界**而非安全边界——它约束的是"你应该只用这些"，
- * 不是"你只能用这些"。等真要拆成独立包 + iframe 时，这张表不用改，
- * 变的只是执行方式（进程内调用 → 跨进程 RPC），这也是为什么它值得现在就写死。
+ * 注意边界性质：一个应用一个窗口一个渲染进程，所以 capabilities 是**强制边界**而不只是约定——
+ * 主进程按 event.sender 反查归属再查能力表，应用既看不到 ipcRenderer，也冒充不了别的应用。
+ * 加接口就在这一层加，实现（主进程）与桥（preload）都跟着这张表走。
  */
 
 /**
@@ -42,6 +41,34 @@ export type SettingsScope = AppId | 'shell'
  */
 export const SHARED_NAMESPACES = ['library'] as const
 export type SharedNamespace = (typeof SHARED_NAMESPACES)[number]
+
+/**
+ * 运行平台。用界面语言里的名字，不把 `win32` 这种 Node 的实现细节写进清单。
+ * 对应关系由 `platformIdOf` 一处给出，主进程、启动器、测试替身都问它。
+ */
+export const PLATFORM_IDS = ['windows', 'macos', 'linux'] as const
+export type PlatformId = (typeof PLATFORM_IDS)[number]
+
+/** Node 的 process.platform → 清单里的平台名；认不出来的算 'unknown' */
+export function platformIdOf(nodePlatform: string): PlatformId | 'unknown' {
+  if (nodePlatform === 'win32') return 'windows'
+  if (nodePlatform === 'darwin') return 'macos'
+  if (nodePlatform === 'linux') return 'linux'
+  return 'unknown'
+}
+
+/**
+ * 壳认识的外部工具登记表。
+ *
+ * 与共享命名空间同理，这份名单**属于壳**：怎么发现、拿什么标志校验它是真的，
+ * 是壳的能力，不是应用的说法。应用只能在清单里声明"我要用哪一个"，
+ * 声明了壳不认识的、或没声明就想用的，一律拒（措辞见 shared/errors.ts）。
+ *
+ * proc 白名单的来历因此仍然只有两个：壳按这张表发现的、或用户在设置里指定并通过校验的。
+ */
+export const TOOL_NAMES = ['ffmpeg', 'wslc'] as const
+export type ToolName = (typeof TOOL_NAMES)[number]
+
 
 /** 应用能力位。应用在自己的 manifest 里声明，壳按声明放行。 */
 export type Capability =
@@ -228,10 +255,10 @@ export interface AirshipBridge {
   }
 
   /**
-   * 壳已发现的外部工具。需要 proc 能力——
-   * 应用只能跑壳找到并放进白名单的东西，不能自己找一个来跑。
+   * 壳已发现的外部工具。要 proc 能力，**并且**要在自己的清单 `tools` 里声明过这一个。
+   * 应用既不能自己找一个来跑，也不能借壳发现的名义跑没声明的工具。
    */
-  tools: { ffmpegPath(): Promise<string | null> }
+  tools: { path(name: ToolName): Promise<string | null> }
 
   tray: {
     set(state: TrayState): Promise<void>
@@ -295,8 +322,12 @@ export interface ShellBridge {
   }
   /** 壳自己的目录（诊断页显示数据落在哪） */
   rootPaths(): Promise<AppPaths>
-  ffmpegPath(): Promise<string | null>
-  setFfmpegPath(exe: string): Promise<{ ok: boolean; error?: string }>
+  /** 这台机器的平台名，启动器按它过滤格子 */
+  currentPlatform(): Promise<PlatformId | 'unknown'>
+  /** 工具发现状态（诊断页显示"ffmpeg 就绪 / 不可用"） */
+  toolPath(name: ToolName): Promise<string | null>
+  /** 用户手动指定工具路径：校验通过才记住并加白名单 */
+  setToolPath(name: ToolName, exe: string): Promise<{ ok: boolean; error?: string }>
   /** 某应用当前被授权的路径数，诊断用 */
   grants(app: string): Promise<{ read: number; write: number }>
   /** 打开系统浏览器（只放行 http/https） */

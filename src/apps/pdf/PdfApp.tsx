@@ -304,11 +304,14 @@ function PdfReader({ api, book, dark, onBack, onError }: ReaderProps): JSX.Eleme
     })
   }, [api, book.id, page, doc])
 
+  // 总页数的两个来源：文档自己报的页数为准，文档还没到位时用索引里登记的页数。
+  // 翻页（按钮与键盘）都夹在这一个数上，不然加载中按一键会翻到第 0 页。
+  const total = doc?.numPages ?? Number(book.meta.pages ?? 0)
+
   // 键盘翻页
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.ctrlKey || e.metaKey || e.altKey) return
-      const total = doc?.numPages ?? 0
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
         e.preventDefault()
         setPage((p) => Math.min(total, p + 1))
@@ -319,9 +322,7 @@ function PdfReader({ api, book, dark, onBack, onError }: ReaderProps): JSX.Eleme
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [doc])
-
-  const total = doc?.numPages ?? Number(book.meta.pages ?? 0)
+  }, [total])
 
   return (
     <div className={`pdf-reader${dark ? ' pdf-reader--dark' : ''}`}>

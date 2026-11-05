@@ -10,7 +10,8 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "shot": "electron-vite build && cross-env AIRSHIP_SHOT=1 electron . --shot",
-    "test": "vitest run"
+    "test": "vitest run",
+    "casecov": "vitest run spec-coverage"
   },
   "dependencies": {
     "foliate-js": "^1.0.1",
@@ -24,6 +25,7 @@
     "cross-env": "^10.1.0",
     "electron": "^45.2.3",
     "electron-vite": "^6.0.0",
+    "jsdom": "^29.1.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "typescript": "^5.9.3",

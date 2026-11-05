@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { SHARED_NAMESPACES, type AppId, type SharedNamespace } from '@shared/protocol'
+import { pathEscape } from '@shared/errors'
 import { appIds } from './appRegistry'
 
 /**
@@ -103,7 +104,7 @@ export function resolveInShared(ns: SharedNamespace, segments: string[]): string
 function resolveUnder(base: string, segments: string[], label: string): string {
   const target = join(base, ...segments)
   if (!isInside(base, target)) {
-    throw new Error(`路径越界：${segments.join('/')} 不在${label}内`)
+    throw new Error(pathEscape(segments, label))
   }
   return target
 }

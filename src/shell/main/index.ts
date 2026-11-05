@@ -5,11 +5,12 @@ import { registerIpc, readTheme } from './ipc'
 import { log } from './services/logging'
 import { proc, setProcEmitter } from './services/proc'
 import { trayService } from './services/tray'
-import { ffmpegPath } from './services/tools'
-import { appsInOrder } from './services/appRegistry'
+import { toolStatus } from './services/tools'
+import { appsAvailableOn } from './services/appRegistry'
 import {
   bringLauncherToFront,
   createLauncher,
+  currentPlatform,
   openAppWindow,
   ownerOfContents,
   sendTo,
@@ -99,7 +100,7 @@ async function runShotMode(): Promise<void> {
   await capture(launcher.webContents, join(outDir, 'launcher.png'))
   const metrics: { label: string; workingSetKB: number }[] = [...windowMetrics()]
 
-  for (const meta of appsInOrder()) {
+  for (const meta of appsAvailableOn(currentPlatform())) {
     openedAt.set(meta.id, Date.now())
     const window = openAppWindow(meta.id)
     const isAutotestTarget = autotest !== null && autotest.app === meta.id
@@ -174,8 +175,8 @@ app.whenReady().then(() => {
   setCachedTheme(theme)
   log.info('shell', '主题', theme)
 
-  // 提前发现 ffmpeg，启动器第一帧就能显示"可用/不可用"
-  log.info('shell', 'ffmpeg 探测结果', { path: ffmpegPath() })
+  // 提前发现外部工具，启动器第一帧就能显示"可用/不可用"
+  log.info('shell', '工具发现结果', toolStatus())
 
   if (SHOT_MODE) {
     void runShotMode()

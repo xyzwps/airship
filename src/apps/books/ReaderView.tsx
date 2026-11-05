@@ -167,11 +167,15 @@ export const ReaderView = forwardRef<ReaderHandle, Props>(function ReaderView(
       wheelTimer = setTimeout(drainWheel, WHEEL_GAP)
     }
 
-    const bindKeys = (doc: Document | null): void => {
-      if (!doc || (doc as Document & { __airshipKeys?: boolean }).__airshipKeys) return
-      ;(doc as Document & { __airshipKeys?: boolean }).__airshipKeys = true
+    // 这一本的键位绑在哪些文档上；换书/关窗时按这份清单解绑。
+    // 早先是用文档上的一个标记防重复绑定，结果是"第一次绑的那个处理程序永远留在文档上"：
+    // 关掉一本再开另一本，按键仍然在翻已经不存在的那一本。
+    const bound: Array<{ doc: Document; off(): void }> = []
 
-      doc.addEventListener('keydown', (event) => {
+    const bindKeys = (doc: Document | null): void => {
+      if (!doc || bound.some((b) => b.doc === doc)) return
+
+      const onKeyDown = (event: KeyboardEvent): void => {
         if (event.ctrlKey || event.metaKey || event.altKey) return
         if (!paging()) return
         const forward = NEXT_KEYS[event.key] === 1
@@ -180,29 +184,35 @@ export const ReaderView = forwardRef<ReaderHandle, Props>(function ReaderView(
         stopWheelDrain()
         wheelAcc = 0
         void (forward ? view!.next() : view!.prev())
+      }
+
+      const onWheel = (event: WheelEvent): void => {
+        if (!paging()) return
+        const hostWin = (event.view?.top ?? window) as Window & { __airshipWheelSeen?: WeakSet<object> }
+        hostWin.__airshipWheelSeen ??= new WeakSet()
+        if (hostWin.__airshipWheelSeen.has(event)) return
+        hostWin.__airshipWheelSeen.add(event)
+
+        const step = Math.abs(event.deltaY)
+        if (step < 8) return
+        event.preventDefault()
+        if (wheelAcc !== 0 && Math.sign(wheelAcc) !== Math.sign(event.deltaY)) {
+          wheelAcc = 0
+          stopWheelDrain()
+        }
+        wheelAcc = Math.max(-WHEEL_CAP, Math.min(WHEEL_CAP, wheelAcc + event.deltaY))
+        if (!wheelTimer) drainWheel()
+      }
+
+      doc.addEventListener('keydown', onKeyDown)
+      doc.addEventListener('wheel', onWheel, { passive: false })
+      bound.push({
+        doc,
+        off: () => {
+          doc.removeEventListener('keydown', onKeyDown)
+          doc.removeEventListener('wheel', onWheel)
+        }
       })
-
-      doc.addEventListener(
-        'wheel',
-        (event) => {
-          if (!paging()) return
-          const hostWin = (event.view?.top ?? window) as Window & { __airshipWheelSeen?: WeakSet<object> }
-          hostWin.__airshipWheelSeen ??= new WeakSet()
-          if (hostWin.__airshipWheelSeen.has(event)) return
-          hostWin.__airshipWheelSeen.add(event)
-
-          const step = Math.abs(event.deltaY)
-          if (step < 8) return
-          event.preventDefault()
-          if (wheelAcc !== 0 && Math.sign(wheelAcc) !== Math.sign(event.deltaY)) {
-            wheelAcc = 0
-            stopWheelDrain()
-          }
-          wheelAcc = Math.max(-WHEEL_CAP, Math.min(WHEEL_CAP, wheelAcc + event.deltaY))
-          if (!wheelTimer) drainWheel()
-        },
-        { passive: false }
-      )
     }
 
     const open = async (): Promise<void> => {
@@ -265,6 +275,8 @@ export const ReaderView = forwardRef<ReaderHandle, Props>(function ReaderView(
     return () => {
       cancelled = true
       stopWheelDrain()
+      for (const b of bound) b.off()
+      bound.length = 0
       view?.close?.()
       view?.remove()
       viewRef.current = null

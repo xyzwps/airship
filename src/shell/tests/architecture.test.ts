@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
  * 否则这个测试就成了又一处"加应用要改壳侧文件"。
  */
 
-const SRC = join(__dirname, '..', 'src')
+const SRC = join(__dirname, '..', '..')
 const APPS_DIR = join(SRC, 'apps')
 const SHELL_DIR = join(SRC, 'shell')
 const SHARED_DIR = join(SRC, 'shared')
@@ -36,7 +36,8 @@ function sources(dir: string, exts = ['.ts', '.tsx']): string[] {
     const p = join(dir, name)
     const st = statSync(p)
     if (st.isDirectory()) {
-      if (name === 'node_modules' || name === 'out' || name === '__tests__') continue
+      // 册子与用例跟着代码放在区域里，但它们不是被扫描的产品源码
+      if (name === 'node_modules' || name === 'out' || name === 'tests' || name === 'specs' || name === '__tests__') continue
       out.push(...sources(p, exts))
     } else if (exts.some((e) => name.endsWith(e))) {
       // 测试文件允许为了断言而提到应用名
@@ -92,7 +93,9 @@ function appTarget(file: string, spec: string): string | null {
 
 describe('应用注册', () => {
   it('每个应用目录都有 app.ts 与 index.tsx，且 id 与目录名一致', () => {
-    const dirs = readdirSync(APPS_DIR).filter((n) => statSync(join(APPS_DIR, n)).isDirectory())
+    const dirs = readdirSync(APPS_DIR).filter(
+      (n) => statSync(join(APPS_DIR, n)).isDirectory() && n !== 'specs' && n !== 'tests'
+    )
     for (const dir of dirs) {
       expect(existsSync(join(APPS_DIR, dir, 'app.ts')), `${dir}/app.ts 必须存在`).toBe(true)
       expect(existsSync(join(APPS_DIR, dir, 'index.tsx')), `${dir}/index.tsx 必须存在`).toBe(true)
@@ -179,7 +182,7 @@ describe('壳侧零应用字面量（I-5 的直接证明）', () => {
 
   // 只扫 src/shell：壳不该知道任何具体应用。
   // 不扫 src/shared——那里出现的 'pdf' 是书的格式名，不是应用名，扫它会误报。
-  it('main / preload / 壳界面里不出现任何具体应用 id', () => {
+  it('AP-010 加一个应用不改动壳的任何文件：壳侧不出现任何具体应用 id', () => {
     const violations: string[] = []
     const scanned = [
       ...topLevelSources(SHELL_DIR),

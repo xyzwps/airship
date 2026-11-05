@@ -1,0 +1,395 @@
+/* 容器台 —— 两页：容器（左列表 + 右详情/日志）、镜像（一列镜像 + 拉取）。
+   颜色与圆角全部复用壳的 CSS 变量与通用类，这里只补布局。 */
+
+.wsld {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 10px;
+  padding: 10px 14px 12px;
+}
+
+/* 页签条：两颗键切换两页 */
+.wsld__nav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  flex: none;
+}
+
+.wsld__navbtn {
+  padding: 4px 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 12.5px;
+  cursor: default;
+}
+
+.wsld__navbtn:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.wsld__navbtn--on {
+  background: var(--bg-active);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.wsld__pages,
+.wsld__pages > div {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.wsld__page {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: 1;
+  min-height: 0;
+}
+
+.wsld__toolbar,
+.wsld__pull,
+.wsld__logbar {
+  flex: none;
+}
+
+.wsld__search {
+  width: 260px;
+}
+
+.wsld__pull-input {
+  flex: 1;
+  min-width: 0;
+  max-width: 460px;
+}
+
+/* 标签在控件左边同一行 */
+.wsld__field {
+  color: var(--fg-dim);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.wsld__refreshed {
+  font-variant-numeric: tabular-nums;
+}
+
+.wsld__bar {
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  flex: none;
+  user-select: text;
+}
+
+.wsld__bar--error {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+}
+
+.wsld__bar--ok {
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+}
+
+/* ---------- 容器页：左列表右详情 ---------- */
+
+.wsld__split {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.wsld__list {
+  width: 330px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.wsld__empty {
+  padding: 14px 10px;
+}
+
+.wsld__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: default;
+  min-width: 0;
+}
+
+.wsld__row:hover {
+  background: var(--bg-hover);
+}
+
+.wsld__row--on {
+  background: var(--bg-active);
+  border-color: var(--border-strong);
+}
+
+.wsld__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-faint);
+  flex: none;
+}
+
+.wsld__dot--on {
+  background: var(--ok);
+}
+
+.wsld__row-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.wsld__row-state {
+  font-size: 11.5px;
+  color: var(--fg-dim);
+  flex: none;
+}
+
+.wsld__row-state--on {
+  color: var(--ok);
+}
+
+.wsld__row-image {
+  flex: 1;
+  min-width: 0;
+  color: var(--fg-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wsld__row-action {
+  flex: none;
+  padding: 3px 9px;
+}
+
+.wsld__detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  overflow-y: auto;
+}
+
+.wsld__detail-head {
+  flex: none;
+}
+
+.wsld__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wsld__badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  color: var(--fg-dim);
+  font-size: 11.5px;
+}
+
+.wsld__badge--on {
+  background: color-mix(in srgb, var(--ok) 22%, transparent);
+  color: var(--ok);
+}
+
+.wsld__tabs {
+  gap: 2px;
+  flex: none;
+}
+
+.wsld__tab {
+  padding: 4px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: default;
+}
+
+.wsld__tab--on {
+  border-bottom-color: var(--accent);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.wsld__pane {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.wsld__pane .card {
+  padding: 11px 14px;
+}
+
+/* 字段：标签一列、值一列，同组共用这一列宽 */
+.wsld__fields {
+  margin: 0;
+  display: grid;
+  gap: 2px 12px;
+}
+
+.wsld__field-row {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.wsld__field-row dt {
+  color: var(--fg-dim);
+  font-size: 12px;
+}
+
+.wsld__field-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.wsld__labels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wsld__label-key {
+  color: var(--fg-dim);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.wsld__label-value {
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+/* ---------- 日志 ---------- */
+
+.wsld__logs-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.wsld__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--fg-dim);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.wsld__logs {
+  flex: 1;
+  min-height: 180px;
+  max-height: 46vh;
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+  overflow: auto;
+  white-space: pre;
+  tab-size: 4;
+}
+
+.wsld__logfoot {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  flex: none;
+}
+
+.wsld__notice {
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  user-select: text;
+}
+
+/* ---------- 镜像页 ---------- */
+
+.wsld__images {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wsld__image {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.wsld__image:hover {
+  background: var(--bg-hover);
+}
+
+.wsld__image-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 460px;
+}
+
+.wsld__image-size,
+.wsld__image-usage {
+  flex: none;
+}
+
+.wsld__image-sub {
+  font-size: 11.5px;
+  color: var(--fg-faint);
+  overflow-wrap: anywhere;
+}
+
+.wsld__footer {
+  flex: none;
+  padding-top: 2px;
+}
+
+.wsld__missing {
+  max-width: 520px;
+  text-align: center;
+  line-height: 1.7;
+}
+
+/* 没对着的那一页不占版面：作者样式会盖掉 hidden 的默认表现，这里补回来 */
+[hidden] {
+  display: none !important;
+}

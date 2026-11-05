@@ -1,4 +1,5 @@
 import type { AppId } from '@shared/protocol'
+import { readDenied, writeDenied } from '@shared/errors'
 import { sharedNamespacesOf } from './appRegistry'
 import { appCacheDir, appDataDir, isInside, sharedDirsFor } from './paths'
 import { log } from './logging'
@@ -67,14 +68,14 @@ export const grants = {
   assertRead(app: AppId, path: string): void {
     if (!this.canRead(app, path)) {
       log.warn(app, '拒绝读取未授权路径', { path })
-      throw new Error(`没有读取权限：${path}（只能读应用数据目录，或先用文件对话框选中它）`)
+      throw new Error(readDenied(path))
     }
   },
 
   assertWrite(app: AppId, path: string): void {
     if (!this.canWrite(app, path)) {
       log.warn(app, '拒绝写入未授权路径', { path })
-      throw new Error(`没有写入权限：${path}（只能写应用数据目录，或用另存为对话框选定目标）`)
+      throw new Error(writeDenied(path))
     }
   },
 

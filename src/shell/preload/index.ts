@@ -10,7 +10,8 @@ import type {
   ShellBridge,
   ShellEvent,
   ShellEventListener,
-  TrayState
+  TrayState,
+  ToolName
 } from '@shared/protocol'
 
 /**
@@ -120,7 +121,7 @@ const bridge: AirshipBridge = {
   },
 
   tools: {
-    ffmpegPath: () => call<string | null>('tools:ffmpegPath', needApp())
+    path: (name: ToolName) => call<string | null>('tools:path', needApp(), name)
   },
 
   tray: {
@@ -176,8 +177,9 @@ if (IS_SHELL) {
       set: <T>(key: string, value: T) => call<void>('launcher:settingsSet', key, value)
     },
     rootPaths: () => call('launcher:rootPaths'),
-    ffmpegPath: () => call('launcher:ffmpegPath'),
-    setFfmpegPath: (exe: string) => call('launcher:setFfmpegPath', exe),
+    currentPlatform: () => call('launcher:currentPlatform'),
+    toolPath: (name: ToolName) => call('launcher:toolPath', name),
+    setToolPath: (name: ToolName, exe: string) => call('launcher:setToolPath', name, exe),
     grants: (app: string) => call('launcher:grants', app),
     openExternal: (url: string) => call('launcher:openExternal', url),
     metrics: () => call('launcher:metrics'),

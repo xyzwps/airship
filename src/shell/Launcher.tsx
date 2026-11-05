@@ -1,8 +1,9 @@
-import { type JSX } from 'react'
-import { APP_ENTRIES } from '../apps'
+import { useEffect, useState, type JSX } from 'react'
+import { entriesAvailableOn } from '../apps'
 import { Titlebar } from './Titlebar'
 import { useTheme, THEME_MODES, type ThemeMode } from './theme'
 import { useReportShotReady } from './shot'
+import type { PlatformId } from '@shared/protocol'
 
 /**
  * 启动器。
@@ -11,13 +12,34 @@ import { useReportShotReady } from './shot'
  * 说明文字、能力标签、壳状态这些一概不放——要看的东西在应用自己里看。
  *
  * 应用列表直接读渲染侧的注册表（它已经急切加载了各应用的图标模块），
- * 不再绕一趟主进程。
+ * 不再绕一趟主进程；只有当前平台用得了的应用进格子。
  */
 export function Launcher(): JSX.Element {
   const { mode, setMode } = useTheme()
-  const entries = Object.values(APP_ENTRIES)
+  const [platform, setPlatform] = useState<PlatformId | 'unknown' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    void window.airshipShell
+      .currentPlatform()
+      .then((p) => alive && setPlatform(p))
+      .catch(() => alive && setPlatform('unknown'))
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const entries = platform === null ? [] : entriesAvailableOn(platform)
 
   useReportShotReady([entries.length])
+
+  const open = (id: string): void => {
+    setError(null)
+    void window.airshipShell.openApp(id).catch((err: unknown) => {
+      setError(err instanceof Error ? err.message : String(err))
+    })
+  }
 
   return (
     <div className="launcher">
@@ -39,6 +61,8 @@ export function Launcher(): JSX.Element {
           </select>
         </div>
 
+        {error && <div className="error">{error}</div>}
+
         <div className="tiles">
           {entries.map(({ meta, iconUrl }) => (
             <button
@@ -46,7 +70,7 @@ export function Launcher(): JSX.Element {
               type="button"
               className="tile"
               style={{ ['--tile-accent' as string]: meta.accent }}
-              onClick={() => void window.airshipShell.openApp(meta.id).catch(() => undefined)}
+              onClick={() => open(meta.id)}
             >
               <span className="tile__icon">
                 <img src={iconUrl} alt="" className="tile__glyph" />

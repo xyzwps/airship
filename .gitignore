@@ -4,3 +4,6 @@ dist/
 shots/
 *.log
 .DS_Store
+
+# 用例的临时 userData
+tests/.tmp/

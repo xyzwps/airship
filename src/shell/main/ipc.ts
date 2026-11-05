@@ -25,9 +25,36 @@ import {
   type AppId,
   type Capability,
   type SharedNamespace,
-  type ThemeSnapshot
+  type ThemeSnapshot,
+  type ToolName,
+  TOOL_NAMES
 } from '@shared/protocol'
-import { canAccessShared, hasCapability, isKnownApp, sharedNamespacesOf } from './services/appRegistry'
+import {
+  appChannelOnly,
+  badToolName,
+  capDenied,
+  identityMismatch,
+  linkDenied,
+  needScopeString,
+  needString,
+  notRegistered,
+  nsDenied,
+  readDenied,
+  shellChannelOnly,
+  shellScopeOnly,
+  toolDenied,
+  unknownApp,
+  unknownSender,
+  writeDenied
+} from '@shared/errors'
+import {
+  canAccessShared,
+  canUseTool,
+  hasCapability,
+  isKnownApp,
+  sharedNamespacesOf,
+  unavailableReason
+} from './services/appRegistry'
 import {
   appCacheDir,
   appDataDir,
@@ -41,10 +68,11 @@ import { grants } from './services/grants'
 import { log } from './services/logging'
 import { proc } from './services/proc'
 import { trayService } from './services/tray'
-import { ffmpegPath, setFfmpegPath } from './services/tools'
+import { setToolPath, toolPath } from './services/tools'
 import {
   bringLauncherToFront,
   broadcast,
+  currentPlatform,
   isRegistered,
   openAppIds,
   openAppWindow,
@@ -77,32 +105,45 @@ import type {
 
 function senderOwner(event: IpcMainInvokeEvent): string | 'shell' {
   const owner = ownerOfContents(event.sender.id)
-  if (!owner) throw new Error('调用来源不是壳注册的窗口，拒绝')
+  if (!owner) throw new Error(unknownSender())
   return owner
 }
 
 /** 应用侧调用：归属必须是某个已注册应用 */
 function assertApp(event: IpcMainInvokeEvent, appArg: unknown): AppId {
   const owner = senderOwner(event)
-  if (owner === 'shell') throw new Error('这个接口只给应用用，启动器不该调')
+  if (owner === 'shell') throw new Error(appChannelOnly())
   if (appArg !== owner) {
     log.error(owner, '身份不匹配，已拒绝', { claimed: String(appArg) })
-    throw new Error(`身份不匹配：这个窗口属于 ${owner}，不能以 ${String(appArg)} 的名义调用`)
+    throw new Error(identityMismatch(owner, String(appArg)))
   }
-  if (!isKnownApp(appArg)) throw new Error(`未知的应用 id：${appArg}`)
+  if (!isKnownApp(appArg)) throw new Error(unknownApp(appArg))
   return appArg
 }
 
 function assertCap(app: AppId, cap: Capability): void {
   if (!hasCapability(app, cap)) {
     log.warn(app, '能力未声明，已拒绝', { capability: cap })
-    throw new Error(`${app} 没有声明 ${cap} 能力（要用它就在 apps/${app}/app.ts 的 capabilities 里声明）`)
+    throw new Error(capDenied(app, cap))
+  }
+}
+
+/** 工具路径只给"有 proc 能力 + 清单里声明了这个工具"的应用 */
+function assertTool(app: AppId, tool: ToolName): void {
+  assertCap(app, 'proc')
+  if (!(TOOL_NAMES as readonly string[]).includes(tool)) {
+    log.warn(app, '问了壳不认识的工具', { tool })
+    throw new Error(badToolName(tool))
+  }
+  if (!canUseTool(app, tool)) {
+    log.warn(app, '工具未声明，已拒绝', { tool })
+    throw new Error(toolDenied(app, tool))
   }
 }
 
 function assertNonEmptyString(value: unknown, label: string): string {
   if (typeof value !== 'string' || value.length === 0) {
-    throw new Error(`${label} 必须是非空字符串，收到 ${JSON.stringify(value)}`)
+    throw new Error(needString(label, value))
   }
   return value
 }
@@ -373,7 +414,7 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
     const namespace = assertNonEmptyString(ns, 'ns')
     if (!canAccessShared(id, namespace)) {
       log.warn(id, '拒绝访问未声明的共享命名空间', { ns: namespace })
-      throw new Error(`${id} 没有声明共享命名空间 ${namespace}（在 apps/${id}/app.ts 的 sharedNamespaces 里声明）`)
+      throw new Error(nsDenied(id, namespace))
     }
     if (!Array.isArray(segments)) throw new Error('segments 必须是数组')
     return resolveInShared(
@@ -409,10 +450,11 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('proc:list', (event, appArg: unknown) => proc.list(assertApp(event, appArg)))
 
-  handle('tools:ffmpegPath', (event, appArg: unknown) => {
+  handle('tools:path', (event, appArg: unknown, toolArg: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'proc')
-    return ffmpegPath()
+    const tool = assertNonEmptyString(toolArg, 'tool') as ToolName
+    assertTool(id, tool)
+    return toolPath(tool)
   })
 
   /* ---------- 托盘 ---------- */
@@ -505,7 +547,7 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
   handle('launcher:openApp', (event, appId: unknown) => {
     requireShell(event)
     const id = assertNonEmptyString(appId, 'appId')
-    if (!isRegistered(id)) throw new Error(`没有注册这个应用：${id}`)
+    if (!isRegistered(id)) throw new Error(notRegistered(id))
     openAppWindow(id)
   })
 
@@ -558,27 +600,32 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
     }
   })
 
-  handle('launcher:ffmpegPath', (event) => {
+  handle('launcher:currentPlatform', (event) => {
     requireShell(event)
-    return ffmpegPath()
+    return currentPlatform()
   })
 
-  handle('launcher:setFfmpegPath', (event, exe: unknown) => {
+  handle('launcher:toolPath', (event, tool: unknown) => {
     requireShell(event)
-    return setFfmpegPath(assertNonEmptyString(exe, 'ffmpeg 路径'))
+    return toolPath(assertToolName(tool))
+  })
+
+  handle('launcher:setToolPath', (event, tool: unknown, exe: unknown) => {
+    requireShell(event)
+    return setToolPath(assertToolName(tool), assertNonEmptyString(exe, '可执行文件路径'))
   })
 
   handle('launcher:grants', (event, appId: unknown) => {
     requireShell(event)
     const id = assertNonEmptyString(appId, 'appId')
-    if (!isRegistered(id)) throw new Error(`没有注册这个应用：${id}`)
+    if (!isRegistered(id)) throw new Error(notRegistered(id))
     return grants.stats(id as AppId)
   })
 
   handle('launcher:openExternal', (event, url: unknown) => {
     requireShell(event)
     const target = assertNonEmptyString(url, 'url')
-    if (!/^https?:\/\//i.test(target)) throw new Error(`只允许打开 http/https 链接：${target}`)
+    if (!/^https?:\/\//i.test(target)) throw new Error(linkDenied(target))
     return shell.openExternal(target)
   })
 
@@ -607,17 +654,24 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 /* ================= 辅助 ================= */
 
 function requireShell(event: IpcMainInvokeEvent): void {
-  if (senderOwner(event) !== 'shell') throw new Error('这个接口只有启动器能用')
+  if (senderOwner(event) !== 'shell') throw new Error(shellChannelOnly())
+}
+
+/** 工具名必须是壳工具表里认识的那一个 */
+function assertToolName(value: unknown): ToolName {
+  const name = assertNonEmptyString(value, 'tool')
+  if (!(TOOL_NAMES as readonly string[]).includes(name)) throw new Error(badToolName(name))
+  return name as ToolName
 }
 
 function scopeOf(event: IpcMainInvokeEvent, scope: unknown): string | 'shell' {
   const owner = senderOwner(event)
   if (scope === 'shell') {
-    if (owner !== 'shell') throw new Error('只有启动器能读写壳级设置')
+    if (owner !== 'shell') throw new Error(shellScopeOnly())
     return 'shell'
   }
-  if (typeof scope !== 'string') throw new Error('设置作用域必须是字符串')
-  if (scope !== owner) throw new Error(`身份不匹配：这个窗口属于 ${owner}，不能写 ${scope} 的设置`)
-  if (!isKnownApp(scope)) throw new Error(`未知的应用 id：${scope}`)
+  if (typeof scope !== 'string') throw new Error(needScopeString())
+  if (scope !== owner) throw new Error(identityMismatch(owner, scope))
+  if (!isKnownApp(scope)) throw new Error(unknownApp(scope))
   return scope
 }

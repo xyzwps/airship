@@ -58,7 +58,7 @@ export class Runner {
   }
 
   async init(): Promise<string | null> {
-    this.exe = await this.api.tools.ffmpegPath()
+    this.exe = await this.api.tools.path('ffmpeg')
     return this.exe
   }
 

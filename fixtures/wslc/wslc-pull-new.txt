@@ -1,0 +1,39 @@
+latest: Pulling from library/nginx
+ecc510c1e359: Pulling fs layer
+04bdbc7ea6b5: Pulling fs layer
+807ab930f3a0: Pulling fs layer
+1efc53192927: Pulling fs layer
+947d22046304: Pulling fs layer
+8020170dc65f: Pulling fs layer
+f7e1db57b58b: Pulling fs layer
+807ab930f3a0: Verifying Checksum
+807ab930f3a0: Download complete
+04bdbc7ea6b5: Downloading
+ecc510c1e359: Downloading
+04bdbc7ea6b5: Verifying Checksum
+04bdbc7ea6b5: Download complete
+ecc510c1e359: Verifying Checksum
+ecc510c1e359: Download complete
+ecc510c1e359: Extracting
+947d22046304: Verifying Checksum
+947d22046304: Download complete
+8020170dc65f: Verifying Checksum
+8020170dc65f: Download complete
+f7e1db57b58b: Verifying Checksum
+f7e1db57b58b: Download complete
+ecc510c1e359: Pull complete
+04bdbc7ea6b5: Extracting
+04bdbc7ea6b5: Pull complete
+807ab930f3a0: Extracting
+807ab930f3a0: Pull complete
+1efc53192927: Extracting
+1efc53192927: Pull complete
+947d22046304: Extracting
+947d22046304: Pull complete
+8020170dc65f: Extracting
+8020170dc65f: Pull complete
+f7e1db57b58b: Extracting
+f7e1db57b58b: Pull complete
+Digest: sha256:f9ea18bfa4fad859e1ed38259d711da7ccad2c3516e875cec3351a57c859f571
+Status: Downloaded newer image for docker.1ms.run/library/nginx:latest
+docker.1ms.run/library/nginx:latest

@@ -6,7 +6,9 @@
 
 状态标记：`[已实现]` 架构规定且代码已达到 · `[待达]` 架构已规定，实现尚未达到
 
-当前进度（2026-11-05）：**§3 每应用独立窗口已落实**，因此 §6.4 的能力边界已从设计边界变成强制边界（身份由 preload 注入 + 主进程按 `event.sender` 反查归属，双重确认）。七条不变量全部有测试或机制守住。实测数据见 §3.1。
+当前进度（2026-11-06）：**§3 每应用独立窗口已落实**，能力边界是强制而非约定（身份由 preload 注入 + 主进程按 `event.sender` 反查归属，双重确认），七条不变量全部有测试或机制守住。
+用户可见契约已按册子建档（册子与用例跟着代码放在各自区域，索引在 `docs/specs/index.md`），用例编号与册子双向差集由 `npm run casecov` 钉住。
+本轮契约变化：拒绝措辞收进 `shared/errors.ts` 一份；清单新增 `platforms`（平台可用）与 `tools`（外部工具声明）；`tools.ffmpegPath()` 改为 `tools.path(name)`，工具发现做成内置表（ffmpeg / wslc）。实测数据见 §3.1。
 
 ---
 
@@ -21,6 +23,8 @@ airship
 ├── 应用 src/apps/<id>/    每个应用由一份清单完整定义
 └── 共享 src/shared/
     ├── protocol.ts / app.ts   契约：类型、能力、事件（依赖图最下层）
+    ├── errors.ts              拒绝原因措辞的唯一真源（主进程、启动器、测试替身共用）
+    ├── registryRules.ts       应用注册的校验规矩（主进程与渲染侧共用一份）
     └── <name>/                共享包：library、textdecode（各自单一入口）
 ```
 
@@ -59,6 +63,8 @@ airship
 | 方面 | 规定 | 状态 |
 |---|---|---|
 | 打开方式 | 点应用 → 新窗口；已开则聚焦，不重复开 | `[已实现]` |
+| 平台可用 | 清单 `platforms` 不写 = 全平台可见；写了就只在列出的平台进格子，硬开被拒并说清原因 | `[已实现]` |
+| 关窗收尾 | 应用窗口关闭 → 销毁进程 + 杀掉该应用名下的子进程 + 清它占的托盘 | `[已实现]` |
 | 渲染进程 | 每窗口独立，`sandbox: true` | `[已实现]` |
 | 崩溃隔离 | 一个应用崩溃只影响自己 | `[已实现]` |
 | 任务栏 | 每应用独立 `setAppUserModelId`，可独立固定与预览 | `[已实现]`（Windows 专有方法，非 Windows 平台静默跳过） |
@@ -102,6 +108,8 @@ src/
   shared/
     protocol.ts        契约：能力、事件、AppApi、启动器面        ← 依赖图叶子
     app.ts             AppMeta（清单类型，纯数据）              ← 依赖图叶子
+    errors.ts          拒绝原因的措辞        → 只依赖 protocol / app
+    registryRules.ts   注册校验规矩          → 只依赖 protocol / app / errors
     library/index.ts   共享包：书库        → 只依赖 protocol
     textdecode/index.ts 共享包：中文解码    → 无依赖
   shell/
@@ -150,6 +158,9 @@ preload 用 `contextBridge.exposeInMainWorld('airship', bridge)` 挂一个对象
 
 所有跨进程调用返回信封 `{ ok, value } | { ok, error }`，由 preload 拆包：成功返回 value，失败抛 `Error(中文原因)`。应用侧就是普通 `try/catch`，不会看到 `Error invoking remote method` 这类 Electron 内部措辞。
 
+**拒绝原因的措辞只有一份**：`src/shared/errors.ts`。主进程、启动器与测试替身都从这里取句子——
+册子（`src/shell/specs/bridge.md`）钉的就是这些原文，各写各的会出现"测试绿着而真实界面念另一句"。
+
 ### 5.3 方法域
 
 | 域 | 方法 | 需要的能力 |
@@ -159,6 +170,7 @@ preload 用 `contextBridge.exposeInMainWorld('airship', bridge)` 挂一个对象
 | `dialog` | `openFiles / openDirectory / saveFile` | `dialog` |
 | `fs` | `read / readRange / write / stat / list / ensureDir / remove / copy / resolveInData / resolveInShared` | `fs.read` / `fs.write` |
 | `proc` | `run`（一次性）/ `start`（后台+事件）/ `kill` / `list` | `proc` |
+| `tools` | `path(name)`：取壳已发现的外部工具绝对路径 | `proc`，**且**清单 `tools` 里声明过这一个 |
 | `tray` | `set / clear` | `tray` |
 | `notify` | `show` | `notify` |
 | `clipboard` | `writeText / readText` | `clipboard` |
@@ -194,11 +206,18 @@ preload 用 `contextBridge.exposeInMainWorld('airship', bridge)` 挂一个对象
 
 `dialog.openFiles` 有 `grantParentDir` 选项，给"输出默认落在源文件同目录"这类应用（vcp）用；默认关闭，保持最小授权。
 
-### 6.3 子进程
+### 6.3 子进程与工具表
 
-`proc` 只跑白名单内的可执行文件。白名单来源只有两个：壳自动发现的 ffmpeg，或用户在设置里手动指定并经 `-version` 校验的 ffmpeg。应用不能拿 `proc` 跑任意命令。
+`proc` 只跑白名单内的可执行文件。白名单的来历仍然只有两个：**壳发现的**、**用户在设置里指定并通过 `-version` 校验的**。
+"壳发现"的知识面是一张内置工具表（`main/services/tools.ts`）：每个工具一条，写着可执行文件名、PATH 之外的已知安装位置、
+以及 `-version` 输出里必须命中的字样。当前表里有 `ffmpeg` 与 `wslc`。
+应用侧只能问"我要用哪一个"（清单 `tools` 声明 + `api.tools.path(name)`），拿不到路径就跑不了，也就跑不了任意命令。
 
-本机事实（已实测）：无系统 ffmpeg、无 ffprobe；ffmpeg 是 imageio_ffmpeg 带的静态 exe。因此媒体探测一律解析 `ffmpeg -hide_banner -i` 的 stderr，不假设有 ffprobe。
+发现顺序对每个工具都一样：环境变量（`AIRSHIP_<NAME>_PATH`，工装用）> 用户指定 > PATH > 已知安装位置/额外手段。
+新增一个工具是**壳的功能变更**（在表里加一条），不是应用变更：应用要新工具不改壳，前提是那个工具已在表里。
+
+本机事实（已实测）：无系统 ffmpeg、无 ffprobe，ffmpeg 是 imageio_ffmpeg 带的静态 exe，因此媒体探测一律解析
+`ffmpeg -hide_banner -i` 的 stderr；`wslc.exe` 由 WSL 3 自带，位于 `C:\Program Files\WSL\`。
 
 ### 6.4 边界的性质 `[已实现]`
 
@@ -225,7 +244,7 @@ apps/vcp/
   VcpApp.tsx      ← 组件本体
   state.ts command.ts probe.ts jobs.ts runner.ts   ← 应用私有，壳不知道
   vcp.css
-  __tests__/
+  tests/
 ```
 
 清单**不含组件引用**，是刻意的：主进程也要读同一批 `app.ts` 做能力校验和目录布局，
@@ -244,6 +263,8 @@ export interface AppMeta {
   capabilities: Capability[]    // 声明式权限
   sharedNamespaces?: SharedNamespace[]
   flush?: boolean               // 内容区是否去掉壳给的内边距
+  tools?: ToolName[]            // 要用的外部工具；名字来自壳的工具表
+  platforms?: PlatformId[]      // 只在这些平台可用；不写 = 全平台可用
 }
 ```
 
@@ -260,6 +281,11 @@ export interface AppMeta {
   大图则作为文件走 `'self'`。
 - 顺序是应用之间的**关系**，任何单个应用都不可能"自己决定"自己的排位。
   壳按名字典序排（`localeCompare(…, 'zh')`）。
+
+与上面两条相反，`tools` 与 `platforms` 是**应用自己的事实**，所以它们进清单：
+依赖 `wslc.exe` 的东西在别的平台上根本跑不起来（`platforms: ['windows']` → 非 Windows 不进格子、硬开被拒），
+要用外部工具就得说清是哪一个（`tools: ['wslc']` → 壳才给路径，也才可审计"谁能跑子进程、跑的是什么"）。
+两个字段的合法值都由壳定义（`TOOL_NAMES` / `PLATFORM_IDS`），清单里写了不认识的名字在注册期直接报错。
 
 组件入口不在清单里，由约定解析：`apps/<id>/index.tsx` 默认导出 `ComponentType<{ api: AppApi }>`。
 
@@ -311,7 +337,7 @@ export interface AppMeta {
 ### 8.1 规则
 
 1. **单一入口**：`shared/<name>/index.ts` 导出全部公开 API；外部只 import 目录。
-2. **契约带版本**：公开 API 有 `*_API_VERSION`；持久数据结构自带 `version`（`library.json` 已是 `version: 1`）。破坏性变更必须升版本，并在同一提交里更新所有声明了该命名空间的应用。
+2. **契约带版本**：公开 API 有 `*_API_VERSION`；持久数据结构自带 `version`（`library.json` 现在是 `version: 2`）。破坏性变更必须升版本，并在同一提交里更新所有声明了该命名空间的应用。
 3. **无消费者专有概念**：共享记录里出现"某个应用才有的字段/分支"就是越界。
 4. **单消费者代码留在应用里**：只有一个使用者的东西不是共享库。
 
@@ -335,7 +361,7 @@ export interface AppMeta {
 
 ```
 %APPDATA%/airship/                    Electron userData
-├── settings.json                     壳级：主题、上次应用、窗口状态、ffmpeg 路径
+├── settings.json                     壳级：主题、窗口状态（launcherWindow / appWindow:<id>）、工具路径（toolPath:<name>）
 ├── logs/airship-YYYY-MM-DD.log       按天
 ├── shared/library/                   壳托管共享区
 │   ├── library.json                  { version: 1, books: [...] }
@@ -405,24 +431,34 @@ export interface AppMeta {
 
 ---
 
-## 13. 测试与验证架构
+## 13. 规格册与验证架构
 
 判据是"看到可观察结果"，不接受"构建成功=能用"。
 
+**册子是契约，用例是它的影子。** `docs/specs/` 一本册子管一块用户可见的东西（壳 9 本 + 共享包 2 本 + 每应用一本），
+四档结构（Purpose / Requirement / Scenario / WHEN-THEN-AND）、稳定编号、只写可观察结果、不写实现。
+规矩与能力索引见 [specs/index.md](specs/index.md)。
+
+绑定方式：用例标题以编号开头（`it('SH-001 …')`），`npm run casecov` 做**双向差集**——
+册里有号没用例 = 未实现，用例有号册里没有 = 私测。两者都算红。
+"写不出可执行判据"的期望不进册子（单实例锁、崩溃隔离这类留在本文 §3）。
+
 | 层 | 手段 | 覆盖什么 |
 |---|---|---|
+| 契约册 | `docs/specs/*.md` + `tests/spec-coverage.test.ts` | 用户可见的结果有清单、有影子、没私测 |
 | 类型 | 两个 tsconfig 分别 `tsc --noEmit` | 契约与实现签名一致 |
-| 逻辑单测 | vitest，纯函数层（vcp 命令构建/队列/探测解析，从原版 84 条 selftest 移植纯逻辑部分） | 业务规则不回归 |
-| 真编码 e2e | `VCP_E2E=1` 门控：探测、抽字幕、4K→360p 烧字幕、停止 | 与真实 ffmpeg 的集成 |
-| 边界测试 | 扫 import 图，挡 §4 的禁止方向与绕过共享包入口 | 不变量 I-1、I-6 |
-| 约定演练 | 新建 `apps/hello/` 两个文件，不碰任何壳侧文件，须出现在应用列表并能开 | 不变量 I-5 |
-| 隔离测试 | 证明 B 应用收不到 A 应用的 `proc` 事件 | §3 事件路由 |
-| 渲染 | `npm run shot` 用 `capturePage` 逐应用截图，真书/真 PDF/真视频探测数据 | 真的画出来了 |
-| 性能 | 按用户可感知口径实测：书架打开耗时、EPUB 翻页延迟、PDF 出图耗时、每窗口内存 | 不是猜的 |
+| 逻辑单测 | vitest（node 环境）：纯逻辑层 + 主进程服务（`electron` 换替身，磁盘用临时目录） | 业务规则与壳的判定不回归 |
+| 界面用例 | jsdom + `tests/helpers/mount.tsx` + `tests/helpers/fakeAirship.ts`（壳的测试替身） | 真渲染真点击：看得见什么文字、点下去变成什么、被拒时念哪句 |
+| 边界测试 | 扫 import 图 | 不变量 I-1、I-5、I-6 |
+| 门控用例 | `VCP_E2E=1` 真编码；`AIRSHIP_WSLD_INTEGRATION=1` 真 `wslc` 只读命令 | 与真实外部 CLI 的集成；默认跳过，编号仍算已实现 |
+| 渲染 | `npm run shot` 逐窗口 `capturePage`，真书/真 PDF/真视频探测数据 | 真的画出来了 |
+| 性能 | 按用户可感知口径实测：窗口挂载、开书、PDF 出图、每窗口内存 | 不是猜的（§3.1） |
 
-上表八类判据**全部已建立并在跑**：43 条单测（vcp 逻辑 22、TXT 排版与中文解码 10、架构边界 7、隔离与路由 7，含三类反向验证）+ 6 条真编码 e2e + 截图回归 + 实测数字（§3.1）。
+`tests/helpers/fakeAirship.ts` 是这一层的地基：它按契约把 `window.airship` 装成一个内存里的小壳——
+能力闸门与拒绝措辞直接取 `shared/errors.ts` 那份真句子，路径授权、共享命名空间、proc 白名单与流式事件都照壳的规矩走。
+所以"应用没声明某能力时用户看到的那句中文"在测试里就是真实界面里的那句，而不是测试自己编的。
 
-边界测试反向验证过：临时给 dagogo 加一条 `import '../books/nope'`，测试立刻红并指出文件与说明符；还原后回绿。
+当前规模与核对：见本文末尾的验证记录。
 
 ---
 

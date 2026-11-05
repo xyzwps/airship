@@ -2,19 +2,20 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 import { isAllowedExecutable } from './tools'
 import { log } from './logging'
+import { dupJob, exeDenied } from '@shared/errors'
 import type { AppId, ProcRequest, ProcResult, ShellEvent } from '@shared/protocol'
 
 /**
  * 子进程服务。
  *
- * 只跑白名单里的可执行文件（见 tools.ts）。白名单的来源只有两个：
- * 壳自己发现/用户手动指定的 ffmpeg。应用不能拿这个服务去跑任意命令。
+ * 只跑白名单里的可执行文件（白名单来历见 tools.ts 的工具表）。
+ * 应用不能拿这个服务去跑任意命令。
  *
  * 两种用法：
- *   run()   一次性跑完拿完整结果，适合 -version、探测这类短命令
- *   start() 后台跑，stdout/stderr 分块推给渲染进程，适合转码这种要显示进度的
+ *   run()   一次性跑完拿完整结果，适合 -version、探测、`wslc list` 这类短命令
+ *   start() 后台跑，stdout/stderr 分块推给渲染进程，适合转码、`wslc logs -f` 这类要流式的
  *
- * 分块解码用 StringDecoder：ffmpeg 输出里有中文，按字节切会把多字节字符劈开，
+ * 分块解码用 StringDecoder：ffmpeg 与 wslc 的输出里有中文，按字节切会把多字节字符劈开，
  * 直接 Buffer.toString() 会出乱码。
  */
 
@@ -45,9 +46,7 @@ function key(app: AppId, jobId: string): string {
 
 function assertExecutable(exe: string): void {
   if (!isAllowedExecutable(exe)) {
-    throw new Error(
-      `不允许执行 ${exe}：可执行文件必须先由壳发现或用户在设置里指定（见 tools.ts 的白名单规则）`
-    )
+    throw new Error(exeDenied(exe))
   }
 }
 
@@ -56,7 +55,7 @@ function spawnJob(app: AppId, request: ProcRequest): Job {
 
   const k = key(app, request.jobId)
   if (jobs.has(k)) {
-    throw new Error(`任务标识重复：${request.jobId}（同一个应用内要唯一）`)
+    throw new Error(dupJob(request.jobId))
   }
 
   log.info(app, '启动子进程', { exe: request.exe, args: request.args, jobId: request.jobId })
@@ -173,6 +172,27 @@ export const proc = {
   list(app: AppId): string[] {
     const prefix = `${app}:`
     return [...jobs.keys()].filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length))
+  },
+
+  /**
+   * 关掉某个应用名下所有还在跑的子进程。
+   * 应用窗口关闭时由 windows.ts 调用——转码跑到一半被关掉，不该留一个孤儿子进程继续吃 CPU。
+   */
+  killApp(app: AppId): number {
+    const prefix = `${app}:`
+    let killed = 0
+    for (const k of [...jobs.keys()]) {
+      if (!k.startsWith(prefix)) continue
+      const job = jobs.get(k)
+      if (!job) continue
+      try {
+        job.child.kill('SIGKILL')
+        killed++
+      } catch {
+        /* 已经没了 */
+      }
+    }
+    return killed
   },
 
   killAll(): void {

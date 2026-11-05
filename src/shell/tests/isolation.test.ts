@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { allTargets, targetsFor, type WindowRef } from '../src/shell/main/services/routing'
+import { allTargets, targetsFor, type WindowRef } from '../main/services/routing'
 
 /**
  * 窗口化买到的东西是隔离，这里验隔离的两条硬规则：
@@ -17,7 +17,7 @@ const WINDOWS: WindowRef[] = [
 ]
 
 describe('事件路由', () => {
-  it('A 应用的事件不会投给 B 应用的窗口', () => {
+  it('BR-010 A 应用的事件不会投给 B 应用的窗口', () => {
     expect(targetsFor('vcp', WINDOWS)).toEqual([2, 4])
     expect(targetsFor('vcp', WINDOWS)).not.toContain(3)
     expect(targetsFor('books', WINDOWS)).toEqual([3])
@@ -27,7 +27,7 @@ describe('事件路由', () => {
     expect(targetsFor('shell', WINDOWS)).toEqual([1])
   })
 
-  it('归属不存在时返回空：事件被丢弃，绝不广播兜底', () => {
+  it('BR-010b 归属不存在时返回空：事件被丢弃，绝不广播兜底', () => {
     // 应用窗口已关，此时广播等于把它的转码进度发给别人——不能这么干
     expect(targetsFor('pdf', WINDOWS)).toEqual([])
   })
@@ -38,9 +38,9 @@ describe('事件路由', () => {
 })
 
 describe('渲染侧拿不到 ipcRenderer', () => {
-  const preloadSource = readFileSync(join(__dirname, '..', 'src', 'shell', 'preload', 'index.ts'), 'utf8')
+  const preloadSource = readFileSync(join(__dirname, '..', 'preload', 'index.ts'), 'utf8')
 
-  it('没有把 ipcRenderer 整体暴露出去', () => {
+  it('BR-009 没有把 ipcRenderer 整体暴露出去', () => {
     // exposeInMainWorld('x', ipcRenderer) 这种写法一旦出现，隔离就形同虚设
     expect(preloadSource).not.toMatch(/exposeInMainWorld\(\s*['"][^'"]+['"]\s*,\s*ipcRenderer\s*\)/)
   })
@@ -51,7 +51,7 @@ describe('渲染侧拿不到 ipcRenderer', () => {
     expect(preloadSource).toContain("ipcRenderer.on('airship:event'")
   })
 
-  it('应用窗口拿不到启动器的面（开不了别人的窗口）', () => {
+  it('BR-005b 应用窗口拿不到启动器的面（开不了别人的窗口）', () => {
     // airshipShell 只在 IS_SHELL 分支里暴露
     const shellBlock = preloadSource.slice(preloadSource.indexOf('if (IS_SHELL)'))
     expect(shellBlock.slice(0, 1200)).toMatch(/exposeInMainWorld\('airshipShell'/)

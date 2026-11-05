@@ -1,5 +1,7 @@
 import type { AppMeta } from '@shared/app'
-import type { Capability, SharedNamespace } from '@shared/protocol'
+import { platformIssue } from '@shared/errors'
+import { manifestProblems } from '@shared/registryRules'
+import type { Capability, PlatformId, SharedNamespace, ToolName } from '@shared/protocol'
 
 /**
  * 主进程侧的应用注册表。
@@ -27,17 +29,12 @@ const problems: string[] = []
 
 for (const [path, mod] of Object.entries(modules)) {
   const dirId = idOfPath(path)
-  const meta = mod.app
-  if (!meta) {
-    problems.push(`${path}: 没导出 app`)
+  const issues = manifestProblems(path, dirId, mod.app, [...collected.keys()])
+  if (issues.length > 0) {
+    problems.push(...issues)
     continue
   }
-  if (meta.id !== dirId) {
-    problems.push(`${path}: 清单 id "${meta.id}" 与目录名 "${dirId}" 不一致`)
-    continue
-  }
-  if (collected.has(meta.id)) problems.push(`${path}: id 重复 "${meta.id}"`)
-  collected.set(meta.id, meta)
+  collected.set(mod.app!.id, mod.app!)
 }
 
 if (problems.length > 0) {
@@ -78,4 +75,32 @@ export function canAccessShared(app: string, ns: string): ns is SharedNamespace 
 /** 本应用声明的共享命名空间 */
 export function sharedNamespacesOf(app: string): SharedNamespace[] {
   return collected.get(app)?.sharedNamespaces ?? []
+}
+
+/** 本应用声明要用的外部工具 */
+export function toolsOf(app: string): ToolName[] {
+  return collected.get(app)?.tools ?? []
+}
+
+/**
+ * 应用能不能问壳要这个工具的路径：
+ * 既要有 proc 能力（拿到路径是为了跑它），也要在清单 tools 里声明过（可审计）。
+ */
+export function canUseTool(app: string, tool: ToolName): boolean {
+  return hasCapability(app, 'proc') && toolsOf(app).includes(tool)
+}
+
+/** 这个应用在当前平台上用不了的话，原因是什么；能用则 null */
+export function unavailableReason(app: string, platform: PlatformId | 'unknown'): string | null {
+  const meta = collected.get(app)
+  return meta ? platformIssue(meta, platform) : null
+}
+
+export function availableOn(app: string, platform: PlatformId | 'unknown'): boolean {
+  return unavailableReason(app, platform) === null
+}
+
+/** 当前平台用得了的应用，按名字典序（启动器与截图工装都按这个顺序摆） */
+export function appsAvailableOn(platform: PlatformId | 'unknown'): AppMeta[] {
+  return appsInOrder().filter((meta) => availableOn(meta.id, platform))
 }
