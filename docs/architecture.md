@@ -317,16 +317,19 @@ export interface AppMeta {
 
 `[待达]` 当前实现是单窗口内常驻挂载（切走只隐藏，不卸载），目的是阅读器翻页进度、vcp 跑着的转码任务不因切换应用而丢。窗口化后这个需求由"窗口不关就不销毁"承接。
 
-### 7.5 现有四个应用
+### 7.5 现有五个应用
 
-| id | 名称 | 能力 | 共享命名空间 |
-|---|---|---|---|
-| `vcp` | vcp | fs.read fs.write dialog settings proc notify clipboard log | — |
-| `books` | 墨读 | fs.read fs.write dialog settings shared notify clipboard log | library |
-| `pdf` | PDF | fs.read fs.write dialog settings shared notify clipboard log | library |
-| `dagogo` | 打勾勾 | fs.read fs.write dialog settings tray notify log | — |
+| id | 名称 | 能力 | 共享命名空间 | 工具 | 平台 |
+|---|---|---|---|---|---|
+| `vcp` | vcp | fs.read fs.write dialog settings proc notify clipboard log | — | ffmpeg | 全平台 |
+| `books` | 墨读 | fs.read fs.write dialog settings shared notify clipboard log | library | — | 全平台 |
+| `pdf` | PDF | fs.read fs.write dialog settings shared notify clipboard log | library | — | 全平台 |
+| `dagogo` | 打勾勾 | fs.read fs.write dialog settings tray notify log | — | — | 全平台 |
+| `wsld` | 容器台 | fs.read fs.write dialog settings proc notify clipboard log | — | wslc | **仅 windows** |
 
 墨读与 PDF 是两个入口、一份书库：书架、导入、封面、进度是同一套数据，各存一份会出现"同一本书在两个入口各一本"。
+`wsld` 是 `wslc.exe` 的图形外壳，离开 Windows 就没有那枚 CLI，所以清单写 `platforms: ['windows']`：
+非 Windows 上它不进启动器格子，硬开被拒（`src/apps/specs/app-model.md` AP-006）。
 
 ---
 
@@ -427,7 +430,7 @@ export interface AppMeta {
 | 安全 | `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`；CSP 允许 `blob:`（foliate 用 blob iframe 渲章节）与样式 `unsafe-inline`（禁掉书就没排版），脚本只 `'self'` |
 | 外部链接 | 只放行 `http/https`，交给系统浏览器；`file://` 与自定义协议不开新窗 |
 
-命令：`npm run dev` 开发 · `npm run build` 构建 · `npm test` 单测 · `npm run shot` 逐应用截图 · `VCP_E2E=1 npx vitest run e2e` 真编码用例。
+命令：`npm run dev` 开发 · `npm run build` 构建 · `npm test` 单测 · `npm run casecov` 册子与用例的双向差集 · `npm run typecheck` 两个 tsconfig · `npm run shot` 逐窗口截图 · `VCP_E2E=1 npx vitest run e2e` 真编码用例 · `AIRSHIP_WSLD_INTEGRATION=1 npx vitest run wsld/tests/real` 真 `wslc` 只读命令。
 
 ---
 
@@ -474,7 +477,12 @@ export interface AppMeta {
 1. **MOBI 仍无真样本可验**。解析走 foliate-js 自带的 `mobi.js`，与 EPUB 同一条 `view.open` 自动识别路径；机器上没有 .mobi/.azw3，这条只能挂着。
 2. **EPUB 翻页延迟未单独采样**。目前只有"打开到首屏"的数字；翻页要另做标记。
 3. **阶段 C（运行时从磁盘加载应用包）与阶段 D（打包分发）未做**。现在应用与壳同仓同构建，改应用要重新构建整个壳——这是"独立修改"已经做到、"独立构建"还没做的地方。
-4. **窗口数不设上限**：四个应用全开约 400 MB。真觉得吃紧再加"同应用多窗口"或闲置回收策略。
+4. **窗口数不设上限**：五个应用全开约 500 MB。真觉得吃紧再加"同应用多窗口"或闲置回收策略。
+5. **wsld 只移植了核心三块**（容器、镜像、日志）。原版还有而这里先没有的：`run` 命令编排（40 余字段拼装/校验/反解）、
+   registry mirror（Docker Hub 路径改写与 pull 后改名）、拉取实时进度。
+   最后那个是**能力缺口**而不是省事：原版的逐层进度靠 ConPTY 伪终端把 wslc 当全屏应用来读（`VtScreenTracker` 那套屏幕模型），
+   而本项目 `proc` 只有管道分块——没有 TTY 就没有那套帧。要么以后给 `proc` 加伪终端能力，要么按普通管道输出重做进度呈现。
+   界面语言与主题原版的 `i18n.md` / `theme.md` 不搬：本项目只做中文，换皮归壳（`src/shell/specs/theme.md`）。
 
 ---
 

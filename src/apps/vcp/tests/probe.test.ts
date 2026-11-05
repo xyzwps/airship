@@ -62,7 +62,7 @@ describe('[3b] 轨道名解析', () => {
     ).toBe('')
   })
 
-  it('parseProbe 取时长与格式', () => {
+  it('VC-002 parseProbe 取时长与格式', () => {
     const info = parseProbe(STDERR, { path: 'T:/multi_sub.mkv', name: 'multi_sub.mkv', dir: 'T:', size: 1 })
     expect(info.duration).toBe(10)
     // 格式只取到第一个逗号，和原版正则一致

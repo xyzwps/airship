@@ -115,7 +115,7 @@ describe('[5] 命令生成', () => {
     expect(args[args.length - 1]).toBe(s.out.path)
   })
 
-  it('复制流 + 滤镜 → 报 error，一键修正改回 x264', () => {
+  it('VC-062 复制流 + 滤镜 → 报 error，一键修正改回 x264', () => {
     const s = withProbe(demoProbe())
     s.keep.videoRel = 0
     s.keep.audioRels.push(0)
@@ -198,7 +198,7 @@ describe('[9] 图形字幕与封面流（仿蓝光 REMUX）', () => {
     expect(args[i + 1]).toBe('copy')
   })
 
-  it('混轨：图形轨 copy、文字轨 srt，逐轨指定', () => {
+  it('VC-013 混轨：图形轨 copy、文字轨 srt，逐轨指定', () => {
     const s = withProbe(pgsProbe())
     s.keep.videoRel = 0
     s.keep.audioRels.push(0)

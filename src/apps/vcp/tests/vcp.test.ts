@@ -5,8 +5,9 @@ import { feedProgress } from '@apps/vcp/runner'
 import { createState, type AppState, type ProbeInfo, type StreamInfo } from '@apps/vcp/state'
 
 /**
- * VC 册子（docs/specs/vcp.md）里"命令与队列"那几条：纯函数，不碰界面也不碰真 ffmpeg。
- * 已有的那批（command/probe/jobs 三份）留在 src/apps/vcp/__tests__/，标题里带着同一批编号。
+ * VC 册子（src/apps/vcp/specs/vcp.md）里"命令与队列"那几条：纯函数，不碰界面也不碰真 ffmpeg。
+ * 更早从 Avalonia 版搬来的那批（command/probe/jobs 三份）在 tests/ 旁边，
+ * 钉的是同一批契约的用例已挂上编号，没挂的是册子里还没立条的历史覆盖。
  */
 
 function st(index: number, rel: number, type: string, codec: string, over: Partial<StreamInfo> = {}): StreamInfo {

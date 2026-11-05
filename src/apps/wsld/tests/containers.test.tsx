@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   commands,
   listEmpty,
@@ -12,7 +12,8 @@ import {
   ndjson,
   rows,
   tap,
-  twoContainers
+  twoContainers,
+  unmountAll
 } from './support'
 import type { Mount } from '@tests/helpers/mount'
 
@@ -46,12 +47,17 @@ const rowOf = (m: Mount, name: string): HTMLElement => {
 }
 
 const valueOf = (m: Mount, label: string): string => {
-  const row = Array.from(m.container.querySelectorAll<HTMLElement>('.wsld__field-row')).find(
-    (el) => el.querySelector('dt')?.textContent === label
+  const key = Array.from(m.container.querySelectorAll<HTMLElement>('dt')).find(
+    (el) => el.textContent === label
   )
-  if (!row) throw new Error(`详情里读不到「${label}」这一项`)
-  return row.querySelector('dd')?.textContent ?? ''
+  if (!key) throw new Error(`详情里读不到「${label}」这一项`)
+  return key.nextElementSibling?.textContent ?? ''
 }
+
+// 每条用例都从干净的界面开始：失败的用例不会把残骸留给下一条
+afterEach(() => {
+  unmountAll()
+})
 
 describe('打开就把本机容器摆出来', () => {
   it('CL-001 启动应用自动读一次，只发那一条命令', async () => {

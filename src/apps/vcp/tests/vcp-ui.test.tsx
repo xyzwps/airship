@@ -7,7 +7,7 @@ import VcpApp from '@apps/vcp/VcpApp'
 import type { AppApi, ShellEventListener } from '@shared/protocol'
 
 /**
- * VC 册子（docs/specs/vcp.md）里"界面看得见什么"那几条：真挂载、真点、真喂输出流。
+ * VC 册子（src/apps/vcp/specs/vcp.md）里"界面看得见什么"那几条：真挂载、真点、真喂输出流。
  * ffmpeg 由 FakeAirship 的 proc 替身顶上：命令行记在 procCalls，流式输出由用例往里推。
  *
  * FakeAirship.api 是展开装配的，展开只带自有属性；paths / theme / on 这三个原型方法
@@ -356,12 +356,14 @@ describe('提交任务与右栏队列', () => {
       ctl.exit({ code: 0 })
     })
     await m.settle(12)
-    expect(m.text()).toContain('完成 1 · 排队 1')
+    // 串行队列：跑完一条自动接上排着的那条，所以这里是"在跑 + 完成"两笔
+    expect(m.text()).toContain('进行中 1 · 完成 1')
     m.unmount()
   })
 
   it('VC-072 批量套用：两个文件各成一条，撞名的自动改名并写在说明里', async () => {
-    const { fake, api } = rig({ picks: [[SOURCE, 'T:/media/4k_demo.mp4']] })
+    // 两次对话框：打开视频挑一个，批量套用挑两个（同名输出要自动改名）
+    const { fake, api } = rig({ picks: [[SOURCE], [SOURCE, 'T:/media/4k_demo.mp4']] })
     fake.vol.set('T:/media/4k_demo.mp4', 'k'.repeat(1 << 20))
     const m = await mount(api, fake)
     await openVideo(m)

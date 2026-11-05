@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   askConfirm,
   commands,
@@ -8,7 +8,8 @@ import {
   ndjson,
   rows,
   tap,
-  twoContainers
+  twoContainers,
+  unmountAll
 } from './support'
 import type { FakeAirship, StartCall, StreamCtl } from '@tests/helpers/fakeAirship'
 import type { Mount } from '@tests/helpers/mount'
@@ -58,6 +59,11 @@ const REFUSED = [
   '错误代码： WSLC_E_CONTAINER_IS_RUNNING',
   '如果此错误是意外错误，请考虑搜索现有问题或在 https://github.com/microsoft/WSL/issues 提交新问题。'
 ].join('\n')
+
+// 每条用例都从干净的界面开始：失败的用例不会把残骸留给下一条
+afterEach(() => {
+  unmountAll()
+})
 
 describe('四颗键与 wslc 子命令一一对应', () => {
   it('CA-001 启动只发一条 start <ID>，不问一句', async () => {

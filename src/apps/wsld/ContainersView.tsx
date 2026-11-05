@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import {
   containerActionArgs,
   loadContainers,
@@ -274,10 +274,10 @@ export function ContainersView({ runner }: { runner: WslcRunner }): JSX.Element 
                     <h4 className="card__title">{section.title}</h4>
                     <dl className="wsld__fields">
                       {section.fields.map((field) => (
-                        <div className="wsld__field-row" key={field.label}>
+                        <Fragment key={field.label}>
                           <dt>{field.label}</dt>
                           <dd className="mono">{field.value}</dd>
-                        </div>
+                        </Fragment>
                       ))}
                     </dl>
                   </section>

@@ -19,7 +19,7 @@ import type { Task } from '@apps/dagogo/types'
  * 所以只把它换成一张假图，断言仍落在壳收到的 `tray.set` 入参上。
  */
 
-vi.mock('../../src/shell/trayIcon', () => ({
+vi.mock('@shell/trayIcon', () => ({
   renderTrayIcon: async (text: string): Promise<string> => `data:image/png;base64,FAKE${text}`
 }))
 

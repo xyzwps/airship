@@ -70,7 +70,7 @@ describe('[10] 任务队列', () => {
     expect(second.spec!.args.some((a) => a.includes('scale=w=1280'))).toBe(true)
   })
 
-  it('同路径没跑完 → 自动改名 _2', () => {
+  it('VC-058 同路径没跑完 → 自动改名 _2', () => {
     const q = new JobQueue()
     const c = cfg()
     const a = fromState(c, q, {})
@@ -117,13 +117,13 @@ describe('[10] 任务队列', () => {
     expect(q.jobs.length).toBe(1)
   })
 
-  it('uniquePath 撞名递增', () => {
+  it('VC-061 uniquePath 撞名递增', () => {
     expect(uniquePath('T:/a.mp4', ['T:/a.mp4'])).toBe('T:/a_2.mp4')
     expect(uniquePath('T:/a.mp4', ['T:/a.mp4', 'T:/a_2.mp4'])).toBe('T:/a_3.mp4')
     expect(uniquePath('T:/b.mp4', ['T:/a.mp4'])).toBe('T:/b.mp4')
   })
 
-  it('状态文案', () => {
+  it('VC-042 状态文案', () => {
     const j: JobSpec = {
       id: 'x',
       no: 1,

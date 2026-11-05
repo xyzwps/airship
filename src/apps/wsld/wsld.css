@@ -249,26 +249,21 @@
   padding: 11px 14px;
 }
 
-/* 字段：标签一列、值一列，同组共用这一列宽 */
+/* 字段：一组字段一个网格，标签共用同一列宽（不写死，按这组里最长的标签走） */
 .wsld__fields {
   margin: 0;
   display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: 2px 12px;
-}
-
-.wsld__field-row {
-  display: grid;
-  grid-template-columns: 84px 1fr;
-  gap: 12px;
   align-items: baseline;
 }
 
-.wsld__field-row dt {
+.wsld__fields dt {
   color: var(--fg-dim);
   font-size: 12px;
 }
 
-.wsld__field-row dd {
+.wsld__fields dd {
   margin: 0;
   overflow-wrap: anywhere;
   user-select: text;
