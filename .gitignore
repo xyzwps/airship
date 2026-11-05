@@ -5,5 +5,5 @@ shots/
 *.log
 .DS_Store
 
-# 用例的临时 userData
-tests/.tmp/
+# 用例的临时 userData（各区 tests/ 下）
+**/tests/.tmp/
