@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState, type JSX } from 'react'
 import type { AppApi } from '@shared/protocol'
 import { useAppAutotest } from '../../shell/autotest'
 import { markPerf } from '../../shell/shot'
@@ -110,7 +110,9 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
     }
   }, [api, s.out.path])
 
-  const notes: Note[] = useMemo(() => checks(s, outStat), [s, outStat, bump])
+  // 状态存在可变的 ref 里，identity 一直不变，所以这里**不能**用 useMemo 缓存：
+  // 缓存的那一份永远停在"还没打开视频"，改了任何开关检查栏都不跟着更新。
+  const notes: Note[] = checks(s, outStat)
 
   /* ---------- 探测 ---------- */
 

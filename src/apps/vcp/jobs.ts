@@ -121,10 +121,12 @@ export class JobQueue {
     return this.jobs.find((j) => j.state === 'queued') ?? null
   }
 
-  /** 停掉正在跑的（kill 由调用方给，队列自己不知道进程怎么杀），排队的全部标取消 */
+  /** 停掉正在跑的（kill 由调用方给，队列自己不知道进程怎么杀），排队的全部标取消。
+   *  先把排队的判掉，再动手杀在跑的：杀的动作要回壳里走一趟，
+   *  回来的结束事件会立刻取下一条，排队的要是还没判掉就被它取走了。 */
   stopAll(killRunning?: (j: JobSpec) => void): void {
-    if (this.running) killRunning?.(this.running)
     for (const j of this.jobs) if (j.state === 'queued') j.state = 'cancelled'
+    if (this.running) killRunning?.(this.running)
   }
 
   clearFinished(discard?: (j: JobSpec) => void): number {

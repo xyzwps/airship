@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   askConfirm,
   commands,
@@ -85,7 +85,7 @@ const removeBtn = (m: Mount, reference: string): HTMLButtonElement => {
 }
 
 const pullBox = (m: Mount): HTMLElement => {
-  const el = m.container.querySelector<HTMLElement>('#wsld-pull')
+  const el = m.field('镜像-拉取框')
   if (!el) throw new Error('界面上找不到拉取框')
   return el
 }
@@ -94,6 +94,11 @@ const errorBar = (m: Mount): string => m.container.querySelector('.wsld__bar--er
 const okBar = (m: Mount): string => m.container.querySelector('.wsld__bar--ok')?.textContent ?? ''
 const imagesCalls = (fake: FakeAirship): string[] =>
   commands(fake).filter((line) => line.includes('images --format json'))
+
+// 每条用例都从干净的界面开始：失败的用例不会把带重复标识的残骸留给下一条
+afterEach(() => {
+  unmountAll()
+})
 
 describe('摆出来的就是本机有的镜像', () => {
   it('IM-001 停在镜像页就自动加载一次，只发那一条命令', async () => {
@@ -135,28 +140,23 @@ describe('摆出来的就是本机有的镜像', () => {
 
   it('IM-004 引用数读不成数字时按没人用说', async () => {
     const [busy] = rows(imagesNdjson())
-    const odd = [{ ...busy!, Containers: 'N/A' }, { ...busy!, ID: 'cc1122334455', Tag: 'other', Containers: '' }]
-    const missing = rows(imagesNdjson()).map((row) => {
-      const { Containers: _drop, ...rest } = row
-      return rest
-    })
-    void missing
+    const asText = { ...busy!, Repository: 'docker.1ms.run/library/redis', Containers: 'N/A' }
+    const asEmpty = { ...busy!, Repository: 'docker.1ms.run/library/redis', Tag: '7', Containers: '' }
+    const noField = { ...busy!, Repository: 'docker.1ms.run/library/redis' }
+    delete (noField as Record<string, unknown>)['Containers']
 
-    const noField = stage({ images: () => ({ stdout: ndjson([odd[0]!]) }) })
-    const a = await openImages(noField.fake)
-    expect(lineOf(a, BUSY)).toContain('未被容器引用')
-    a.unmount()
-
-    const empty = stage({ images: () => ({ stdout: ndjson([odd[1]!]) }) })
-    const b = await openImages(empty.fake)
-    expect(lineOf(b, BUSY)).toContain('未被容器引用')
-    b.unmount()
-
-    const absent = stage({ images: () => ({ stdout: ndjson([missing[0]]) }) })
-    const c = await openImages(absent.fake)
-    expect(lineOf(c, BUSY)).toContain('未被容器引用')
-    expect(c.container.querySelector('.wsld__bar--error')).toBeNull()
-    c.unmount()
+    const cases: Array<[string, Record<string, unknown>]> = [
+      ['N/A', asText],
+      ['空串', asEmpty],
+      ['没这个字段', noField]
+    ]
+    for (const [label, row] of cases) {
+      const one = stage({ images: () => ({ stdout: ndjson([row]) }) })
+      const m = await openImages(one.fake)
+      expect(lineOf(m, 'docker.1ms.run/library/redis'), `引用数写成${label}时`).toContain('未被容器引用')
+      expect(m.container.querySelector('.wsld__bar--error')).toBeNull()
+      m.unmount()
+    }
   })
 
   it('IM-005 没有标签的镜像有自己的说法', async () => {
@@ -228,7 +228,7 @@ describe('摆出来的就是本机有的镜像', () => {
     const { fake } = stage({ images: () => ({ stdout: `${imagesNdjson().trim()}\n这一行不是 JSON` }) })
     const m = await openImages(fake)
 
-    expect(errorBar(m)).toContain('第 2 行')
+    expect(errorBar(m)).toContain('第 3 行')
     expect(errorBar(m)).toContain('镜像')
     expect(errorBar(m)).toContain('这一行不是 JSON')
     m.unmount()
@@ -337,8 +337,6 @@ describe('拉取', () => {
     const m = await openImages(fake)
 
     expect(removeBtn(m, BUSY)).toBeTruthy()
-    console.log('IM009 TEXT:', m.text().slice(0, 200))
-    console.log('IM009 IDS:', Array.from(m.container.querySelectorAll('[id]')).map((e) => e.id).join(','))
     const box = pullBox(m)
     await act(async () => {
       box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
@@ -463,7 +461,7 @@ describe('删除与强制删除', () => {
     expect(okBar(m)).toBe(`已删除 ${FREE}`)
     expect(imagesCalls(fake)).toHaveLength(before + 1)
     expect(imageLines(m)).toHaveLength(1)
-    expect(m.text()).not.toContain(FREE)
+    expect(imageLines(m).join(' ')).not.toContain(FREE)
     m.unmount()
   })
 
@@ -526,8 +524,8 @@ describe('删除与强制删除', () => {
 
     const sent = commands(fake).filter((line) => line.includes('rmi'))
     expect(sent).toEqual(['wslc rmi docker.1ms.run/library/busybox:backup'])
-    expect(m.text()).toContain(BUSY)
-    expect(m.text()).not.toContain('docker.1ms.run/library/busybox:backup')
+    expect(imageLines(m).join(' ')).toContain(BUSY)
+    expect(imageLines(m).join(' ')).not.toContain('docker.1ms.run/library/busybox:backup')
     m.unmount()
   })
 
@@ -583,9 +581,8 @@ describe('同一时刻只有一个动作在跑', () => {
     expect((m.field('镜像-刷新') as HTMLButtonElement).disabled).toBe(true)
 
     const before = commands(fake).length
-    await tap(m, '镜像-取消')
-    await tap(m, '镜像-取消')
-    await m.settle()
+    await tap(m, '镜像-刷新')
+    await tap(m, `镜像-删除-${FREE}`)
     expect(commands(fake).length).toBe(before)
     expect(imagesCalls(fake)).toHaveLength(1)
 

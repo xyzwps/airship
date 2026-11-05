@@ -254,9 +254,7 @@ export function LogsView({ runner, containerRef, running, active }: Props): JSX.
   return (
     <div className="wsld__logs-pane">
       <div className="wsld__logbar row--wrap">
-        <label className="wsld__field" htmlFor="wsld-tail">
-          行数
-        </label>
+        <span className="wsld__field">行数</span>
         <select
           className="select"
           aria-label="行数"

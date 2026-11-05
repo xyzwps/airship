@@ -38,8 +38,17 @@ export function makeFake(setup: FakeSetup = {}): FakeAirship {
   })
 }
 
+const mounted: Mount[] = []
+
 export async function mountWsld(fake: FakeAirship, confirm = true): Promise<Mount> {
-  return mountUi(<WsldApp api={appApiOf(fake)} />, { fake, confirm })
+  const m = await mountUi(<WsldApp api={appApiOf(fake)} />, { fake, confirm })
+  mounted.push(m)
+  return m
+}
+
+/** 点开的窗口一律收掉：留着上一用例的残骸会让这一用例的界面查询认岔对象 */
+export function unmountAll(): void {
+  while (mounted.length > 0) mounted.pop()?.unmount()
 }
 
 /**

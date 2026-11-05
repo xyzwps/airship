@@ -220,11 +220,10 @@ export function ImagesView({ runner }: { runner: WslcRunner }): JSX.Element {
       </div>
 
       <div className="wsld__pull row">
-        <label className="wsld__field" htmlFor="wsld-pull">
-          拉取
-        </label>
+        <span className="wsld__field">拉取</span>
         <input
-          id="wsld-pull"
+          data-test="镜像-拉取框"
+          aria-label="镜像引用"
           className="input wsld__pull-input"
           placeholder={PULL_PLACEHOLDER}
           value={pullText}
