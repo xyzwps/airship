@@ -14,9 +14,9 @@ vi.mock('../../apps', async () => {
   const { lazy } = await import('react')
   const iconUrl = 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='
   const metas = {
-    vcp: { id: 'vcp', name: 'vcp', description: '编排台', accent: '#e0834a', capabilities: ['log'], flush: true },
-    plain: { id: 'plain', name: '素面应用', description: '要壳给留白的', accent: '#333', capabilities: ['log'] },
-    slow: { id: 'slow', name: '慢热应用', description: 'chunk 还没到', accent: '#444', capabilities: ['log'] }
+    vcp: { id: 'vcp', name: 'vcp', description: '编排台', capabilities: ['log'], flush: true },
+    plain: { id: 'plain', name: '素面应用', description: '要壳给留白的', capabilities: ['log'] },
+    slow: { id: 'slow', name: '慢热应用', description: 'chunk 还没到', capabilities: ['log'] }
   } as const
 
   const entries = {

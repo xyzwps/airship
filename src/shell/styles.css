@@ -196,20 +196,18 @@ button {
   outline-offset: -1px;
 }
 
-/* 图标底板只给一点强调色的味道，不铺满——铺满四个应用就是四块色板 */
+/* 图标就是图标：原始文件直接画，不套底板。
+   应用给的图本来就自带形状（位图常常自己就是圆角方块），再套一层圆角壳会变成两层框 */
 .tile__icon {
   width: 46px;
   height: 46px;
   display: grid;
   place-items: center;
-  border-radius: 11px;
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--tile-accent, var(--accent)) 14%, var(--bg-elev));
 }
 
 .tile__glyph {
-  width: 24px;
-  height: 24px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
 }
 

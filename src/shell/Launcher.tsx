@@ -69,7 +69,6 @@ export function Launcher(): JSX.Element {
               key={meta.id}
               type="button"
               className="tile"
-              style={{ ['--tile-accent' as string]: meta.accent }}
               onClick={() => open(meta.id)}
             >
               <span className="tile__icon">

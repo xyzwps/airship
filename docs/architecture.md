@@ -259,7 +259,6 @@ export interface AppMeta {
   id: string                    // 唯一，必须等于目录名；同时是数据目录名
   name: string                  // 界面显示名
   description: string           // 一句话
-  accent: string                // 强调色
   capabilities: Capability[]    // 声明式权限
   sharedNamespaces?: SharedNamespace[]
   flush?: boolean               // 内容区是否去掉壳给的内边距
@@ -276,8 +275,7 @@ export interface AppMeta {
   清单里写 `iconPath: string` 那种做法等于假定"图标必须是单条 path 的 SVG"，两个假定都错。
   图标单独成文件而不是跟组件同处 `index.tsx`，是因为启动器要给四个应用画图标，
   同 chunk 就得把 pdf 那 800KB 一起拉进来，懒加载白做。
-  代价：文件图标拿不到 `currentColor`，颜色得烘进图里，所以 `accent` 只用于图标底板掺色，
-  两处颜色各自成立。小于 4KB 的 SVG 会被 Vite 内联成 `data:` URL（CSP 的 `img-src` 已允许），
+  代价：文件图标拿不到 `currentColor`，颜色得烘进图里。小于 4KB 的 SVG 会被 Vite 内联成 `data:` URL（CSP 的 `img-src` 已允许），
   大图则作为文件走 `'self'`。
 - 顺序是应用之间的**关系**，任何单个应用都不可能"自己决定"自己的排位。
   壳按名字典序排（`localeCompare(…, 'zh')`）。

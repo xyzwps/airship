@@ -22,8 +22,6 @@ export interface AppMeta {
   name: string
   /** 一句话说清它是干什么的 */
   description: string
-  /** 强调色，用于图标底板掺色 */
-  accent: string
   /** 声明式权限。没写的一律拒绝，且抛可读原因 */
   capabilities: Capability[]
   /** 要访问的壳托管共享命名空间；必须含 'shared' 能力才有意义 */

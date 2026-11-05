@@ -22,7 +22,6 @@ function meta(over: Partial<AppMeta> & { id: string }): AppMeta {
     id: over.id,
     name: over.name ?? over.id,
     description: '测试',
-    accent: '#fff',
     capabilities: [],
     ...over
   } as AppMeta

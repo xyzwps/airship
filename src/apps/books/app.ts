@@ -4,7 +4,6 @@ export const app: AppMeta = {
   id: 'books',
   name: '墨读',
   description: 'EPUB / MOBI / TXT 电子书书架与阅读器',
-  accent: '#5b8c7b',
   capabilities: [
     'fs.read',
     'fs.write',

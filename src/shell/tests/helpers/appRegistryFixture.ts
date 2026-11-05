@@ -14,7 +14,6 @@ import type { AppMeta as Meta } from '@shared/app'
 export function meta(over: Partial<Meta> & { id: string; name: string }): AppMeta {
   return {
     description: '测试用清单',
-    accent: '#123456',
     capabilities: ['log'],
     ...over
   } as AppMeta

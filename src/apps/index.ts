@@ -17,8 +17,7 @@ import type { AppApi, PlatformId } from '@shared/protocol'
  *
  * 图标是文件而不是组件：约定就是"往应用目录扔一张 icon.svg"，
  * 壳不假定它的内部结构（几条 path、circle、渐变、位图都随应用便）。
- * 代价是文件图标拿不到 currentColor，颜色得烘进图里——
- * 所以清单里的 accent 只用于图标底板的掺色，两处颜色各自成立。
+ * 代价是文件图标拿不到 currentColor，颜色得烘进图里。
  */
 
 const metaModules = import.meta.glob<{ app: AppMeta }>('./*/app.ts', { eager: true })
