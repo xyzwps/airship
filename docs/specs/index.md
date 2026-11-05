@@ -13,7 +13,7 @@ src/apps/<id>/specs/*.md      每个应用一本（或多本）
 src/apps/<id>/tests/*.test.*  每个应用的用例
 src/shared/<包>/specs/*.md    共享包一本；tests/ 放它的用例
 docs/specs/index.md           这本索引——唯一跨区的文件，与架构文档同级
-fixtures/                     真样本（真 wslc 输出、真书等）
+src/<区>/<名>/tests/fixtures/   真样本跟着用它的用例走（wslc 的真实输出在 src/apps/wsld/tests/fixtures/）
 ```
 
 `npm run casecov` 递归找所有 `specs/*.md` 与 `tests/**` 里的用例，新加区域不用改检查器。

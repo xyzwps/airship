@@ -9,12 +9,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * "写坏了怎么办"这类契约只能对着真实文件系统验，替身里磁盘永远是好的。
  */
 
-const ROOT = join(process.cwd(), 'tests', '.tmp', 'settings-userData')
+const ROOT = join(__dirname, '.tmp', 'settings-userData')
 
 vi.mock('electron', async () => {
   const { join: p } = await import('node:path')
   return {
-    app: { getPath: () => p(process.cwd(), 'tests', '.tmp', 'settings-userData'), getVersion: () => '0.0.0-test' }
+    app: { getPath: () => p(__dirname, '.tmp', 'settings-userData'), getVersion: () => '0.0.0-test' }
   }
 })
 

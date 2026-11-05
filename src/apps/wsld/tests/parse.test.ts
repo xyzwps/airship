@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseImages, pullIsUpToDate, splitLogLines } from '../parse'
 import { imageCreatedText, imageSizeText, imageSubtleLine, imageUsageText } from '../model'
-import { fixture } from '@tests/helpers/fakeAirship'
+import { sample } from './support'
 import type { RawImage } from '../parse'
 
 /**
@@ -29,7 +29,7 @@ function localStamp(utcMs: number): string {
 describe('镜像字段的读法', () => {
   it('IM-007 创建时间与大小按人能读的样子写，解析不动就原样站着', () => {
     // 真样本里那格写的是 "2026-05-13 10:21:49 +0800 GMT+8"，末尾的时区名会把通用解析器带糊涂
-    const [busybox] = parseImages(fixture('wslc/wslc-images.ndjson'))
+    const [busybox] = parseImages(sample('wslc-images.ndjson'))
     const shown = imageCreatedText(busybox!)
     expect(shown).toBe(localStamp(Date.UTC(2026, 4, 13, 10, 21, 49) - 8 * 60 * 60 * 1000))
 
@@ -64,8 +64,8 @@ describe('镜像字段的读法', () => {
 
   it('IM-011 IM-012 IM-013 拉取结果分得清“新下载”、“已是最新”与没有 Status 行', () => {
     // 这两份都是 wslc 3.0.1 的真输出
-    expect(pullIsUpToDate(fixture('wslc/wslc-pull-new.txt'))).toBe(false)
-    expect(pullIsUpToDate(fixture('wslc/wslc-pull-uptodate.txt'))).toBe(true)
+    expect(pullIsUpToDate(sample('wslc-pull-new.txt'))).toBe(false)
+    expect(pullIsUpToDate(sample('wslc-pull-uptodate.txt'))).toBe(true)
     // 找不到 Status 行不算错误：按"真下载了"说，不谎报
     expect(pullIsUpToDate('latest: Pulling from library/busybox\n')).toBe(false)
     expect(pullIsUpToDate('')).toBe(false)

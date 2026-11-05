@@ -8,11 +8,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * 真写磁盘：日志这件事的判据就是文件里那一行长什么样。
  */
 
-const ROOT = join(process.cwd(), 'tests', '.tmp', 'logs-userData')
+const ROOT = join(__dirname, '.tmp', 'logs-userData')
 
 vi.mock('electron', async () => {
   const { join: p } = await import('node:path')
-  return { app: { getPath: () => p(process.cwd(), 'tests', '.tmp', 'logs-userData') } }
+  return { app: { getPath: () => p(__dirname, '.tmp', 'logs-userData') } }
 })
 
 const { log } = await import('../main/services/logging')

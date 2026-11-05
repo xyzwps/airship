@@ -11,11 +11,11 @@ import { useTheme } from '../theme'
  * TH-001 ~ TH-009：三档主题的选定与落地。
  */
 
-const ROOT = join(process.cwd(), 'tests', '.tmp', 'theme-userData')
+const ROOT = join(__dirname, '.tmp', 'theme-userData')
 
 vi.mock('electron', async () => {
   const { join: p } = await import('node:path')
-  const root = p(process.cwd(), 'tests', '.tmp', 'theme-userData')
+  const root = p(__dirname, '.tmp', 'theme-userData')
   return {
     app: { getPath: () => root, getVersion: () => '0.0.0-test' },
     ipcMain: { handle: () => undefined, on: () => undefined },

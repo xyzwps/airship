@@ -21,7 +21,7 @@ import type { Mount } from '@tests/helpers/mount'
  * CL-001 ~ CL-027：容器页那一列容器，与点一行之后右边那块详情。
  *
  * 每一条都真渲染、真点：命令行看 `fake.procCalls`，话看界面文字。
- * 容器与镜像数据一律从 wslc 3.0.1 的真样本改出来（见 fixtures/wslc/）。
+ * 容器与镜像数据一律从 wslc 3.0.1 的真样本改出来（见 tests/fixtures/）。
  */
 
 /** 按 `wslc list -a --format json` 的应答造一个壳 */

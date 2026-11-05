@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('electron', async () => {
   const { join } = await import('node:path')
   const { mkdirSync, rmSync } = await import('node:fs')
-  const root = join(process.cwd(), 'tests', '.tmp', 'grants-userData')
+  const root = join(__dirname, '.tmp', 'grants-userData')
   rmSync(root, { recursive: true, force: true })
   mkdirSync(root, { recursive: true })
   return {
@@ -66,7 +66,7 @@ describe('应用自己的地盘', () => {
 })
 
 describe('共享命名空间与显式授权', () => {
-  const root = join(process.cwd(), 'tests', '.tmp', 'grants-userData')
+  const root = join(__dirname, '.tmp', 'grants-userData')
 
   it('GR-004 声明过的共享区可读写，没声明的应用碰不到', () => {
     const book = join(sharedDir('library'), 'files', 'a.epub')

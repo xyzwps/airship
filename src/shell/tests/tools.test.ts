@@ -9,13 +9,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * 假 exe 只是普通文件——发现阶段只问"这文件在不在"，校验阶段才真去跑 `-version`。
  */
 
-const ROOT = join(process.cwd(), 'tests', '.tmp', 'tools-userData')
+const ROOT = join(__dirname, '.tmp', 'tools-userData')
 const FAKE_BIN = join(ROOT, 'fakeBin')
 const FAKE_PF = join(ROOT, 'ProgramFiles')
 
 vi.mock('electron', async () => {
   const { join: p } = await import('node:path')
-  return { app: { getPath: () => p(process.cwd(), 'tests', '.tmp', 'tools-userData') } }
+  return { app: { getPath: () => p(__dirname, '.tmp', 'tools-userData') } }
 })
 
 const { isAllowedExecutable, resetToolDiscovery, setToolPath, toolPath, toolStatus } = await import(

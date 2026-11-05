@@ -13,7 +13,7 @@ import {
 /**
  * 起进程之前那一道门（node 环境，不开界面）。
  *
- * 实测 `wslc logs -n 0` / `-n abc` 只换回 8 行 usage 加退出码 1（见 fixtures/wslc 里那份样本），
+ * 实测 `wslc logs -n 0` / `-n abc` 只换回 8 行 usage 加退出码 1（见 tests/fixtures 里那份样本），
  * 对使用者毫无价值，所以非法输入在拼命令这一步就该被挡下 ——
  * 命令拼不出来，进程自然一个都不起。
  */

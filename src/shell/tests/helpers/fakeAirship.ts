@@ -28,7 +28,6 @@ import type {
   TrayState,
   ToolName
 } from '@shared/protocol'
-import { existsSync, readFileSync } from 'node:fs'
 
 /**
  * 壳的测试替身 —— 应用侧用例的地基，地位等同 wslc-desktop 里的 FakeWslcCli。
@@ -520,9 +519,4 @@ function parentOf(p: string): string {
 function baseOf(p: string): string {
   const clean = FakeAirship.norm(p)
   return clean.slice(clean.lastIndexOf('/') + 1)
-}
-
-/** 真读一个仓库里的样本文件，用于"拿真实 wslc 输出喂解析"那类用例 */
-export function fixture(name: string): string {
-  return readFileSync(existsSync(`fixtures/${name}`) ? `fixtures/${name}` : `fixtures/${name}`, 'utf8')
 }

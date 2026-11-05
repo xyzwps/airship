@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act } from 'react'
 import WsldApp from '@apps/wsld/WsldApp'
-import { FakeAirship, fixture, type FakeOptions } from '@tests/helpers/fakeAirship'
+import { FakeAirship, type FakeOptions } from '@tests/helpers/fakeAirship'
 import { mountUi, type Mount } from '@tests/helpers/mount'
 import type { AppApi } from '@shared/protocol'
 import type { ProcResult } from '@shared/protocol'
@@ -101,17 +103,23 @@ export function countOf(fake: FakeAirship, needle: string): number {
 
 /* ---------------- 真样本 ---------------- */
 
-export const listRunning = (): string => fixture('wslc/wslc-list-running.ndjson')
-export const listExited = (): string => fixture('wslc/wslc-list-exited.ndjson')
-export const listEmpty = (): string => fixture('wslc/wslc-list-empty.ndjson')
-export const imagesNdjson = (): string => fixture('wslc/wslc-images.ndjson')
-export const imagesUntagged = (): string => fixture('wslc/wslc-images-untagged.ndjson')
-export const logsPlain = (): string => fixture('wslc/wslc-logs.txt')
-export const logsStamped = (): string => fixture('wslc/wslc-logs-timestamps.txt')
-export const logsNotFound = (): string => fixture('wslc/wslc-logs-not-found.txt')
-export const logsUsage = (): string => fixture('wslc/wslc-logs-usage-error.txt')
-export const pullNew = (): string => fixture('wslc/wslc-pull-new.txt')
-export const pullUpToDate = (): string => fixture('wslc/wslc-pull-uptodate.txt')
+/**
+ * wslc 3.0.1 的真实输出，跟着用例放在本目录的 fixtures/ 下。
+ * 解析类断言一律吃这些样本，不手搓假 JSON——真输出换个排版也要能被吃下，那才是要钉的东西。
+ */
+export const sample = (name: string): string => readFileSync(join(__dirname, 'fixtures', name), 'utf8')
+
+export const listRunning = (): string => sample('wslc-list-running.ndjson')
+export const listExited = (): string => sample('wslc-list-exited.ndjson')
+export const listEmpty = (): string => sample('wslc-list-empty.ndjson')
+export const imagesNdjson = (): string => sample('wslc-images.ndjson')
+export const imagesUntagged = (): string => sample('wslc-images-untagged.ndjson')
+export const logsPlain = (): string => sample('wslc-logs.txt')
+export const logsStamped = (): string => sample('wslc-logs-timestamps.txt')
+export const logsNotFound = (): string => sample('wslc-logs-not-found.txt')
+export const logsUsage = (): string => sample('wslc-logs-usage-error.txt')
+export const pullNew = (): string => sample('wslc-pull-new.txt')
+export const pullUpToDate = (): string => sample('wslc-pull-uptodate.txt')
 
 /** 按行拆开 NDJSON 样本（真实字段形态，改哪一格自己说） */
 export function rows(text: string): Record<string, unknown>[] {

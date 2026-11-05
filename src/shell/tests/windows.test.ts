@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('electron', async () => {
   const { join: p } = await import('node:path')
-  const root = p(process.cwd(), 'tests', '.tmp', 'shell-userData')
+  const root = p(__dirname, '.tmp', 'shell-userData')
   const { rmSync: rm, mkdirSync: mk } = await import('node:fs')
   rm(root, { recursive: true, force: true })
   mk(root, { recursive: true })
@@ -26,7 +26,7 @@ vi.mock('electron', async () => {
   }
 })
 
-const USER_DATA = join(process.cwd(), 'tests', '.tmp', 'shell-userData')
+const USER_DATA = join(__dirname, '.tmp', 'shell-userData')
 
 const { WindowLedger, appUserModelIdFor, boundsForRestore, boundsKeyFor, boundsToSave } = await import(
   '../main/services/windowLedger'

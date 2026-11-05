@@ -26,7 +26,7 @@ const shellState = vi.hoisted(() => ({
 vi.mock('electron', async () => {
   const { join } = await import('node:path')
   const { mkdirSync, rmSync } = await import('node:fs')
-  const root = join(process.cwd(), 'tests', '.tmp', 'ipc-userData')
+  const root = join(__dirname, '.tmp', 'ipc-userData')
   rmSync(root, { recursive: true, force: true })
   mkdirSync(root, { recursive: true })
   const store = io
@@ -205,7 +205,7 @@ describe('未声明的能力一律拒绝', () => {
 })
 
 describe('对话框给出去的许可', () => {
-  const dir = join(process.cwd(), 'tests', '.tmp', 'picked')
+  const dir = join(__dirname, '.tmp', 'picked')
   const one = join(dir, 'a.mp4')
   const other = join(dir, 'b.mp4')
 
