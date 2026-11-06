@@ -4,6 +4,8 @@ import { act } from 'react'
 import { FakeAirship, type StartCall, type StreamCtl } from '@tests/helpers/fakeAirship'
 import { mountUi, type Mount } from '@tests/helpers/mount'
 import VcpApp from '@apps/vcp/VcpApp'
+import { placeCard } from '@apps/vcp/HelpTip'
+import { HELP, type HelpKey } from '@apps/vcp/help'
 import type { AppApi, ShellEventListener } from '@shared/protocol'
 
 /**
@@ -103,6 +105,39 @@ async function setPath(m: Mount, value: string): Promise<void> {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
     setter?.call(el, value)
     el.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await m.settle()
+}
+
+/** 指针事件：React 的 onMouseEnter/onMouseLeave 是从 mouseover/mouseout 合成的 */
+async function fireMouse(m: Mount, el: Element, type: 'mouseover' | 'mouseout'): Promise<void> {
+  await act(async () => {
+    el.dispatchEvent(new MouseEvent(type, { bubbles: true, relatedTarget: document.body }))
+  })
+  await m.settle()
+}
+
+function helpBtn(m: Mount, k: string): Element {
+  const el = m.container.querySelector(`.vcp__help[data-help="${k}"]`)
+  if (!el) throw new Error(`界面上没有「${k}」旁边那颗 ?`)
+  return el
+}
+
+async function hoverHelp(m: Mount, k: string): Promise<void> {
+  await fireMouse(m, helpBtn(m, k), 'mouseover')
+}
+
+async function unhoverHelp(m: Mount, k: string): Promise<void> {
+  await fireMouse(m, helpBtn(m, k), 'mouseout')
+}
+
+const helpCard = (m: Mount, k: string): HTMLElement | null =>
+  m.container.querySelector(`.vcp__help-card[data-help="${k}"]`)
+
+/** 卡片不是立刻收的：问号与卡片之间留了一拍缓冲，断言"收了"要先等过那一拍 */
+async function pastGrace(m: Mount): Promise<void> {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 240))
   })
   await m.settle()
 }
@@ -414,5 +449,134 @@ describe('提交任务与右栏队列', () => {
     expect(m.text()).toContain('4k_demo_2.mp4')
     expect(m.text()).toContain('改名 4k_demo_2.mp4')
     m.unmount()
+  })
+})
+
+describe('参数旁边那颗 ?：悬停念出作用与代价', () => {
+  it('VC-076 悬停 ? 出说明卡：作用与代价两句都念得出来', async () => {
+    const { fake, api } = rig()
+    const m = await mount(api, fake)
+    await openVideo(m)
+
+    expect(helpCard(m, 'scale')).toBeNull()
+    await hoverHelp(m, 'scale')
+    const card = helpCard(m, 'scale')
+    expect(card?.textContent).toContain('缩放')
+    expect(card?.textContent).toContain('把画面重画成指定宽度')
+    expect(card?.textContent).toContain('重画必须重编码')
+    m.unmount()
+  })
+
+  it('VC-077 纯图标键：无障碍名称带参数名，键盘聚焦同样出卡、失焦就收', async () => {
+    const { fake, api } = rig()
+    const m = await mount(api, fake)
+    await openVideo(m)
+    const btn = m.container.querySelector('.vcp__help[data-help="crf"]') as HTMLElement
+
+    expect(btn.getAttribute('aria-label')).toBe('说明：质量 / 速度')
+    await act(async () => {
+      btn.focus()
+    })
+    await m.settle()
+    expect(helpCard(m, 'crf')).toBeTruthy()
+
+    await act(async () => {
+      btn.blur()
+    })
+    await pastGrace(m)
+    expect(helpCard(m, 'crf')).toBeNull()
+    m.unmount()
+  })
+
+  it('VC-080 问号与卡片是同一块热区：指针挪到卡片上不收，两边都离开才收', async () => {
+    const { fake, api } = rig()
+    const m = await mount(api, fake)
+    await openVideo(m)
+
+    await hoverHelp(m, 'scale')
+    const card = helpCard(m, 'scale') as HTMLElement
+    expect(card).toBeTruthy()
+
+    // 指针离开问号，那一拍之内落到卡片上：卡片留下，还是同一张
+    await fireMouse(m, helpBtn(m, 'scale'), 'mouseout')
+    await fireMouse(m, card, 'mouseover')
+    await pastGrace(m)
+    expect(helpCard(m, 'scale')).toBe(card)
+
+    // 两边都离开、隔了一拍没再接住：这才收
+    await fireMouse(m, card, 'mouseout')
+    await pastGrace(m)
+    expect(helpCard(m, 'scale')).toBeNull()
+    m.unmount()
+  })
+
+  it('VC-078 说不清的三处各带一段小动画，缩放那张只有两句文字', async () => {
+    const { fake, api } = rig()
+    const m = await mount(api, fake)
+    await openVideo(m)
+
+    for (const k of ['crf', 'faststart', 'pixfmt']) {
+      await hoverHelp(m, k)
+      expect(helpCard(m, k)?.querySelector('.vcp__demo')).toBeTruthy()
+      await unhoverHelp(m, k)
+    }
+
+    await hoverHelp(m, 'scale')
+    expect(helpCard(m, 'scale')?.querySelector('.vcp__demo')).toBeNull()
+    m.unmount()
+  })
+
+  it('VC-079 每一个参数旁边都有一颗 ?：界面上的 ? 与文案表一处不差，两句都念得出话', async () => {
+    const { fake, api } = rig()
+    const m = await mount(api, fake)
+    await openVideo(m)
+
+    const keys = Object.keys(HELP) as HelpKey[]
+    const onScreen = [...m.container.querySelectorAll<HTMLElement>('.vcp__help')].map((b) => b.dataset.help)
+    expect(onScreen.slice().sort()).toEqual(keys.slice().sort())
+
+    let withDemo = 0
+    for (const k of keys) {
+      await hoverHelp(m, k)
+      const card = helpCard(m, k)
+      expect(card, `悬停「${k}」旁边那颗 ? 没出卡片`).toBeTruthy()
+      expect(card?.textContent).toContain('作用')
+      expect(card?.textContent).toContain('代价')
+      // 两句都得真说出话，不留空着的格子
+      expect(HELP[k].what.length).toBeGreaterThan(12)
+      expect(HELP[k].cost.length).toBeGreaterThan(12)
+      if (card?.querySelector('.vcp__demo')) withDemo += 1
+      await unhoverHelp(m, k)
+    }
+    expect(withDemo).toBe(3)
+    m.unmount()
+  })
+})
+
+describe('说明卡摆在哪、箭头指着谁', () => {
+  const VIEW = { w: 1100, h: 740 }
+  const SIZE = { w: 320, h: 200 }
+  const at = (top: number, left = 300): { left: number; top: number; bottom: number; width: number } => ({
+    left,
+    top,
+    bottom: top + 16,
+    width: 16
+  })
+
+  it('VC-081 下面放不下就翻到上面，箭头跟着从卡片上边挪到下边', () => {
+    const room = placeCard(at(100), SIZE, VIEW)
+    expect(room.side).toBe('below')
+    expect(room.top).toBe(124) // 问号下沿 116 + 8
+    expect(room.caretX).toBe(160) // 卡片正好以问号为中心：尖落在卡片正中
+
+    const tight = placeCard(at(600), SIZE, VIEW)
+    expect(tight.side).toBe('above')
+    expect(tight.top).toBe(392) // 600 - 8 - 200
+  })
+
+  it('VC-081 卡片被视口边界夹住挪了位子，箭头仍找回问号那一列', () => {
+    const atEdge = placeCard(at(100, 8), SIZE, VIEW)
+    expect(atEdge.left).toBe(8) // 本想以问号为中心（-144），被夹到边上
+    expect(atEdge.caretX).toBe(14) // 尖贴到最小距离，仍旧朝着问号那边
   })
 })

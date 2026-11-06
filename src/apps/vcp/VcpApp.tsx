@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type JSX } from '
 import type { AppApi } from '@shared/protocol'
 import { useAppAutotest } from '../../shell/autotest'
 import { markPerf } from '../../shell/shot'
+import { Help } from './HelpTip'
 import { build, checks, display, swapExt, syncOutPath, type Fix, type Note } from './command'
 import {
   buildBatchSpec,
@@ -464,7 +465,10 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
             ) : (
               <div className="vcp__streams">
                 <div className="vcp__stream-group">
-                  <span className="vcp__stream-label">视频</span>
+                  <div className="vcp__stream-head">
+                    <span className="vcp__stream-label">视频</span>
+                    <Help k="video" />
+                  </div>
                   <div className="row row--wrap">
                     {videos.map((v) => (
                       <label key={`v${v.rel}`} className="vcp__pick">
@@ -495,7 +499,10 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
                 </div>
 
                 <div className="vcp__stream-group">
-                  <span className="vcp__stream-label">音频</span>
+                  <div className="vcp__stream-head">
+                    <span className="vcp__stream-label">音频</span>
+                    <Help k="audio" />
+                  </div>
                   <div className="row row--wrap">
                     {audios.map((a) => (
                       <label key={`a${a.rel}`} className="vcp__pick">
@@ -520,7 +527,10 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
                 </div>
 
                 <div className="vcp__stream-group">
-                  <span className="vcp__stream-label">字幕</span>
+                  <div className="vcp__stream-head">
+                    <span className="vcp__stream-label">字幕</span>
+                    <Help k="sub" />
+                  </div>
                   <div className="row row--wrap">
                     {subs.map((sub) => (
                       <label key={`s${sub.rel}`} className="vcp__pick">
@@ -551,6 +561,7 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
                   </div>
                   <div className="row" style={{ marginTop: 8 }}>
                     <span className="hint">字幕方式</span>
+                    <Help k="submode" />
                     <label className="vcp__pick">
                       <input
                         type="radio"
@@ -688,7 +699,10 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
     <section className="card">
       <h2 className="card__title">处理链</h2>
       <div className="field-grid">
-        <label>缩放</label>
+        <div className="field-label">
+          <label>缩放</label>
+          <Help k="scale" />
+        </div>
         <div className="row">
           <Toggle on={s.scale.on} onChange={(v) => mut((st) => void (st.scale.on = v))} />
           <input className="input vcp__num" type="number" value={s.scale.w} onChange={(e) => mut((st) => void (st.scale.w = Number(e.target.value)))} />
@@ -697,7 +711,10 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
           <span className="hint">-2 表示按宽度自动算偶数高</span>
         </div>
 
-        <label>补边</label>
+        <div className="field-label">
+          <label>补边</label>
+          <Help k="pad" />
+        </div>
         <div className="row">
           <Toggle on={s.pad.on} onChange={(v) => mut((st) => void (st.pad.on = v))} />
           <input className="input vcp__num" type="number" value={s.pad.w} onChange={(e) => mut((st) => void (st.pad.w = Number(e.target.value)))} />
@@ -705,13 +722,19 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
           <input className="input vcp__num" type="number" value={s.pad.h} onChange={(e) => mut((st) => void (st.pad.h = Number(e.target.value)))} />
         </div>
 
-        <label>帧率</label>
+        <div className="field-label">
+          <label>帧率</label>
+          <Help k="fps" />
+        </div>
         <div className="row">
           <Toggle on={s.fps.on} onChange={(v) => mut((st) => void (st.fps.on = v))} />
           <input className="input vcp__num" type="number" value={s.fps.v} onChange={(e) => mut((st) => void (st.fps.v = Number(e.target.value)))} />
         </div>
 
-        <label>裁剪</label>
+        <div className="field-label">
+          <label>裁剪</label>
+          <Help k="trim" />
+        </div>
         <div className="row">
           <Toggle on={s.trim.on} onChange={(v) => mut((st) => void (st.trim.on = v))} />
           <input className="input vcp__time" placeholder="开始 00:01:00" value={s.trim.ss} onChange={(e) => mut((st) => void (st.trim.ss = e.target.value))} />
@@ -723,7 +746,10 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
           </label>
         </div>
 
-        <label>色彩</label>
+        <div className="field-label">
+          <label>色彩</label>
+          <Help k="eq" />
+        </div>
         <div className="row">
           <Toggle on={s.eq.on} onChange={(v) => mut((st) => void (st.eq.on = v))} />
           <span className="hint">亮</span>
@@ -734,17 +760,26 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
           <input className="input vcp__num" type="number" step="0.05" value={s.eq.s} onChange={(e) => mut((st) => void (st.eq.s = Number(e.target.value)))} />
         </div>
 
-        <label>音量</label>
+        <div className="field-label">
+          <label>音量</label>
+          <Help k="vol" />
+        </div>
         <div className="row">
           <Toggle on={s.vol.on} onChange={(v) => mut((st) => void (st.vol.on = v))} />
           <input className="input vcp__num" type="number" step="0.1" value={s.vol.v} onChange={(e) => mut((st) => void (st.vol.v = Number(e.target.value)))} />
           <span className="hint">倍</span>
         </div>
 
-        <label>响度归一</label>
+        <div className="field-label">
+          <label>响度归一</label>
+          <Help k="loud" />
+        </div>
         <Toggle on={s.loud.on} onChange={(v) => mut((st) => void (st.loud.on = v))} />
 
-        <label>文字水印</label>
+        <div className="field-label">
+          <label>文字水印</label>
+          <Help k="text" />
+        </div>
         <div className="row">
           <Toggle on={s.text.on} onChange={(v) => mut((st) => void (st.text.on = v))} />
           <input className="input" value={s.text.t} onChange={(e) => mut((st) => void (st.text.t = e.target.value))} />
@@ -766,7 +801,10 @@ function OutputPanel({ s, mut, api }: PanelProps & { api: AppApi }): JSX.Element
     <section className="card">
       <h2 className="card__title">输出</h2>
       <div className="field-grid">
-        <label>容器</label>
+        <div className="field-label">
+          <label>容器</label>
+          <Help k="container" />
+        </div>
         <select
           className="select"
           value={o.container}
@@ -779,14 +817,20 @@ function OutputPanel({ s, mut, api }: PanelProps & { api: AppApi }): JSX.Element
           ))}
         </select>
 
-        <label>视频编码</label>
+        <div className="field-label">
+          <label>视频编码</label>
+          <Help k="vcodec" />
+        </div>
         <select className="select" value={o.vcodec} onChange={(e) => mut((st) => void (st.out.vcodec = e.target.value))}>
           {['libx264', 'libx265', 'copy', 'h264_nvenc', 'hevc_nvenc', 'libsvtav1'].map((c) => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
 
-        <label>质量 / 速度</label>
+        <div className="field-label">
+          <label>质量 / 速度</label>
+          <Help k="crf" />
+        </div>
         <div className="row">
           <span className="hint">CRF</span>
           <input className="input vcp__num" value={o.crf} onChange={(e) => mut((st) => void (st.out.crf = e.target.value))} />
@@ -797,7 +841,10 @@ function OutputPanel({ s, mut, api }: PanelProps & { api: AppApi }): JSX.Element
           </select>
         </div>
 
-        <label>音频</label>
+        <div className="field-label">
+          <label>音频</label>
+          <Help k="acodec" />
+        </div>
         <div className="row">
           <select className="select" value={o.acodec} onChange={(e) => mut((st) => void (st.out.acodec = e.target.value))}>
             {['aac', 'libopus', 'copy', 'ac3', 'eac3'].map((c) => (
@@ -813,16 +860,24 @@ function OutputPanel({ s, mut, api }: PanelProps & { api: AppApi }): JSX.Element
             <input type="checkbox" checked={o.faststart} onChange={(e) => mut((st) => void (st.out.faststart = e.target.checked))} />
             <span>faststart</span>
           </label>
+          <Help k="faststart" />
           <label className="vcp__pick">
             <input type="checkbox" checked={o.pixFmt} onChange={(e) => mut((st) => void (st.out.pixFmt = e.target.checked))} />
             <span>yuv420p</span>
           </label>
+          <Help k="pixfmt" />
         </div>
 
-        <label>附加参数</label>
+        <div className="field-label">
+          <label>附加参数</label>
+          <Help k="extra" />
+        </div>
         <input className="input mono" placeholder="原样追加到命令末尾" value={o.extra} onChange={(e) => mut((st) => void (st.out.extra = e.target.value))} />
 
-        <label>输出到</label>
+        <div className="field-label">
+          <label>输出到</label>
+          <Help k="outpath" />
+        </div>
         <div className="row">
           <input
             className="input vcp__path"

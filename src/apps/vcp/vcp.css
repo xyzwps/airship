@@ -85,9 +85,17 @@
 
 .field-grid {
   display: grid;
-  grid-template-columns: 84px 1fr;
+  /* 100px：标签那一格要容得下「质量 / 速度」再加旁边那颗 ? */
+  grid-template-columns: 100px 1fr;
   gap: 8px 10px;
   align-items: center;
+}
+
+/* 标签与它旁边的 ? 键：一行里贴左排，? 不许把标签挤下去 */
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .field-grid .row,
@@ -147,6 +155,13 @@
   font-size: 11px;
   font-weight: 700;
   opacity: 0.7;
+}
+
+/* 组名与它旁边的 ? 键同一行，别把 ? 挤到下一组去 */
+.vcp__stream-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .vcp__pick {
@@ -363,6 +378,288 @@
 .chip--bad {
   background: color-mix(in srgb, var(--danger) 18%, transparent);
   color: var(--danger);
+}
+
+/* ---------- 参数说明：? 键与悬浮卡 ---------- */
+
+.vcp__help {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  /* 悬停底色是方的，与壳里其余动作键一路：圆的是图形，不是热区 */
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg-faint);
+  cursor: default;
+}
+
+.vcp__help svg {
+  display: block;
+}
+
+.vcp__help:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.vcp__help:focus-visible {
+  background: var(--bg-hover);
+  color: var(--fg);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 卡片吃鼠标：它与问号是同一块热区，指针挪过来不算离开（`.selectable` 是壳的公用类，文字选得中） */
+.vcp__help-card {
+  /* 面板自己会滚，绝对定位会被 overflow 剪掉半张卡 */
+  position: fixed;
+  z-index: 20;
+  width: 320px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* 指着问号那一头：一颗转了 45° 的方片，留两条边、抹两条边，看着就是卡片长出来的尖。
+   横向位置由 --caret-x 给（卡片被视口边界夹过时不在问号正中，尖得自己找回问号） */
+.vcp__help-card::after {
+  content: '';
+  position: absolute;
+  left: var(--caret-x, 50%);
+  margin-left: -5px;
+  width: 10px;
+  height: 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  transform: rotate(45deg);
+}
+
+.vcp__help-card--below::after {
+  top: -6px;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.vcp__help-card--above::after {
+  bottom: -6px;
+  border-left-color: transparent;
+  border-top-color: transparent;
+}
+
+.vcp__help-title {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.vcp__help-line {
+  display: flex;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.vcp__help-tag {
+  flex: none;
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+
+/* ---------- 说明卡里的小动画（纯 CSS） ---------- */
+
+.vcp__demo {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vcp__demo-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vcp__demo-cap {
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+
+.vcp__demo-track {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-active);
+}
+
+.vcp__demo-knob {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--fg);
+  animation: vcp-crf-knob 4s ease-in-out infinite alternate;
+}
+
+.vcp__demo-bar {
+  height: 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.vcp__demo-fill {
+  display: block;
+  height: 100%;
+  width: 92%;
+  background: var(--accent);
+  opacity: 0.55;
+  animation: vcp-crf-size 4s ease-in-out infinite alternate;
+}
+
+.vcp__demo-file {
+  position: relative;
+  height: 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.vcp__demo-mdat {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  background: var(--bg-active);
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+
+.vcp__demo-moov {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 10px;
+  animation: vcp-moov 4s ease-in-out infinite;
+}
+
+.vcp__demo-play {
+  color: var(--ok);
+  animation: vcp-play 4s linear infinite;
+}
+
+.vcp__demo-chroma {
+  height: 18px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  font-size: 10px;
+  color: var(--bg);
+  background-image: linear-gradient(90deg, #d98a80 33.3%, #83b395 33.3% 66.6%, #7fa8d8 66.6%);
+  background-size: 12px 100%;
+}
+
+/* 色度那一层摊开一倍就是 4:2:0：动的只有 background-size 这一件事，亮度不动 */
+.vcp__demo-chroma--half {
+  animation: vcp-chroma 3s ease-in-out infinite alternate;
+}
+
+@keyframes vcp-chroma {
+  from {
+    background-size: 12px 100%;
+  }
+  to {
+    background-size: 24px 100%;
+  }
+}
+
+@keyframes vcp-crf-knob {
+  from {
+    left: 0;
+  }
+  to {
+    left: calc(100% - 10px);
+  }
+}
+
+@keyframes vcp-crf-size {
+  from {
+    width: 92%;
+  }
+  to {
+    width: 22%;
+  }
+}
+
+@keyframes vcp-moov {
+  0%,
+  12% {
+    left: calc(100% - 46px);
+  }
+  45%,
+  100% {
+    left: 2px;
+  }
+}
+
+@keyframes vcp-play {
+  0%,
+  40% {
+    opacity: 0.25;
+  }
+  55%,
+  100% {
+    opacity: 1;
+  }
+}
+
+/* 关了系统动效的人要看到同一张图的结论，不是看到静止的半成品 */
+@media (prefers-reduced-motion: reduce) {
+  .vcp__demo-knob,
+  .vcp__demo-fill,
+  .vcp__demo-moov,
+  .vcp__demo-play {
+    animation: none;
+  }
+
+  .vcp__demo-knob {
+    left: calc(100% - 10px);
+  }
+
+  .vcp__demo-fill {
+    width: 22%;
+  }
+
+  .vcp__demo-play {
+    opacity: 1;
+  }
+
+  .vcp__demo-chroma--half {
+    animation: none;
+    background-size: 24px 100%;
+  }
 }
 
 @media (max-width: 900px) {
