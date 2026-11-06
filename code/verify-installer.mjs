@@ -21,10 +21,10 @@ const fail = (message) => {
   process.exit(1)
 }
 
-if (!existsSync(release)) fail('还没有 release/ 目录，先跑 npm run dist')
+if (!existsSync(release)) fail('还没有 release/ 目录，先跑 just dist')
 
 const exes = readdirSync(release).filter((n) => /^airship-Setup-.*-x64\.exe$/.test(n))
-if (exes.length === 0) fail('release/ 里没有安装包，先跑 npm run dist')
+if (exes.length === 0) fail('release/ 里没有安装包，先跑 just dist')
 
 const expected = `airship-Setup-${pkg.version}-x64.exe`
 if (!exes.includes(expected)) fail(`没有版本 ${pkg.version} 的安装包，release/ 里是：${exes.join(', ')}`)

@@ -3,7 +3,7 @@
 一条命令产出一个 `setup.exe`，拷给别人双击安装即可。**客户机不需要装 Node、不需要装 Electron。**
 
 ```bash
-npm run dist
+just dist
 ```
 
 产物：
@@ -19,11 +19,16 @@ npm run dist
 
 | 命令 | 做什么 |
 |---|---|
-| `npm run dist` | 构建三个目标 + 出安装包（含 `.sha256` 之前先跑 `npm run verify-installer`） |
-| `npm run pack` | 只出 `release/win-unpacked/`，不编安装包（调包体内容时用） |
-| `npm run verify-installer` | 出包后自检：安装包在不在、是不是 NSIS 向导、体积、写 `.sha256` |
-| `npm run icon` | 由母版 `assets/icon-master.png` 重出 `assets/icon.ico`（16/24/32/48/64/128/256） |
-| `npm run shot` | 逐窗口截图，验证"真的跑起来了"（安装包出之前至少跑一遍） |
+| `just dist` | 先清场，再构建三个目标 + 出安装包 + 自检（`.sha256` 由自检写）。唯一的发布入口 |
+| `just verify-installer` | 出包后自检：安装包在不在、是不是 NSIS 向导、体积、写 `.sha256` |
+| `just icon` | 由母版 `assets/icon-master.png` 重出 `assets/icon.ico`（16/24/32/48/64/128/256） |
+| `just shot` | 逐窗口截图，验证"真的跑起来了"（安装包出之前至少跑一遍） |
+
+> 清场（`code/clean-installer.mjs`）为什么算必要步骤：安装包的名字只由 `package.json` 的 version
+> 决定，不 bump 版本号就永远是同一个文件名；一次没写成安装包的运行（`dist` 半路失败，或只跑了解包）
+> 会让上一次那颗原地留着冒充刚出的那版。`verify-installer` 按名字匹配、只验 PE 头与 NSIS 签名，
+> 对旧包照样全绿，还会把 `.sha256` 一起改成旧包的。规矩：**release/ 里的安装包永远等于最后一次构建，
+> 宁可没有，不可有旧的**。清掉的这颗重跑一次 `dist` 就回来；`win-unpacked` 不在删除范围内。
 
 ## 里面装了什么
 
@@ -44,7 +49,7 @@ npm run dist
 
 ## 已验证到哪一步
 
-- `npm run dist` 出包 + `npm run verify-installer` 自检通过（MZ 头、NSIS 签名、SHA256）。
+- `just dist` 出包 + `just verify-installer` 自检通过（MZ 头、NSIS 签名、SHA256）。
 - **打包版真跑过**：直接执行 `release/win-unpacked/飞船.exe --shot`，六个窗口（启动器 + 五个应用）
   都开出来并截到图；再带 `AIRSHIP_AUTOTEST` 导入一份真 PDF，页面渲染正常 —— 说明排除构建期依赖没排除错。
 - 打包版与开发版共用 `%APPDATA%/airship`，装上去书架是同一份。

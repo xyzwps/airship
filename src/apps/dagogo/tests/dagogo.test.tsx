@@ -15,7 +15,7 @@ import type { Task } from '@apps/dagogo/types'
  * 打勾勾的全部数据都在应用自己的 data 目录里（dagogo.json），导出文件与手机版互读，
  * 托盘徽标与提示文字交给壳——三条都拿 FakeAirship 断言。
  *
- * 托盘那张图是渲染侧用 canvas 画的（jsdom 没有 2D 上下文，图上的字归 `npm run shot`），
+ * 托盘那张图是渲染侧用 canvas 画的（jsdom 没有 2D 上下文，图上的字归 `just shot`），
  * 所以只把它换成一张假图，断言仍落在壳收到的 `tray.set` 入参上。
  */
 

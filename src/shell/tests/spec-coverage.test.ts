@@ -3,7 +3,7 @@ import { basename, dirname, join, relative, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * 规格册与用例的绑定检查（`npm run casecov`，对应 wslc-desktop 的 `just casecov`）。
+ * 规格册与用例的绑定检查（`just casecov`，对应 wslc-desktop 的 `just casecov`）。
  *
  * 册子与用例都**跟着它们管的代码走**：
  *

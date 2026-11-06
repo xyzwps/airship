@@ -12,7 +12,7 @@ import { loadBooks } from '@shared/library'
  * 渲染库（foliate-js）在测试里真跑不起来，所以整个换成替身：
  * 替身只记"我们的代码交出去的是什么、翻了几页、跳到哪"，
  * 排版产物、目录、字号、进度落盘、键位与滚轮这些判据都落在我们自己的代码上。
- * 真书渲染的观感归 `npm run shot`。
+ * 真书渲染的观感归 `just shot`。
  *
  * TXT 的章节切分与分段那五条在 src/apps/books/__tests__/txtBook.test.ts，编号已收进这本。
  */

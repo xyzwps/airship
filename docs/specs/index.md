@@ -16,7 +16,7 @@ docs/specs/index.md           这本索引——唯一跨区的文件，与架�
 src/<区>/<名>/tests/fixtures/   真样本跟着用它的用例走（wslc 的真实输出在 src/apps/wsld/tests/fixtures/）
 ```
 
-`npm run casecov` 递归找所有 `specs/*.md` 与 `tests/**` 里的用例，新加区域不用改检查器。
+`just casecov` 递归找所有 `specs/*.md` 与 `tests/**` 里的用例，新加区域不用改检查器。
 
 ## 结构（固定四档）
 
@@ -56,7 +56,7 @@ src/<区>/<名>/tests/fixtures/   真样本跟着用它的用例走（wslc 的�
    跨进程调用（能力位名、错误文案原文）。它们是外部真看得见的一面，允许出现，但仍不写由哪个类去发。
 3. **一条 Scenario 只锁一个不变量。**
 4. **bug fix 必须先补 Scenario**（描述现象），再补可执行用例，再改代码。
-5. 界面观感（宽度、圆角、对齐）不进册子——那是 `npm run shot` 截图走查的事，产物不入代码库。
+5. 界面观感（宽度、圆角、对齐）不进册子——那是 `just shot` 截图走查的事，产物不入代码库。
 6. **写不出可执行判据的期望别进册子**。只能在真机上观察的东西（单实例锁、崩溃隔离、任务栏缩略图）
    记在 [../architecture.md](../architecture.md) 对应小节；册子里每一条都要有一个挂得上编号的用例。
 7. 每条契约讲不清"为什么这样定"时，在 Requirement 正文里给一句指向 architecture.md 的引用，别把依据抄成长段。
@@ -70,7 +70,7 @@ it('SH-001 启动只出现启动器窗口', () => { … })
 ```
 
 ```bash
-npm run casecov   # = npx vitest run spec-coverage，册里编号与用例编号做双向差集
+just casecov   # = vitest run spec-coverage，册里编号与用例编号做双向差集
 ```
 
 册里有号、用例没挂 = 未实现；用例挂了号、册子里没有 = 私测（禁止）。
@@ -78,7 +78,7 @@ npm run casecov   # = npx vitest run spec-coverage，册里编号与用例编号
 
 ## 能力索引
 
-验证档：**自动化** = `npm test` 默认跑；**门控** = 用例存在但按环境变量跳过（要真环境）；**截图** = `npm run shot`。
+验证档：**自动化** = `just test` 默认跑；**门控** = 用例存在但按环境变量跳过（要真环境）；**截图** = `just shot`。
 
 ### 壳（`src/shell/` + `src/shared/protocol.ts`）
 
@@ -124,4 +124,4 @@ npm run casecov   # = npx vitest run spec-coverage，册里编号与用例编号
 ## 加一个新能力
 
 索引表添一行、取一个没用过的两字母前缀、开一本新册子。
-册子写完后跑 `npm run casecov`：漏挂的编号会逐条列出来。
+册子写完后跑 `just casecov`：漏挂的编号会逐条列出来。

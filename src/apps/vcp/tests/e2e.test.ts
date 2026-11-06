@@ -8,8 +8,8 @@ import { createState, type AppState } from '../state'
 
 /**
  * 真素材 / 真编码用例，对应 SelfTest.cs 的 [3][6][7][8]。
- * 默认跳过（npm test 保持快），用 VCP_E2E=1 打开：
- *   VCP_E2E=1 npx vitest run e2e
+ * 默认跳过（just test 保持快），用 VCP_E2E=1 打开：
+ *   just e2e
  *
  * 素材与 ffmpeg 位置用环境变量给，不给就回落到本机的已知位置，没有就跳过——
  * 不让测试因为环境差异假失败。

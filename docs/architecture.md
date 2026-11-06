@@ -7,7 +7,7 @@
 状态标记：`[已实现]` 架构规定且代码已达到 · `[待达]` 架构已规定，实现尚未达到
 
 当前进度（2026-11-06）：**§3 每应用独立窗口已落实**，能力边界是强制而非约定（身份由 preload 注入 + 主进程按 `event.sender` 反查归属，双重确认），七条不变量全部有测试或机制守住。
-用户可见契约已按册子建档（册子与用例跟着代码放在各自区域，索引在 `docs/specs/index.md`），用例编号与册子双向差集由 `npm run casecov` 钉住。
+用户可见契约已按册子建档（册子与用例跟着代码放在各自区域，索引在 `docs/specs/index.md`），用例编号与册子双向差集由 `just casecov` 钉住。
 本轮契约变化：拒绝措辞收进 `shared/errors.ts` 一份；清单新增 `platforms`（平台可用）与 `tools`（外部工具声明）；`tools.ffmpegPath()` 改为 `tools.path(name)`，工具发现做成内置表（ffmpeg / wslc）。实测数据见 §3.1。
 
 ---
@@ -426,12 +426,12 @@ export interface AppMeta {
 | 关键库 | foliate-js 1.0.1（自带 mobi.js，MOBI6+KF8+PalmDOC+HUFF/CDIC）· pdfjs-dist 6.5.438 |
 | 版本约束原因 | vitest 5 要求 node ≥26，本机 node 25.9，故钉 4.x；npm registry 与 electron 二进制走 npmmirror |
 | 构建 | 三目标：main / preload / renderer；应用各自懒加载 chunk |
-| 打包 | `npm run dist`：electron-builder 出 NSIS 安装包 `release/airship-Setup-<版本>-x64.exe`，`npm run verify-installer` 自检并写 `.sha256`；细节与未做的事（无代码签名、无自动更新）见 [release-packaging.md](release-packaging.md) |
+| 打包 | `just dist`：electron-builder 出 NSIS 安装包 `release/airship-Setup-<版本>-x64.exe`，`just verify-installer` 自检并写 `.sha256`；细节与未做的事（无代码签名、无自动更新）见 [release-packaging.md](release-packaging.md) |
 | 图标 | 母版 `assets/icon-master.png`（用户提供的图形），`python code/make-icons.py` 重出 `assets/icon.png`（256，窗口图标）与 `assets/tray.png`（16，托盘默认），`python code/make-ico.py` 重出 `assets/icon.ico`（16–256 七档，安装包与 exe 的图标）；标题栏那颗品牌图形是同一张图的 SVG 简化版，写在 `shell/Titlebar.tsx` |
 | 安全 | `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`；CSP 允许 `blob:`（foliate 用 blob iframe 渲章节）与样式 `unsafe-inline`（禁掉书就没排版），脚本只 `'self'` |
 | 外部链接 | 只放行 `http/https`，交给系统浏览器；`file://` 与自定义协议不开新窗 |
 
-命令：`npm run dev` 开发 · `npm run build` 构建 · `npm run dist` 出安装包 · `npm run verify-installer` 出包自检 · `npm test` 单测 · `npm run casecov` 册子与用例的双向差集 · `npm run typecheck` 两个 tsconfig · `npm run shot` 逐窗口截图 · `VCP_E2E=1 npx vitest run e2e` 真编码用例 · `AIRSHIP_WSLD_INTEGRATION=1 npx vitest run wsld/tests/real` 真 `wslc` 只读命令。
+命令：`just dev` 开发 · `just build` 构建 · `just dist` 出安装包 · `just verify-installer` 出包自检 · `just test` 单测 · `just casecov` 册子与用例的双向差集 · `just typecheck` 两个 tsconfig · `just shot` 逐窗口截图 · `just e2e` 真编码用例 · `just wsld-real` 真 `wslc` 只读命令。
 
 ---
 
@@ -443,7 +443,7 @@ export interface AppMeta {
 四档结构（Purpose / Requirement / Scenario / WHEN-THEN-AND）、稳定编号、只写可观察结果、不写实现。
 规矩与能力索引见 [specs/index.md](specs/index.md)。
 
-绑定方式：用例标题以编号开头（`it('SH-001 …')`），`npm run casecov` 做**双向差集**——
+绑定方式：用例标题以编号开头（`it('SH-001 …')`），`just casecov` 做**双向差集**——
 册里有号没用例 = 未实现，用例有号册里没有 = 私测。两者都算红。
 "写不出可执行判据"的期望不进册子（单实例锁、崩溃隔离这类留在本文 §3）。
 
@@ -455,7 +455,7 @@ export interface AppMeta {
 | 界面用例 | jsdom + `tests/helpers/mount.tsx` + `tests/helpers/fakeAirship.ts`（壳的测试替身） | 真渲染真点击：看得见什么文字、点下去变成什么、被拒时念哪句 |
 | 边界测试 | 扫 import 图 | 不变量 I-1、I-5、I-6 |
 | 门控用例 | `VCP_E2E=1` 真编码；`AIRSHIP_WSLD_INTEGRATION=1` 真 `wslc` 只读命令 | 与真实外部 CLI 的集成；默认跳过，编号仍算已实现 |
-| 渲染 | `npm run shot` 逐窗口 `capturePage`，真书/真 PDF/真视频探测数据 | 真的画出来了 |
+| 渲染 | `just shot` 逐窗口 `capturePage`，真书/真 PDF/真视频探测数据 | 真的画出来了 |
 | 性能 | 按用户可感知口径实测：窗口挂载、开书、PDF 出图、每窗口内存 | 不是猜的（§3.1） |
 
 `tests/helpers/fakeAirship.ts` 是这一层的地基：它按契约把 `window.airship` 装成一个内存里的小壳——
@@ -477,7 +477,7 @@ export interface AppMeta {
 
 1. **MOBI 仍无真样本可验**。解析走 foliate-js 自带的 `mobi.js`，与 EPUB 同一条 `view.open` 自动识别路径；机器上没有 .mobi/.azw3，这条只能挂着。
 2. **EPUB 翻页延迟未单独采样**。目前只有"打开到首屏"的数字；翻页要另做标记。
-3. **阶段 D 已做，阶段 C 未做**。`npm run dist` 出 Windows 安装包（见 [release-packaging.md](release-packaging.md)），但应用与壳仍同仓同构建——改一个应用要重出整个安装包："独立修改"已经做到，"独立构建"（运行时从磁盘加载应用包）还没做。安装包也没有代码签名，首次运行会有 SmartScreen 那道提示。
+3. **阶段 D 已做，阶段 C 未做**。`just dist` 出 Windows 安装包（见 [release-packaging.md](release-packaging.md)），但应用与壳仍同仓同构建——改一个应用要重出整个安装包："独立修改"已经做到，"独立构建"（运行时从磁盘加载应用包）还没做。安装包也没有代码签名，首次运行会有 SmartScreen 那道提示。
 4. **窗口数不设上限**：五个应用全开约 500 MB。真觉得吃紧再加"同应用多窗口"或闲置回收策略。
 5. **wsld 只移植了核心三块**（容器、镜像、日志）。原版还有而这里先没有的：`run` 命令编排（40 余字段拼装/校验/反解）、
    registry mirror（Docker Hub 路径改写与 pull 后改名）、拉取实时进度。

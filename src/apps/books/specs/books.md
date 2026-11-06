@@ -3,7 +3,7 @@
 ## Purpose
 墨读那一屏：书架与阅读器，管 EPUB / MOBI / TXT。
 书目、封面、进度与 PDF 应用是同一份数据（判据见 `src/shared/library/specs/library.md`），这里只管墨读自己画出来的东西
-与它交给渲染库的内容。真书的排版观感归 `npm run shot`。
+与它交给渲染库的内容。真书的排版观感归 `just shot`。
 
 ### Requirement: 书架只列自家格式，但那份书是共用的
 两个入口一份索引：这里筛掉 PDF，剩下的归墨读。

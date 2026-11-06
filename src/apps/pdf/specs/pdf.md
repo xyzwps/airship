@@ -3,7 +3,7 @@
 ## Purpose
 PDF 那一屏：书架只列 PDF，阅读界面只有翻页与缩放。
 书目、封面、进度与墨读是同一份数据（判据见 `src/shared/library/specs/library.md`），这里只管 PDF 自己画出来的东西。
-真出图的观感与性能归 `npm run shot`，不在这本册子里。
+真出图的观感与性能归 `just shot`，不在这本册子里。
 
 ### Requirement: 书架上只列 PDF，但那份书是共用的
 两个入口一份索引：这里筛 `format` 是 pdf 的那几本，别的归墨读。

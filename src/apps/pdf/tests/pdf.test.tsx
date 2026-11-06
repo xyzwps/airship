@@ -11,7 +11,7 @@ import { loadBooks } from '@shared/library'
  *
  * pdf.js 在测试里真起不来（没有 worker，jsdom 也没有画布），所以把那一层换成替身：
  * 只交页数与"取一页"，剩下的全是应用自己的代码——续读落点、页码与缩放那一栏、
- * 出图期间的提示、导入时把页数写进这本的附加信息。真出图那条归 `npm run shot`。
+ * 出图期间的提示、导入时把页数写进这本的附加信息。真出图那条归 `just shot`。
  *
  * 书库与墨读共用同一份索引：断言读的都是 userData/shared/library 里那个文件。
  */

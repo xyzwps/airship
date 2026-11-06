@@ -12,7 +12,7 @@ import { imageReference, containerName } from '../model'
  * 它直接问本机的 wslc.exe，**只跑只读命令**：这是用户自己的机器，
  * 建容器、删容器、拉镜像那类会留下痕迹的动作一概不碰。
  *
- *   $env:AIRSHIP_WSLD_INTEGRATION = "1"; npx vitest run src/apps/wsld/tests/real.test.ts
+ *   just wsld-real
  */
 
 const ENABLED = process.env['AIRSHIP_WSLD_INTEGRATION'] === '1'
