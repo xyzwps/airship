@@ -225,50 +225,6 @@
   flex: none;
 }
 
-/* 动作键是图标：平时无边框无底色，悬停给一块方形反馈，删除那颗用危险色 */
-.icon-btn {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--fg-dim);
-  cursor: default;
-}
-
-.icon-btn:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--fg);
-}
-
-.icon-btn:disabled {
-  color: var(--fg-faint);
-  opacity: 0.5;
-}
-
-.icon-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.icon-btn--danger {
-  color: var(--danger, #b3564e);
-}
-
-.icon-btn--danger:hover:not(:disabled) {
-  color: var(--danger, #b3564e);
-}
-
-/* 页签那两颗：选中态要看得见，用底部一条强调色横线 */
-.icon-btn--on {
-  color: var(--fg);
-  border-bottom: 2px solid var(--accent);
-  border-radius: var(--radius) var(--radius) 0 0;
-}
-
 .wsld__pane {
   display: flex;
   flex-direction: column;

@@ -281,6 +281,12 @@ export interface AirshipBridge {
     toggleMaximize(): Promise<void>
     close(): Promise<void>
     isMaximized(): Promise<boolean>
+    /**
+     * 把"正在看什么"交给标题栏中段（`null` 收回）。
+     * 书名是应用的内容，不是窗口名字：任务栏那侧念的是「墨读 · 书名」，
+     * 窗口里那行中段念的是书名本身。
+     */
+    setTitle(title: string | null): Promise<void>
   }
 
   /** 订阅壳事件（只收本窗口该收到的），返回退订函数 */

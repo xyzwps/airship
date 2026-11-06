@@ -332,22 +332,53 @@ describe('阅读界面那一栏与字号', () => {
     return mountUi(<BooksApp api={fake.api} />, { fake })
   }
 
-  it('BK-016 顶栏那颗「← 书架」回书架', async () => {
+  it('BK-016 顶栏那颗回书架的图标键点了就回书架', async () => {
     const m = await reader()
     await m.press('起风了')
-    expect(m.text()).toContain('← 书架')
-    await m.press('← 书架')
+    const back = m.field('回书架')
+    expect(back, '顶栏该有一颗回书架的图标键').not.toBeNull()
+    // 纯图标键：悬停说明与无障碍名称都得说话
+    expect(back!.getAttribute('title')).toBe('返回书架')
+    expect(back!.getAttribute('aria-label')).toBe('返回书架')
+    await m.pressIn('.icon-btn')
     expect(m.text()).toContain('导入书籍')
     m.unmount()
   })
 
-  it('BK-017 顶栏念得出书名与作者，底下那行念得出共几节', async () => {
+  it('BK-031 顶栏没有翻页键', async () => {
     const m = await reader()
     await m.press('起风了')
+    expect(m.text()).not.toContain('上一页')
+    expect(m.text()).not.toContain('下一页')
+    // 剩下的都是必需项
+    expect(m.field('回书架')).not.toBeNull()
+    expect(m.text()).toContain('目录')
+    expect(m.text()).toContain('A＋')
+    m.unmount()
+  })
+
+  it('BK-017 书名交给标题栏中段，底栏念得出读到哪一节与全书进度', async () => {
+    const fake = shelf()
+    fake.seed(`${SHARED}/library.json`, `${JSON.stringify({ version: 2, books: [record({ progress: null })] }, null, 2)}
+`)
+    fake.seed(`${SHARED}/files/b1.txt`, TXT_BODY)
+    const m = await mountUi(<BooksApp api={fake.api} />, { fake })
+    await m.press('起风了')
     await m.settle()
-    expect(m.text()).toContain('起风了')
-    expect(m.text()).toContain('堀辰雄')
-    expect(m.text()).toContain('方向键 / 空格 / 滚轮翻页 · 共 2 节')
+
+    // 书名与作者交给标题栏中段（应用窗口里由宿主画出来，见 SH-019）
+    expect(fake.windowTitles.at(-1)).toBe('起风了 · 堀辰雄')
+    // 工具条上不再重复一份书名
+    expect(m.container.querySelector('.books-reader__title')).toBeNull()
+
+    // 底栏：第几节 / 共几节 + 全书百分比
+    const hint = m.container.querySelector('.books-reader__hint')!.textContent!.replace(/\s+/g, ' ')
+    expect(hint).toContain('第 1 / 2 节')
+    expect(hint).toMatch(/约 \d+%/)
+
+    await m.pressIn('.icon-btn')
+    await m.settle()
+    expect(fake.windowTitles.at(-1)).toBeNull()
     m.unmount()
   })
 
@@ -500,7 +531,7 @@ describe('续读落在上次的位置，翻页写回共用索引', () => {
     const m = await mount(fake)
     await m.press('起风了')
     await m.key('ArrowRight')
-    await m.press('← 书架')
+    await m.pressIn('.icon-btn')  // 回书架那颗是纯图标键
 
     const [book] = await loadBooks(fake.api)
     expect(book!.progress?.section).toBe(1)
@@ -535,7 +566,10 @@ describe('翻页输入', () => {
     await wheel(40)
     expect(rec.nextCalls).toBe(0)
     await wheel(110)
-    await m.settle()
+    // 滚轮是每 220ms 排一次额度：等真时间过去，别用 settle() 的空转（负载高时会偶发红）
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 260))
+    })
     expect(rec.nextCalls).toBe(1)
     m.unmount()
   })
@@ -554,7 +588,7 @@ describe('翻页输入', () => {
     await m.key('ArrowRight')
     expect(first.nextCalls).toBe(1)
 
-    await m.press('← 书架')
+    await m.pressIn('.icon-btn')  // 回书架那颗是纯图标键
     await m.press('河上的船')
     await m.settle()
     const second = foliate.views[1]!

@@ -148,7 +148,8 @@ const bridge: AirshipBridge = {
     minimize: () => call<void>('window:minimize'),
     toggleMaximize: () => call<void>('window:toggleMaximize'),
     close: () => call<void>('window:close'),
-    isMaximized: () => call<boolean>('window:isMaximized')
+    isMaximized: () => call<boolean>('window:isMaximized'),
+    setTitle: (title: string | null) => call<void>('window:setTitle', title)
   },
 
   on: (listener: ShellEventListener) => {

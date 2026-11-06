@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { makeBook } from 'foliate-js/view.js'
 import { useTheme } from '../../shell/theme'
+import { IconButton } from '../../shell/IconButton'
 import { useAppAutotest } from '../../shell/autotest'
 import { markPerf } from '../../shell/shot'
 import type { AppApi } from '@shared/protocol'
@@ -92,6 +93,7 @@ export default function BooksApp({ api }: { api: AppApi }): JSX.Element {
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sectionCount, setSectionCount] = useState(0)
+  const [pos, setPos] = useState({ section: 0, fraction: 0 })
 
   const readerRef = useRef<ReaderHandle>(null)
   const progressRef = useRef<BookProgress | null>(null)
@@ -130,6 +132,7 @@ export default function BooksApp({ api }: { api: AppApi }): JSX.Element {
   const handleProgress = useCallback(
     (p: BookProgress) => {
       progressRef.current = p
+      setPos({ section: p.section ?? 0, fraction: p.fraction ?? 0 })
       if (flushTimer.current) return
       flushTimer.current = setTimeout(() => {
         flushTimer.current = null
@@ -231,19 +234,24 @@ export default function BooksApp({ api }: { api: AppApi }): JSX.Element {
     setTocOpen(false)
   }
 
+  // 书名是"正在看什么"，交给标题栏中段；合上就收回，任务栏恢复成只念应用名
+  useEffect(() => {
+    void api.window.setTitle(openBook ? (openBook.author ? `${openBook.title} · ${openBook.author}` : openBook.title) : null)
+  }, [api, openBook])
+
   /* ---------- 渲染 ---------- */
 
   if (openBook) {
     return (
       <div className="books-reader" style={{ background: theme.paper, color: theme.ink }}>
         <header className="books-reader__bar">
-          <button type="button" className="btn btn--ghost" onClick={() => setOpenBook(null)}>
-            ← 书架
-          </button>
-          <div className="books-reader__title" title={openBook.title}>
-            {openBook.title}
-            {openBook.author && <span className="books-reader__author"> · {openBook.author}</span>}
-          </div>
+          <IconButton
+            icon="back"
+            label="返回书架"
+            testId="回书架"
+            onClick={() => setOpenBook(null)}
+          />
+
           <div className="row">
             <button type="button" className="btn btn--ghost" onClick={() => setTocOpen((v) => !v)} disabled={toc.length === 0}>
               目录{toc.length ? ` ${toc.length}` : ''}
@@ -255,12 +263,7 @@ export default function BooksApp({ api }: { api: AppApi }): JSX.Element {
             <button type="button" className="btn btn--ghost" onClick={() => changeFont(0.1)} disabled={fontScale >= FONT_MAX}>
               A＋
             </button>
-            <button type="button" className="btn btn--ghost" onClick={() => readerRef.current?.prev()}>
-              上一页
-            </button>
-            <button type="button" className="btn btn--ghost" onClick={() => readerRef.current?.next()}>
-              下一页
-            </button>
+
           </div>
         </header>
 
@@ -298,7 +301,9 @@ export default function BooksApp({ api }: { api: AppApi }): JSX.Element {
 
         {error && <div className="books-reader__error">{error}</div>}
         <div className="books-reader__hint">
-          方向键 / 空格 / 滚轮翻页 · 共 {sectionCount} 节
+          {'方向键 / 空格 / 滚轮翻页 · '}
+          第 {Math.min(pos.section + 1, sectionCount || 1)} / {sectionCount} 节 · 约{' '}
+          {sectionCount === 0 ? 0 : Math.min(100, Math.round(((pos.section + pos.fraction) / sectionCount) * 100))}%
         </div>
       </div>
     )

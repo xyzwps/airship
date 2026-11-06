@@ -31,7 +31,8 @@ interface FoliateView extends HTMLElement {
   }
   renderer?: {
     setStyles?(styles: Record<string, string>): void
-    getContents?(): { doc?: Document }[]
+    /** 已经渲染出来的那几页文档：注入纸面样式要用 */
+    getContents?(): { doc?: Document; index?: number }[]
     addEventListener(type: string, fn: (e: CustomEvent) => void): void
   }
   lastLocation?: { cfi?: string; tocItem?: { label?: unknown; href?: unknown } }
@@ -111,6 +112,28 @@ export const ReaderView = forwardRef<ReaderHandle, Props>(function ReaderView(
   const stateRef = useRef({ fontScale, theme })
   stateRef.current = { fontScale, theme }
 
+  /**
+   * 把纸面与墨色钉进每一节的文档。
+   *
+   * `setStyles` 只把颜色写在渲染器那层，EPUB 自带的 CSS 常写 `body{background:#fff}`，
+   * 于是暗色模式下书叶还是白底——只能往每节文档里塞一条带 !important 的样式才压得住。
+   */
+  const applyPaper = (doc: Document | null | undefined): void => {
+    if (!doc || !doc.head) return
+    const t = stateRef.current.theme
+    let el = doc.getElementById('airship-paper') as HTMLStyleElement | null
+    if (!el) {
+      el = doc.createElement('style')
+      el.id = 'airship-paper'
+      doc.head.appendChild(el)
+    }
+    el.textContent = `html,body{background:${t.paper} !important;background-color:${t.paper} !important;color:${t.ink} !important;}`
+  }
+
+  const applyPaperToAll = (): void => {
+    for (const content of viewRef.current?.renderer?.getContents?.() ?? []) applyPaper(content.doc)
+  }
+
   const applyStyles = (): void => {
     const { fontScale: scale, theme: t } = stateRef.current
     viewRef.current?.renderer?.setStyles?.({
@@ -131,6 +154,7 @@ export const ReaderView = forwardRef<ReaderHandle, Props>(function ReaderView(
 
   useEffect(() => {
     applyStyles()
+    applyPaperToAll()
   }, [fontScale, theme.ink, theme.paper])
 
   useEffect(() => {
@@ -224,6 +248,7 @@ export const ReaderView = forwardRef<ReaderHandle, Props>(function ReaderView(
       view.addEventListener('load', (e) => {
         const detail = (e as CustomEvent).detail as { doc?: Document } | undefined
         bindKeys(detail?.doc ?? null)
+        applyPaper(detail?.doc)
       })
 
       bindKeys(document)

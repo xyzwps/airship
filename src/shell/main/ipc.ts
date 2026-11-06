@@ -48,6 +48,7 @@ import {
   writeDenied
 } from '@shared/errors'
 import {
+  APP_MAP,
   canAccessShared,
   canUseTool,
   hasCapability,
@@ -539,6 +540,16 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
   handle('window:isMaximized', (event) => {
     senderOwner(event)
     return ownWindow(event)?.isMaximized() ?? false
+  })
+
+  // 应用把"正在看什么"交给标题栏中段；任务栏那侧念「应用名 · 书名」
+  handle('window:setTitle', (event, title: unknown) => {
+    const owner = senderOwner(event)
+    const win = ownWindow(event)
+    if (!win) return
+    const base = owner === 'shell' ? '飞船' : APP_MAP.get(owner)?.name ?? String(owner)
+    const sub = typeof title === 'string' && title.trim() ? title.trim() : null
+    win.setTitle(sub ? `${base} · ${sub}` : base)
   })
 
   /* ---------- 启动器专用面 ---------- */

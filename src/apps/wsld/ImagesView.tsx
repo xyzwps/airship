@@ -1,4 +1,4 @@
-import { IconButton } from './IconButton'
+import { IconButton } from '@shell/IconButton'
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import { loadImages, nextJobId, pullArgs, rmiArgs, type WslcRunner } from './cli'
 import {

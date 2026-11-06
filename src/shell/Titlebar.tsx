@@ -4,7 +4,7 @@ import { useEffect, useState, type JSX } from 'react'
  * 自绘标题栏。窗口是 frame:false，所以最小化/最大化/关闭得自己画。
  * 整条是可拖拽区（CSS 里的 -webkit-app-region: drag），按钮那一块显式排除。
  */
-export function Titlebar({ here, icon }: { here?: string | null; icon?: React.ReactNode }): JSX.Element {
+export function Titlebar({ here, center, icon }: { here?: string | null; center?: string | null; icon?: React.ReactNode }): JSX.Element {
   const [maximized, setMaximized] = useState(false)
 
   useEffect(() => {
@@ -32,16 +32,11 @@ export function Titlebar({ here, icon }: { here?: string | null; icon?: React.Re
             <rect x="8.9" y="8.3" width="4.6" height="4.6" rx="2" fill="#eba6b8" />
           </svg>
         )}
-        <span>飞船</span>
-        {here && (
-          <>
-            <span style={{ color: 'var(--fg-faint)' }}>/</span>
-            <span className="titlebar__here">{here}</span>
-          </>
-        )}
+        {/* 应用窗口只念应用名：这扇窗就是那个应用，"飞船 / "前缀是多余的自我说明 */}
+        <span>{here ?? '飞船'}</span>
       </div>
 
-      <div className="titlebar__spacer" />
+      <div className="titlebar__center">{center ?? ''}</div>
 
       <div className="titlebar__controls">
         <button

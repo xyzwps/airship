@@ -9,7 +9,10 @@ import type { AirshipBridge, AppApi, AppId } from '@shared/protocol'
  */
 
 /** 由应用宿主构造：{ id, ...window.airship } */
-export function makeAppApi(id: AppId): AppApi {
+export function makeAppApi(
+  id: AppId,
+  hooks?: { onWindowTitle?(title: string | null): void }
+): AppApi {
   const bridge = (globalThis as { airship?: AirshipBridge }).airship
   if (!bridge) {
     throw new Error(
@@ -17,5 +20,16 @@ export function makeAppApi(id: AppId): AppApi {
         '检查 electron.vite.config.ts 的 preload 入口和窗口的 webPreferences.preload 路径。'
     )
   }
-  return { id, ...bridge }
+  const api = { id, ...bridge } as AppApi
+  if (hooks?.onWindowTitle) {
+    const setTitle = api.window.setTitle.bind(api.window)
+    api.window = {
+      ...api.window,
+      setTitle: async (title: string | null) => {
+        hooks.onWindowTitle?.(title && title.trim() ? title.trim() : null)
+        await setTitle(title)
+      }
+    }
+  }
+  return api
 }

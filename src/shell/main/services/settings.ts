@@ -49,13 +49,42 @@ function load(app: AppId | 'shell'): Store {
   return store
 }
 
+/**
+ * 改名替换。
+ *
+ * Windows 上刚写好的文件常被杀软或索引器占住一下，rename 会抛 EPERM——
+ * 这不是数据坏了，稍等就成功，所以重试几次；真的一直失败才把错抛出去（不静默降级成直接覆盖，
+ * 那样就丢掉了"中途崩不留半个文件"这条保证）。
+ */
+function renameIntoPlace(tmp: string, file: string): void {
+  const delays = [0, 20, 60, 150, 300]
+  let lastErr: unknown = null
+  for (const wait of delays) {
+    try {
+      if (wait) sleepSync(wait)
+      renameSync(tmp, file)
+      return
+    } catch (err) {
+      lastErr = err
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'EPERM' && code !== 'EBUSY' && code !== 'ENOTEMPTY') break
+    }
+  }
+  throw lastErr
+}
+
+/** 同步等待：设置落盘是主进程里的同步操作，不值得为它开异步 */
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
 function persist(app: AppId | 'shell'): void {
   const file = fileFor(app)
   const store = cache.get(app) ?? {}
   mkdirSync(dirname(file), { recursive: true })
   const tmp = file + '.tmp'
   writeFileSync(tmp, JSON.stringify(store, null, 2), 'utf8')
-  renameSync(tmp, file)
+  renameIntoPlace(tmp, file)
 }
 
 export const settings = {

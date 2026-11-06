@@ -15,7 +15,8 @@ import { useReportShotReady } from './shot'
  * 主题在这里落地：每个窗口是独立文档，宿主不读主题，整个窗口就没有 CSS 变量。
  */
 export function AppHost({ appId }: { appId: string }): JSX.Element {
-  const [api] = useState<AppApi>(() => makeAppApi(appId))
+  const [docTitle, setDocTitle] = useState<string | null>(null)
+  const [api] = useState<AppApi>(() => makeAppApi(appId, { onWindowTitle: setDocTitle }))
   const entry = entryFor(appId)
   // 只读：应用不能改主题，但必须把主题画出来
   useTheme()
@@ -55,6 +56,7 @@ export function AppHost({ appId }: { appId: string }): JSX.Element {
     <div className="app-window">
       <Titlebar
         here={entry.meta.name}
+        center={docTitle}
         icon={<img src={entry.iconUrl} alt="" className="titlebar__app-glyph" />}
       />
       <div className={`app-window__body${entry.flush ? ' app-window__body--flush' : ''}`}>

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { FakeAirship } from './helpers/fakeAirship'
+import type { AppApi } from '@shared/protocol'
 import { mountUi } from './helpers/mount'
 
 /**
@@ -11,15 +12,34 @@ import { mountUi } from './helpers/mount'
  */
 
 vi.mock('../../apps', async () => {
-  const { lazy } = await import('react')
+  const { lazy, useEffect } = await import('react')
   const iconUrl = 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='
   const metas = {
     vcp: { id: 'vcp', name: 'vcp', description: '编排台', capabilities: ['log'], flush: true },
     plain: { id: 'plain', name: '素面应用', description: '要壳给留白的', capabilities: ['log'] },
-    slow: { id: 'slow', name: '慢热应用', description: 'chunk 还没到', capabilities: ['log'] }
+    slow: { id: 'slow', name: '慢热应用', description: 'chunk 还没到', capabilities: ['log'] },
+    titled: { id: 'titled', name: '带标题的应用', description: '挂载时交出书名', capabilities: ['log'] }
   } as const
 
   const entries = {
+    titled: {
+      meta: metas.titled,
+      iconUrl,
+      flush: false,
+      component: lazy(() =>
+        Promise.resolve({
+          default: ({ api }: { api: AppApi }) => {
+            useEffect(() => {
+              void api.window.setTitle('第一推动·畅销经典')
+              // 把应用真正拿到的那份 api 交出来：收回标题要走同一条路（宿主在 makeAppApi 里包过一层）
+              ;(globalThis as unknown as { __titledApi?: AppApi }).__titledApi = api
+            }, [])
+            return null
+          }
+        })
+      ),
+      load: () => Promise.resolve({ default: () => null })
+    },
     vcp: {
       meta: metas.vcp,
       iconUrl,
@@ -61,11 +81,13 @@ function mountHost(appId: string) {
 }
 
 describe('应用窗口里壳只添三样东西', () => {
-  it('SH-011 标题栏念得出"飞船 / 应用名"，三颗键各有可读名称', async () => {
+  it('SH-011 应用窗口的标题栏只念应用名，三颗键各有可读名称', async () => {
     const m = await mountHost('vcp')
     const visible = m.text()
-    expect(visible).toContain('飞船')
     expect(visible).toContain('vcp')
+    // 这扇窗就是那个应用，不需要再自报家门一次
+    expect(visible, '应用窗口的标题栏不该带「飞船 /」前缀').not.toContain('飞船')
+    expect(visible).not.toContain('/')
     expect(m.container.querySelector('.titlebar__app-glyph')).not.toBeNull()
 
     for (const name of ['最小化', '最大化', '关闭']) {
@@ -91,6 +113,23 @@ describe('应用窗口里壳只添三样东西', () => {
     const m = await mountHost('slow')
     expect(m.container.querySelector('.spinner')).not.toBeNull()
     expect(m.text()).not.toContain('慢热应用正文')
+    m.unmount()
+  })
+
+  it('SH-019 应用交来的标题落在标题栏中段，收回就空', async () => {
+    const m = await mountHost('titled')
+    const fake = m.fake!
+    await m.settle()
+    const center = m.container.querySelector('.titlebar__center')
+    expect(center, '标题栏该有一块中段').not.toBeNull()
+    expect(center!.textContent).toBe('第一推动·畅销经典')
+    // 任务栏那侧由主进程拼「应用名 · 书名」，这里只验渲染侧中段跟着走
+    expect(fake.windowTitles.at(-1)).toBe('第一推动·畅销经典')
+
+    const handed = (globalThis as unknown as { __titledApi?: AppApi }).__titledApi!
+    await handed.window.setTitle(null)
+    await m.settle()
+    expect(m.container.querySelector('.titlebar__center')!.textContent).toBe('')
     m.unmount()
   })
 

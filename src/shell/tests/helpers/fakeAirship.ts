@@ -100,6 +100,8 @@ export class FakeAirship implements AirshipBridge {
   readonly notifications: NotifyOptions[] = []
   readonly logs: Array<{ level: 'info' | 'warn' | 'error'; message: string; detail?: unknown }> = []
   readonly windowCalls: string[] = []
+  /** 应用交给标题栏中段的标题（null = 收回） */
+  readonly windowTitles: Array<string | null> = []
   trayState: TrayState | null = null
   clipboard = ''
   settingsStore: Record<string, unknown> = {}
@@ -486,7 +488,10 @@ export class FakeAirship implements AirshipBridge {
     close: async (): Promise<void> => {
       this.windowCalls.push('close')
     },
-    isMaximized: async (): Promise<boolean> => false
+    isMaximized: async (): Promise<boolean> => false,
+    setTitle: async (title: string | null): Promise<void> => {
+      this.windowTitles.push(title)
+    }
   }
 
   on(listener: ShellEventListener): () => void {

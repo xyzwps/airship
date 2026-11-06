@@ -1,4 +1,4 @@
-import { IconButton } from './IconButton'
+import { IconButton } from '@shell/IconButton'
 import { Fragment, useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import {
   containerActionArgs,

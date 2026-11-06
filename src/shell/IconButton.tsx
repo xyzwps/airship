@@ -1,19 +1,26 @@
 import { type JSX, type MouseEvent } from 'react'
 
 /**
- * 图标键：界面上只画图形，动作名字靠悬停说明与无障碍名称说话。
+ * 图标键（壳的渲染侧件，应用直接用）：界面上只画图形，动作名字靠悬停说明与无障碍名称说话。
  *
  * 文字按钮会把行撑满（一列六行各挂一颗"启动"，行里就只剩按钮了），图标换回横向空间。
  * 代价是读屏与键盘用户看不见它是什么，所以 `title` 与 `aria-label` 是**强制项**，
  * 不是可选项——见 `src/apps/specs/app-model.md` 与 wsld 那几本册子里的同一条。
  */
 
-export type IconName = 'refresh' | 'start' | 'stop' | 'restart' | 'remove' | 'detail' | 'logs'
+export type IconName = 'back' | 'refresh' | 'start' | 'stop' | 'restart' | 'remove' | 'detail' | 'logs'
 
 export function Glyph({ name }: { name: IconName }): JSX.Element {
   const box = { width: 17, height: 17, viewBox: '0 0 16 16', 'aria-hidden': true } as const
   const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round' } as const
   switch (name) {
+    case 'back':
+      // 向左的箭头：回上一级
+      return (
+        <svg {...box}>
+          <path d="M6.6 3.4 2.6 8l4 4.6M3 8h10.2" {...stroke} />
+        </svg>
+      )
     case 'start':
       // 播放三角
       return (
