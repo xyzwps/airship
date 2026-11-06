@@ -404,7 +404,7 @@ describe('检查', () => {
 
   it('VC-041 一处问题都没有时不产生任何提示', () => {
     const s = opened(probe([st(0, 0, 'video', 'hevc', { w: 1920, h: 1080 })]))
-    s.out.path = 'T:/media/新名字.mp4'
+    s.out.path = 'T:/media/新名字.mkv'
     s.out.container = 'mkv'
     s.keep.subs = []
     expect(checks(s, null)).toEqual([])

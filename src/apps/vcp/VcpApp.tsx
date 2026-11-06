@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type JSX } from '
 import type { AppApi } from '@shared/protocol'
 import { useAppAutotest } from '../../shell/autotest'
 import { markPerf } from '../../shell/shot'
-import { build, checks, defaultOutPath, display, type Fix, type Note } from './command'
+import { build, checks, display, swapExt, syncOutPath, type Fix, type Note } from './command'
 import {
   buildBatchSpec,
   detailText,
@@ -46,7 +46,11 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
   const [, bump] = useReducer((x: number) => x + 1, 0)
   const mut = useCallback(
     (fn: (s: AppState) => void) => {
-      fn(stateRef.current)
+      const st = stateRef.current
+      const containerBefore = st.out.container
+      fn(st)
+      // 输出名跟着配置走，规则写在 command.ts 的 syncOutPath 里，界面上不另写一份
+      syncOutPath(st, containerBefore)
       bump()
     },
     []
@@ -143,7 +147,6 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
       st.keep.audioRels = defAudio ? [defAudio.rel] : []
       st.keep.subs = []
       st.out.pathTouched = false
-      defaultOutPath(st)
     })
   }
 
@@ -347,15 +350,17 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
           st.scale.h = -2
           break
         case 'container':
+          // 只换容器：名字交给 mut 那一条规矩去收拾（没手敲过重算，手敲过换后缀）
           st.out.container = fix.value
-          st.out.pathTouched = false
-          defaultOutPath(st)
           break
         case 'submode-soft':
           st.keep.subMode = 'soft'
           break
         case 'scale-on':
           st.scale.on = true
+          break
+        case 'out-ext':
+          st.out.path = swapExt(st.out.path, st.out.container)
           break
         case 'out-rename': {
           st.out.pathTouched = true
@@ -468,10 +473,7 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
                           name="vcp-video"
                           checked={s.keep.videoRel === v.rel}
                           onChange={() =>
-                            mut((st) => {
-                              st.keep.videoRel = v.rel
-                              if (!st.out.pathTouched) defaultOutPath(st)
-                            })
+                            mut((st) => void (st.keep.videoRel = v.rel))
                           }
                         />
                         <span>
@@ -769,10 +771,7 @@ function OutputPanel({ s, mut, api }: PanelProps & { api: AppApi }): JSX.Element
           className="select"
           value={o.container}
           onChange={(e) =>
-            mut((st) => {
-              st.out.container = e.target.value
-              if (!st.out.pathTouched) defaultOutPath(st)
-            })
+            mut((st) => void (st.out.container = e.target.value))
           }
         >
           {['mp4', 'mkv', 'mov', 'webm'].map((c) => (

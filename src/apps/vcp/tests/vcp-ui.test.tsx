@@ -168,6 +168,46 @@ describe('打开一个文件，界面念得出 ffmpeg 说的话', () => {
     m.unmount()
   })
 
+  it('VC-074 输出名跟着配置走：缩放那一截自己长收，后缀永远跟着容器换', async () => {
+    const { fake, api } = rig()
+    const m = await mount(api, fake)
+    await openVideo(m)
+    const field = (): string => (m.container.querySelector('.vcp__path') as HTMLInputElement).value
+
+    // 开缩放（1920×-2，源 3840×2160 → 1080）→ 高度那一截自己长出来
+    await pressToggle(m, 0)
+    expect(field()).toBe('T:/media/4k_demo_1080p.mp4')
+
+    // 关掉 → 那一截自己收回去
+    await pressToggle(m, 0)
+    expect(field()).toBe(OUT)
+
+    // 换容器 → 后缀跟着换
+    await chooseBy(m, 'mp4', 'mkv')
+    expect(field()).toBe('T:/media/4k_demo.mkv')
+
+    // 手敲过之后主名不再被覆盖，但换容器时后缀照样跟着换
+    await setPath(m, 'T:/media/我起的名字.mkv')
+    await pressToggle(m, 0)
+    expect(field()).toBe('T:/media/我起的名字.mkv')
+    await chooseBy(m, 'mkv', 'mp4')
+    expect(field()).toBe('T:/media/我起的名字.mp4')
+    m.unmount()
+  })
+
+  it('VC-075 手敲的后缀与容器不符：检查区念出来，一键「换成 .mp4」点得动', async () => {
+    const { fake, api } = rig()
+    const m = await mount(api, fake)
+    await openVideo(m)
+    await setPath(m, 'T:/media/4k_demo.avi')
+
+    expect(m.text()).toContain('输出名后缀是 .avi，容器选的却是 mp4：ffmpeg 按后缀认容器，产物会是 .avi。')
+    await m.press('换成 .mp4')
+    expect((m.container.querySelector('.vcp__path') as HTMLInputElement).value).toBe('T:/media/4k_demo.mp4')
+    expect(m.text()).not.toContain('输出名后缀是 .avi')
+    m.unmount()
+  })
+
   it('VC-052 什么视频都没打开时界面说的话', async () => {
     const { fake, api } = rig()
     const m = await mount(api, fake)

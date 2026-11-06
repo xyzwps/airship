@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { build, checks, defaultOutPath, display, type Fix, type Note } from '../command'
+import { build, checks, display, swapExt, syncOutPath, type Fix, type Note } from '../command'
 import { createState, type AppState, type ProbeInfo, type StreamInfo, type SubRef } from '../state'
 
 /**
@@ -67,6 +67,8 @@ function findFix(notes: Note[], level: Note['level'], fragment: string): Note | 
 }
 
 function applyFix(s: AppState, fix: Fix): void {
+  // 与界面上的那颗一键修正是同一套：改完交给 syncOutPath 收拾输出名，规则不在这里重抄
+  const containerBefore = s.out.container
   switch (fix.kind) {
     case 'vcodec':
       s.out.vcodec = fix.value
@@ -80,8 +82,6 @@ function applyFix(s: AppState, fix: Fix): void {
       break
     case 'container':
       s.out.container = fix.value
-      s.out.pathTouched = false
-      defaultOutPath(s)
       break
     case 'submode-soft':
       s.keep.subMode = 'soft'
@@ -89,9 +89,13 @@ function applyFix(s: AppState, fix: Fix): void {
     case 'scale-on':
       s.scale.on = true
       break
+    case 'out-ext':
+      s.out.path = swapExt(s.out.path, s.out.container)
+      break
     case 'out-rename':
       break
   }
+  syncOutPath(s, containerBefore)
 }
 
 describe('[5] 命令生成', () => {
@@ -255,5 +259,55 @@ describe('字幕引用与占位', () => {
     const args = build(s)
     expect(args.some((a) => a.includes('@EXTRACT@'))).toBe(false)
     expect(args.some((a) => a.includes('subtitles=filename='))).toBe(true)
+  })
+})
+
+describe('输出名永远跟着容器走', () => {
+  it('VC-074 后缀跟着容器换：主名不动，没后缀就补，整条是目录就不动', () => {
+    expect(swapExt('T:/media/片源.mp4', 'mkv')).toBe('T:/media/片源.mkv')
+    expect(swapExt('T:\\media\\片源', 'mp4')).toBe('T:\\media\\片源.mp4')
+    expect(swapExt('T:/media/a.b.c.mkv', 'mp4')).toBe('T:/media/a.b.c.mp4')
+    expect(swapExt('T:/media/', 'mp4')).toBe('T:/media/')
+    expect(swapExt('', 'mp4')).toBe('')
+
+    // 手敲过的主名保留，只换后缀
+    const touched = withProbe(demoProbe())
+    touched.out.path = 'T:/media/我起的名字.mp4'
+    touched.out.pathTouched = true
+    touched.out.container = 'mkv'
+    syncOutPath(touched, 'mp4')
+    expect(touched.out.path).toBe('T:/media/我起的名字.mkv')
+
+    // 没手敲过 → 整条按当前配置重算
+    const auto = withProbe(demoProbe())
+    auto.out.container = 'mkv'
+    syncOutPath(auto, 'mp4')
+    expect(auto.out.path).toBe('T:/4k_demo.mkv')
+
+    // 手敲过、这一次又不是在换容器 → 一个字都不动
+    const kept = withProbe(demoProbe())
+    kept.out.path = 'T:/media/我起的名字.avi'
+    kept.out.pathTouched = true
+    kept.scale.on = true
+    syncOutPath(kept, 'mp4')
+    expect(kept.out.path).toBe('T:/media/我起的名字.avi')
+  })
+
+  it('VC-075 后缀与容器不符：warn 说清产物会是哪一个，一键换成容器后缀', () => {
+    const s = withProbe(demoProbe())
+    s.keep.videoRel = 0
+    s.out.path = 'T:/片源.avi'
+    s.out.pathTouched = true
+
+    const note = findFix(checks(s, null), 'warn', '后缀是 .avi')
+    expect(note?.msg).toBe('输出名后缀是 .avi，容器选的却是 mp4：ffmpeg 按后缀认容器，产物会是 .avi。')
+    expect(note?.fixLabel).toBe('换成 .mp4')
+    applyFix(s, note!.fix!)
+    expect(s.out.path).toBe('T:/片源.mp4')
+    expect(findFix(checks(s, null), 'warn', '后缀是')).toBeFalsy()
+
+    // 一个后缀都没有 → 说的是"补上"
+    s.out.path = 'T:/片源'
+    expect(findFix(checks(s, null), 'warn', '没有后缀')?.fixLabel).toBe('补上 .mp4')
   })
 })

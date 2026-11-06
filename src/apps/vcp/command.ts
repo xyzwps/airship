@@ -166,6 +166,39 @@ export function defaultOutPath(s: AppState): void {
   s.out.path = `${s.probe.dir}/${stem}${tag}.${s.out.container}`
 }
 
+/**
+ * 后缀永远跟着容器换，主名一个字不动。
+ * ffmpeg 是按输出文件名的后缀认容器的，容器改了而后缀没改，产物就是后缀那一个——名字在说谎。
+ * 结尾没有点（或点打头）就当没有后缀，直接补一个；整条以分隔符结尾（那是个目录）原样退回。
+ */
+export function swapExt(path: string, container: string): string {
+  if (path.length === 0) return path
+  const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  const dir = slash >= 0 ? path.slice(0, slash + 1) : ''
+  const base = slash >= 0 ? path.slice(slash + 1) : path
+  if (base.length === 0) return path
+  const dot = base.lastIndexOf('.')
+  return `${dir}${dot > 0 ? base.slice(0, dot) : base}.${container}`
+}
+
+/** 输出名结尾那一段后缀，小写；没有后缀给空串 */
+function outExt(path: string): string {
+  const base = path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
+  const dot = base.lastIndexOf('.')
+  return dot > 0 ? base.slice(dot + 1).toLowerCase() : ''
+}
+
+/**
+ * 每一次界面改动之后收拾输出名，规则只在这里写一遍（界面上的 mut 与一键修正都走它）：
+ *   - 用户没亲手动过「输出到」：整条按当前设置重算（缩放那一截、容器后缀都在名字里）
+ *   - 手敲过：主名不再被覆盖，但换容器时后缀跟着换
+ * containerBefore 是这次改动之前的容器，用来认出"这一次是不是在换容器"。
+ */
+export function syncOutPath(s: AppState, containerBefore: string): void {
+  if (!s.out.pathTouched) defaultOutPath(s)
+  else if (s.out.container !== containerBefore) s.out.path = swapExt(s.out.path, s.out.container)
+}
+
 /* ---------- 校验 ---------- */
 
 export type Fix =
@@ -176,6 +209,7 @@ export type Fix =
   | { kind: 'submode-soft' }
   | { kind: 'scale-on' }
   | { kind: 'out-rename' }
+  | { kind: 'out-ext' }
 
 export interface Note {
   level: 'error' | 'warn' | 'info'
@@ -287,6 +321,19 @@ export function checks(s: AppState, outStat: OutStat | null): Note[] {
       fixLabel: '另存为新名',
       fix: { kind: 'out-rename' }
     })
+
+  if (o.path.length > 0) {
+    const ext = outExt(o.path)
+    if (ext !== o.container.toLowerCase())
+      v.push({
+        level: 'warn',
+        msg: ext
+          ? `输出名后缀是 .${ext}，容器选的却是 ${o.container}：ffmpeg 按后缀认容器，产物会是 .${ext}。`
+          : `输出名没有后缀，而容器选的是 ${o.container}：ffmpeg 按后缀认容器，产物会没有格式。`,
+        fixLabel: ext ? `换成 .${o.container}` : `补上 .${o.container}`,
+        fix: { kind: 'out-ext' }
+      })
+  }
 
   if (main && main.w >= 3840 && !s.scale.on && o.vcodec !== 'copy')
     v.push({
