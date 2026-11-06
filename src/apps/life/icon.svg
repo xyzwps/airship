@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#4d7a5e" stroke-width="1.6" stroke-linejoin="round">
+  <!-- 一只滑翔机：五格，正斜着走的那只（形状照 patterns.ts 的 glider） -->
+  <rect x="9.5" y="3.5" width="5" height="5" rx="1"/>
+  <rect x="15.5" y="9.5" width="5" height="5" rx="1"/>
+  <rect x="3.5" y="15.5" width="5" height="5" rx="1"/>
+  <rect x="9.5" y="15.5" width="5" height="5" rx="1"/>
+  <rect x="15.5" y="15.5" width="5" height="5" rx="1"/>
+</svg>

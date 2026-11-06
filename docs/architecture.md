@@ -317,7 +317,7 @@ export interface AppMeta {
 
 `[待达]` 当前实现是单窗口内常驻挂载（切走只隐藏，不卸载），目的是阅读器翻页进度、vcp 跑着的转码任务不因切换应用而丢。窗口化后这个需求由"窗口不关就不销毁"承接。
 
-### 7.5 现有五个应用
+### 7.5 现有六个应用
 
 | id | 名称 | 能力 | 共享命名空间 | 工具 | 平台 |
 |---|---|---|---|---|---|
@@ -325,6 +325,7 @@ export interface AppMeta {
 | `books` | 墨读 | fs.read fs.write dialog settings shared notify clipboard log | library | — | 全平台 |
 | `pdf` | PDF | fs.read fs.write dialog settings shared notify clipboard log | library | — | 全平台 |
 | `dagogo` | 打勾勾 | fs.read fs.write dialog settings tray notify log | — | — | 全平台 |
+| `life` | 生命游戏 | **一件都不声明** | — | — | 全平台 |
 | `wsld` | 容器台 | fs.read fs.write dialog settings proc notify clipboard log | — | wslc | **仅 windows** |
 
 墨读与 PDF 是两个入口、一份书库：书架、导入、封面、进度是同一套数据，各存一份会出现"同一本书在两个入口各一本"。
@@ -478,7 +479,7 @@ export interface AppMeta {
 1. **MOBI 仍无真样本可验**。解析走 foliate-js 自带的 `mobi.js`，与 EPUB 同一条 `view.open` 自动识别路径；机器上没有 .mobi/.azw3，这条只能挂着。
 2. **EPUB 翻页延迟未单独采样**。目前只有"打开到首屏"的数字；翻页要另做标记。
 3. **阶段 D 已做，阶段 C 未做**。`just dist` 出 Windows 安装包（见 [release-packaging.md](release-packaging.md)），但应用与壳仍同仓同构建——改一个应用要重出整个安装包："独立修改"已经做到，"独立构建"（运行时从磁盘加载应用包）还没做。安装包也没有代码签名，首次运行会有 SmartScreen 那道提示。
-4. **窗口数不设上限**：五个应用全开约 500 MB。真觉得吃紧再加"同应用多窗口"或闲置回收策略。
+4. **窗口数不设上限**：六个应用全开约 500 MB。真觉得吃紧再加"同应用多窗口"或闲置回收策略。
 5. **wsld 只移植了核心三块**（容器、镜像、日志）。原版还有而这里先没有的：`run` 命令编排（40 余字段拼装/校验/反解）、
    registry mirror（Docker Hub 路径改写与 pull 后改名）、拉取实时进度。
    最后那个是**能力缺口**而不是省事：原版的逐层进度靠 ConPTY 伪终端把 wslc 当全屏应用来读（`VtScreenTracker` 那套屏幕模型），

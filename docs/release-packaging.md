@@ -50,7 +50,7 @@ just dist
 ## 已验证到哪一步
 
 - `just dist` 出包 + `just verify-installer` 自检通过（MZ 头、NSIS 签名、SHA256）。
-- **打包版真跑过**：直接执行 `release/win-unpacked/飞船.exe --shot`，六个窗口（启动器 + 五个应用）
+- **打包版真跑过**：直接执行 `release/win-unpacked/飞船.exe --shot`，七个窗口（启动器 + 六个应用）
   都开出来并截到图；再带 `AIRSHIP_AUTOTEST` 导入一份真 PDF，页面渲染正常 —— 说明排除构建期依赖没排除错。
 - 打包版与开发版共用 `%APPDATA%/airship`，装上去书架是同一份。
 

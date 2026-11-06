@@ -109,6 +109,7 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 | BK | 墨读：书架与阅读器 | `books.md` | 自动化 + 门控（真书） |
 | PD | PDF：书架与阅读 | `pdf.md` | 自动化 |
 | DG | 打勾勾：每日清单与托盘徽标 | `dagogo.md` | 自动化 |
+| LF | 生命游戏：100 / 200 / 300 三档网格与缩放、世代推演、经典图形与自画 | `life.md` | 自动化 |
 | CL | wsld：容器列表与详情 | `wsld-containers.md` | 自动化（替身）+ 门控（`AIRSHIP_WSLD_INTEGRATION=1`） |
 | CA | wsld：容器生命周期操作 | `wsld-container-actions.md` | 同左 |
 | WL | wsld：容器日志（尾部行数、时间戳、实时） | `wsld-logs.md` | 同左 |

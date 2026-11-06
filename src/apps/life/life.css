@@ -1,0 +1,207 @@
+/* 生命游戏：版心自己管（清单里 flush: true），配色全用壳的变量，不自己另调一套。 */
+
+.life {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 14px 14px;
+}
+
+/* ---------- 顶栏：动作键 + 两簇档位 + 状态行 ---------- */
+
+.life__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.life__sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+.life__segset {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.life__seg {
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 9px;
+  cursor: pointer;
+}
+
+.life__seg + .life__seg {
+  border-left: 1px solid var(--border);
+}
+
+.life__seg:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+/* 亮着的那一档永远是"此刻真在用的那一档"，不是鼠标划过的那一档 */
+.life__seg--on {
+  background: var(--bg-active);
+  color: var(--fg);
+}
+
+.life__stat {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+/* ---------- 画布与图形库 ---------- */
+
+.life__main {
+  display: flex;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+}
+
+.life__stage {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  display: grid;
+  /* 网格是方的，可视区通常是扁的：长边那一截空白分到两侧，不堆在右下角。
+     写两行是因为 `safe` 关键字在不支持的引擎上会把整条声明丢掉。 */
+  place-items: center;
+  place-items: safe center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+}
+
+.life__canvas {
+  display: block;
+  /* 放大到 200% 以上时保持方块边缘硬，不糊成一片 */
+  image-rendering: pixelated;
+}
+
+.life__lib {
+  width: 296px;
+  flex: none;
+  overflow: auto;
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.life__lib-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.life__group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 2px;
+}
+
+/* 手风琴的组头：整行都是热区，箭头只说"这一组现在是展开还是收起" */
+.life__group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  font: inherit;
+  color: var(--fg-dim);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.life__group-head:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.life__group-name {
+  font-size: 12.5px;
+}
+
+.life__group-count {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--fg-faint);
+}
+
+.life__chevron {
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+.life__chevron--on {
+  transform: rotate(90deg);
+}
+
+.life__pattern {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--fg);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.life__pattern:hover {
+  background: var(--bg-hover);
+}
+
+.life__pattern-name {
+  font-size: 13px;
+}
+
+.life__pattern-note {
+  font-size: 11.5px;
+  color: var(--fg-dim);
+}
+
+.life__hint {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+/* 说一句就走，不占版面：所以浮在左下角，不把画布顶得跳一下 */
+.life__notice {
+  position: absolute;
+  left: 14px;
+  bottom: 20px;
+  max-width: 60%;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+}
