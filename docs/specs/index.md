@@ -115,12 +115,12 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 | WL | wsld：容器日志（尾部行数、时间戳、实时） | `wsld-logs.md` | 同左 |
 | IM | wsld：镜像列表、拉取、删除与强制删除 | `wsld-images.md` | 同左 |
 
-移植时**先不开**的册子（原版有、这期不做，理由各自写在那本原册或下面的取舍段里）：
-`pull-progress`（拉取实时进度靠伪终端屏幕模型，本项目没有那一层）、
-`run-builder`（命令编排表单 + 40 余字段拼装/反解，量最大的一块）、
-`registry-mirror`（镜像源改写与拉后改名）、`i18n`（界面语言归壳，本项目只做中文）、
-`settings`（wsld 自己的设置页——本期只留镜像列表那几颗键，走壳的 `storage.md`）。
-`shell.md` 与 `theme.md` 也不搬：窗口、导航与换皮都归 airship 壳自己（本册表里的 SH / TH）。
+移植时**先不开**的册子（原版有、这期不做）：`run-builder`、`registry-mirror`、`pull-progress`、
+`settings`（wsld 自己的设置页）。它们为什么还没开、各要动哪一层，统一记在
+[../../todo.md](../todo.md) 的 TD-007 到 TD-010，这本索引不再抄理由。
+
+`shell.md` 与 `theme.md` 也不搬：窗口、导航与换皮都归 airship 壳自己（本册表里的 SH / TH）；
+界面语言同理——本项目只做中文，见 todo.md 末尾"不做，只留理由"那一节。
 
 ## 加一个新能力
 

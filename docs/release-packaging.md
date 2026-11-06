@@ -56,13 +56,11 @@ just dist
 
 ## 没做的事（实话）
 
-- **没有代码签名证书**。第一次运行 Windows SmartScreen 会拦一道"未知发布者"，
-  点"仍要运行"即可；要消掉这道提示得买 OV/EV 证书，或者走 Microsoft Store。
-- **没有自动更新链路**。`latest.yml` 只是产物，应用里没有接 `electron-updater`。
-- **阶段 C 未做**：应用与壳同仓同构建，改一个应用要重出整个安装包（架构文档 §14）。
-- 用的是 NSIS 而不是 wslc-desktop 那套 Inno Setup。想要 Inno 的观感（同一份 `.isl` 双语文案、
-  LZMA2 极限压缩），需要本机先装 Inno Setup 6（`winget install JRSoftware.InnoSetup`），
-  然后我可以照 `wsld.iss` 写一份 `installer/airship.iss`，拿 `release/win-unpacked/` 当输入。
+集中在 [todo.md](todo.md)：TD-002 阶段 C（改一个应用也要重出整个安装包）、TD-003 没有代码签名、
+TD-004 没有自动更新链路、TD-005 想要 Inno Setup 那一档观感要先装 Inno 6。
+
+对拿到安装包的人来说只有一条要预告：**没有签名，第一次运行会被 SmartScreen 拦一道"未知发布者"**，
+点"仍要运行"就过去了。
 
 ## 客户机要求
 

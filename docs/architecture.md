@@ -67,7 +67,7 @@ airship
 | 关窗收尾 | 应用窗口关闭 → 销毁进程 + 杀掉该应用名下的子进程 + 清它占的托盘 | `[已实现]` |
 | 渲染进程 | 每窗口独立，`sandbox: true` | `[已实现]` |
 | 崩溃隔离 | 一个应用崩溃只影响自己 | `[已实现]` |
-| 任务栏 | 每应用独立 `setAppUserModelId`，可独立固定与预览 | `[已实现]`（Windows 专有方法，非 Windows 平台静默跳过） |
+| 任务栏 | 每应用一个独立身份，可单独固定与预览 | `[待达]` 现在那行调用是一次空操作（方法挂错了对象），四条改动缺一不可，见 [todo.md](todo.md) TD-001 |
 | 事件路由 | 壳事件只投递给归属窗口；应用收不到别的应用的 `proc` 事件 | `[已实现]`，`tests/isolation.test.ts` 守住 |
 | 身份注入 | 应用侧不传 id：preload 按启动参数绑定，主进程按 `event.sender` 反查二次确认 | `[已实现]` |
 | 单实例 | 二次启动唤起已有启动器 | `[已实现]` |
@@ -427,7 +427,7 @@ export interface AppMeta {
 | 关键库 | foliate-js 1.0.1（自带 mobi.js，MOBI6+KF8+PalmDOC+HUFF/CDIC）· pdfjs-dist 6.5.438 |
 | 版本约束原因 | vitest 5 要求 node ≥26，本机 node 25.9，故钉 4.x；npm registry 与 electron 二进制走 npmmirror |
 | 构建 | 三目标：main / preload / renderer；应用各自懒加载 chunk |
-| 打包 | `just dist`：electron-builder 出 NSIS 安装包 `release/airship-Setup-<版本>-x64.exe`，`just verify-installer` 自检并写 `.sha256`；细节与未做的事（无代码签名、无自动更新）见 [release-packaging.md](release-packaging.md) |
+| 打包 | `just dist`：electron-builder 出 NSIS 安装包 `release/airship-Setup-<版本>-x64.exe`，`just verify-installer` 自检并写 `.sha256`；细节见 [release-packaging.md](release-packaging.md)，还没做的那几件在 [todo.md](todo.md) |
 | 图标 | 母版 `assets/icon-master.png`（用户提供的图形），`python code/make-icons.py` 重出 `assets/icon.png`（256，窗口图标）与 `assets/tray.png`（16，托盘默认），`python code/make-ico.py` 重出 `assets/icon.ico`（16–256 七档，安装包与 exe 的图标）；标题栏那颗品牌图形是同一张图的 SVG 简化版，写在 `shell/Titlebar.tsx` |
 | 安全 | `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`；CSP 允许 `blob:`（foliate 用 blob iframe 渲章节）与样式 `unsafe-inline`（禁掉书就没排版），脚本只 `'self'` |
 | 外部链接 | 只放行 `http/https`，交给系统浏览器；`file://` 与自定义协议不开新窗 |
@@ -476,15 +476,9 @@ export interface AppMeta {
 
 **未尽**
 
-1. **MOBI 仍无真样本可验**。解析走 foliate-js 自带的 `mobi.js`，与 EPUB 同一条 `view.open` 自动识别路径；机器上没有 .mobi/.azw3，这条只能挂着。
-2. **EPUB 翻页延迟未单独采样**。目前只有"打开到首屏"的数字；翻页要另做标记。
-3. **阶段 D 已做，阶段 C 未做**。`just dist` 出 Windows 安装包（见 [release-packaging.md](release-packaging.md)），但应用与壳仍同仓同构建——改一个应用要重出整个安装包："独立修改"已经做到，"独立构建"（运行时从磁盘加载应用包）还没做。安装包也没有代码签名，首次运行会有 SmartScreen 那道提示。
-4. **窗口数不设上限**：六个应用全开约 500 MB。真觉得吃紧再加"同应用多窗口"或闲置回收策略。
-5. **wsld 只移植了核心三块**（容器、镜像、日志）。原版还有而这里先没有的：`run` 命令编排（40 余字段拼装/校验/反解）、
-   registry mirror（Docker Hub 路径改写与 pull 后改名）、拉取实时进度。
-   最后那个是**能力缺口**而不是省事：原版的逐层进度靠 ConPTY 伪终端把 wslc 当全屏应用来读（`VtScreenTracker` 那套屏幕模型），
-   而本项目 `proc` 只有管道分块——没有 TTY 就没有那套帧。要么以后给 `proc` 加伪终端能力，要么按普通管道输出重做进度呈现。
-   界面语言与主题原版的 `i18n.md` / `theme.md` 不搬：本项目只做中文，换皮归壳（`src/shell/specs/theme.md`）。
+全部移到 [待办清单](todo.md)（TD-001 到 TD-012），这本里不再抄一份。
+其中与架构直接相关的三条：TD-001 任务栏身份还没真做到一应用一个、TD-002 阶段 C（应用与壳同仓同构建）、
+TD-009 拉取实时进度是 `proc` 缺伪终端造成的**能力缺口**而不是省事。
 
 ---
 
