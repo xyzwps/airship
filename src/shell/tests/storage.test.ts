@@ -21,10 +21,12 @@ vi.mock('electron', async () => {
 const { settings } = await import('../main/services/settings')
 const { appSettingsFile, shellSettingsFile } = await import('../main/services/paths')
 
-function resetDisk(): void {
-  // settings 有内存缓存，先把内存清掉：模块缓存靠重新 import 做不到，所以每个用例用各自己的键名与应用
-  rmSync(ROOT, { recursive: true, force: true })
-  mkdirSync(ROOT, { recursive: true })
+function resetDisk(app: string): void {
+  // 只清这个应用自己的那份文件：整棵 ROOT 删掉会连带把 logs/ 端了，
+  // 而 ST-004 那条正读同一天的日志——套件偶发红就是这么来的。
+  // settings 的内存缓存没法按用例重置，所以每条用例占一个应用、键名也各自独立。
+  rmSync(join(ROOT, 'apps', app), { recursive: true, force: true })
+  mkdirSync(join(ROOT, 'apps'), { recursive: true })
 }
 
 function fileOf(app: string): string {
@@ -33,6 +35,9 @@ function fileOf(app: string): string {
 
 describe('每应用一份设置，壳自己一份', () => {
   it('ST-001 应用之间看不到彼此的设置，磁盘上是两份文件', () => {
+    // 这条要断言"pdf 那份文件不存在"，所以先把两边都清干净，别留上一轮的
+    resetDisk('vcp')
+    resetDisk('pdf')
     settings.set('vcp', 'prefs', { crf: 20 })
     expect(settings.get('pdf', 'prefs', null)).toBeNull()
     expect(settings.get('vcp', 'prefs', null)).toEqual({ crf: 20 })
@@ -54,7 +59,7 @@ describe('每应用一份设置，壳自己一份', () => {
 
 describe('落盘是"临时文件 + 改名"', () => {
   it('ST-003 写完只剩正式文件，内容是完整 JSON', () => {
-    resetDisk()
+    resetDisk('books')
     settings.set('books', 'prefs', { fontScale: 1.2 })
     expect(existsSync(`${fileOf('books')}.tmp`)).toBe(false)
     const text = readFileSync(fileOf('books'), 'utf8')
@@ -65,7 +70,7 @@ describe('落盘是"临时文件 + 改名"', () => {
 
 describe('坏文件不致命', () => {
   it('ST-004 解析失败就改名留证、记日志、从空开始', () => {
-    resetDisk()
+    resetDisk('dagogo')
     mkdirSync(join(ROOT, 'apps', 'dagogo'), { recursive: true })
     writeFileSync(fileOf('dagogo'), '{ 残缺', 'utf8')
 
@@ -80,7 +85,7 @@ describe('坏文件不致命', () => {
   })
 
   it('ST-005 顶层是数组时同样从空开始', () => {
-    resetDisk()
+    resetDisk('pdf')
     mkdirSync(join(ROOT, 'apps', 'pdf'), { recursive: true })
     writeFileSync(fileOf('pdf'), '[1,2,3]', 'utf8')
     expect(settings.get('pdf', 'k', '回落')).toBe('回落')
@@ -90,7 +95,7 @@ describe('坏文件不致命', () => {
 
 describe('连续写与副本', () => {
   it('ST-006 连着写两笔，最后一份文件里两笔都在', () => {
-    resetDisk()
+    resetDisk('vcp')
     settings.set('vcp', 'a', 1)
     settings.set('vcp', 'b', 2)
     const stored = JSON.parse(readFileSync(fileOf('vcp'), 'utf8')) as Record<string, unknown>
@@ -98,7 +103,7 @@ describe('连续写与副本', () => {
   })
 
   it('ST-007 一次拿全是副本，改它不影响壳里那份', () => {
-    resetDisk()
+    resetDisk('vcp')
     settings.set('vcp', 'keep', '原值')
     const dump = settings.dump('vcp')
     dump['keep'] = '被外面改了'

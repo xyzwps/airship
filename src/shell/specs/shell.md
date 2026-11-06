@@ -49,20 +49,34 @@
 - **THEN** 它的 webContents 不再认得出归属（`ownerOfContents` 返回空）
 - **AND** 台账里它不再算"开着的应用"，可以再开一个新窗口
 
-#### Scenario: SH-008 窗口状态一应用记一份
-- **WHEN** vcp 窗口拖成 1200×800，PDF 窗口保持 1100×740
-- **THEN** 壳设置里落两笔：`appWindow:vcp` 与 `appWindow:pdf`，各自的宽高互不串味
+#### Scenario: SH-010 每个应用在任务栏是自己的一个条目
+- **WHEN** 看某应用窗口的任务栏身份
+- **THEN** 身份是 `dev.xyzwp.airship.<应用 id>`，两个应用的身份必然不同
+- **AND** 启动器自己的身份是 `dev.xyzwp.airship`，不带应用 id 后缀
+
+### Requirement: 窗口状态一应用记一份，只记位置
+记的是这台机器上的习惯：摆在哪儿、有没有最大化。**宽高不记**——版心宽度是应用自己的事
+（清单 `defaultWidth` / `defaultHeight`），记下过一次就再也改不动，等于让用户调了不算。
+
+#### Scenario: SH-008 位置一应用记一份，互不串味
+- **WHEN** vcp 窗口拖到 (40,60)，PDF 窗口拖到 (200,100)
+- **THEN** 壳设置里落两笔：`appWindow:vcp` 与 `appWindow:pdf`，各自的坐标互不串味
 - **AND** 启动器自己那一份记在 `launcherWindow` 下，不与任何应用共用
 
 #### Scenario: SH-009 最大化时不记假位置
 - **WHEN** 把窗口最大化后记下窗口状态
 - **THEN** 记下的是"最大化"，不带 x/y
-- **AND** 下次恢复用默认尺寸而不是屏幕外那组坐标；取消最大化后记的才带 x/y
+- **AND** 下次恢复让系统决定放哪；取消最大化后记的才带 x/y
 
-#### Scenario: SH-010 每个应用在任务栏是自己的一个条目
-- **WHEN** 看某应用窗口的任务栏身份
-- **THEN** 身份是 `dev.xyzwp.airship.<应用 id>`，两个应用的身份必然不同
-- **AND** 启动器自己的身份是 `dev.xyzwp.airship`，不带应用 id 后缀
+#### Scenario: SH-015 清单写了尺寸的应用，开出来就是那个尺寸
+- **WHEN** 某应用清单写了 `defaultWidth: 980`、`defaultHeight: 660`
+- **THEN** 开出来的窗口是 980×660，而不是壳的默认 1100×740
+- **AND** 只写 `defaultWidth: 1280` 的是 1280×740（高度跟壳），什么都不写的两个都跟壳
+
+#### Scenario: SH-016 拖过的尺寸不留到下次，位置照旧
+- **WHEN** 某应用清单写 `defaultWidth: 600`，用户上回把这窗口手动拉成 1125 宽
+- **THEN** 下次打开仍是 600 宽：改清单值立刻生效，不用先删掉什么记忆
+- **AND** 窗口回到上次那个坐标——记的是摆哪儿，不是多大
 
 ### Requirement: 应用窗口里壳只添三样东西
 标题栏、内容区的留白、主题变量。剩下的全是应用自己的事。

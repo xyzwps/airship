@@ -119,6 +119,32 @@ describe('清单只写应用自己的事实', () => {
       expect(icons.length, `${id} 的图标应当有且只有一张`).toBe(1)
     }
   })
+  it('AP-012 默认窗口尺寸必须是正整数，不写就全按壳的默认', () => {
+    // 收下像话的写法
+    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultWidth: 900, defaultHeight: 620 }), [])).toEqual([])
+    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultWidth: 1280 }), [])).toEqual([])
+    // 不像话的在注册期就说清是哪个字段、收到了什么
+    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultWidth: 0 }), [])).toEqual([
+      'apps/a/app.ts: 清单 defaultWidth 必须是正整数像素值，收到 0'
+    ])
+    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultHeight: -1 }), [])).toEqual([
+      'apps/a/app.ts: 清单 defaultHeight 必须是正整数像素值，收到 -1'
+    ])
+    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultWidth: 900.5 }), [])).toEqual([
+      'apps/a/app.ts: 清单 defaultWidth 必须是正整数像素值，收到 900.5'
+    ])
+    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultWidth: 'wide' as never }), [])).toEqual([
+      'apps/a/app.ts: 清单 defaultWidth 必须是正整数像素值，收到 "wide"'
+    ])
+
+    // 真清单里要么没写，要么写的是正整数
+    for (const m of APPS) {
+      for (const key of ['defaultWidth', 'defaultHeight'] as const) {
+        const v = m[key]
+        if (v !== undefined) expect(Number.isInteger(v) && v > 0, `${m.id} 的 ${key}=${String(v)}`).toBe(true)
+      }
+    }
+  })
 })
 
 describe('两侧看的是同一批清单', () => {

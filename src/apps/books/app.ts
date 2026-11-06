@@ -17,4 +17,6 @@ export const app: AppMeta = {
   // 与 pdf 应用共用同一份书库：书架、导入、封面、进度是同一套数据
   sharedNamespaces: ['library'],
   flush: true,
+  defaultWidth: 600,
+  defaultHeight: 800,
 }

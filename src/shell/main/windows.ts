@@ -9,7 +9,9 @@ import {
   appUserModelIdFor,
   boundsForRestore,
   boundsKeyFor,
-  boundsToSave
+  defaultSizeFor,
+  placeToSave,
+  type WindowPlace
 } from './services/windowLedger'
 import { settings } from './services/settings'
 import { log } from './services/logging'
@@ -81,15 +83,15 @@ function loadEntry(window: BrowserWindow, entry: 'launcher' | 'app', query?: Rec
   })
 }
 
-/** 恢复某归属上次的位置与尺寸（一应用一份） */
-function boundsFor(owner: Owner, fallback: { width: number; height: number }) {
-  const saved = settings.get<ReturnType<typeof boundsForRestore> | null>('shell', boundsKeyFor(owner), null)
-  return boundsForRestore(saved, fallback)
+/** 恢复某归属上次的位置（宽高一律用这一档窗口的默认，不记尺寸） */
+function boundsFor(owner: Owner, size: { width: number; height: number }) {
+  const saved = settings.get<WindowPlace | null>('shell', boundsKeyFor(owner), null)
+  return boundsForRestore(saved, size)
 }
 
 function persistBounds(owner: Owner, window: BrowserWindow): void {
   if (window.isDestroyed()) return
-  settings.set('shell', boundsKeyFor(owner), boundsToSave(window.getBounds(), window.isMaximized()))
+  settings.set('shell', boundsKeyFor(owner), placeToSave(window.getBounds(), window.isMaximized()))
 }
 
 function wireWindow(window: BrowserWindow, owner: Owner, title: string, saved: { maximized: boolean }): void {
@@ -171,7 +173,7 @@ export function openAppWindow(appId: string): BrowserWindow {
     }
   }
 
-  const saved = boundsFor(appId, APP_SIZE)
+  const saved = boundsFor(appId, defaultSizeFor(meta, APP_SIZE))
   const window = new BrowserWindow({
     ...saved,
     show: false,

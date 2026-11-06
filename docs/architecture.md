@@ -71,7 +71,7 @@ airship
 | 事件路由 | 壳事件只投递给归属窗口；应用收不到别的应用的 `proc` 事件 | `[已实现]`，`tests/isolation.test.ts` 守住 |
 | 身份注入 | 应用侧不传 id：preload 按启动参数绑定，主进程按 `event.sender` 反查二次确认 | `[已实现]` |
 | 单实例 | 二次启动唤起已有启动器 | `[已实现]` |
-| 窗口状态 | 每窗口独立尺寸/位置/最大化，记在壳设置，退出前落盘 | `[已实现]` |
+| 窗口状态 | 位置与最大化一应用记一份，退出前落盘；**宽高不记**——每次按清单 `defaultWidth/defaultHeight` 开（SH-008 / SH-015 / SH-016） | `[已实现]` |
 | 退出 | 关所有窗口 → 杀干净子进程 → 清托盘 | `[已实现]` |
 
 ### 3.1 实测数据
@@ -262,6 +262,8 @@ export interface AppMeta {
   capabilities: Capability[]    // 声明式权限
   sharedNamespaces?: SharedNamespace[]
   flush?: boolean               // 内容区是否去掉壳给的内边距
+  defaultWidth?: number         // 窗口宽高：不写用壳的默认 1100×740
+  defaultHeight?: number        // 两维各自独立可缺；壳不记宽高，改这两个数立刻生效
   tools?: ToolName[]            // 要用的外部工具；名字来自壳的工具表
   platforms?: PlatformId[]      // 只在这些平台可用；不写 = 全平台可用
 }

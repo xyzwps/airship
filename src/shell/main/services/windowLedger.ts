@@ -72,35 +72,57 @@ export function appUserModelIdFor(owner: string, prefix = 'dev.xyzwp.airship'): 
   return owner === SHELL ? prefix : `${prefix}.${owner}`
 }
 
-/** 窗口落下的位置信息：尺寸、坐标、是否最大化 */
-export interface WindowBounds {
-  width: number
-  height: number
+/**
+ * 记在壳设置里的窗口状态：**只有位置与最大化**。
+ *
+ * 宽高刻意不记：版心宽度是应用自己的事（清单 defaultWidth/defaultHeight），
+ * 记下过一次就再也改不动——用户调清单值要先把记忆删掉，这不对。
+ * 摆到哪个屏幕、是不是最大化，那是这台机器上的习惯，留着。
+ */
+export interface WindowPlace {
   x?: number
   y?: number
   maximized: boolean
+}
+
+/** 开窗口要的完整尺寸：宽高来自清单默认，位置来自记下的那一份 */
+export interface WindowBounds extends WindowPlace {
+  width: number
+  height: number
 }
 
 /**
  * 记进设置的窗口状态。
  * 最大化时不写坐标：那是"占满屏幕"的假位置，下次照着恢复会跑到屏幕外。
  */
-export function boundsToSave(b: { width: number; height: number; x: number; y: number }, maximized: boolean): WindowBounds {
-  return maximized
-    ? { width: b.width, height: b.height, maximized: true }
-    : { width: b.width, height: b.height, x: b.x, y: b.y, maximized: false }
+export function placeToSave(b: { x: number; y: number }, maximized: boolean): WindowPlace {
+  return maximized ? { maximized: true } : { x: b.x, y: b.y, maximized: false }
 }
 
-/** 恢复时用哪个初始位置：上次记下的，或这一档窗口的默认尺寸 */
-export function boundsForRestore(saved: WindowBounds | null | undefined, fallback: { width: number; height: number }): WindowBounds {
-  if (!saved || typeof saved.width !== 'number' || typeof saved.height !== 'number') {
-    return { ...fallback, maximized: false }
-  }
+/** 恢复时用哪份位置：记下的那一份，尺寸一律用传进来的默认 */
+export function boundsForRestore(place: WindowPlace | null | undefined, size: { width: number; height: number }): WindowBounds {
+  const saved = place && typeof place === 'object' ? place : null
+  const maximized = saved?.maximized === true
   return {
-    width: saved.width,
-    height: saved.height,
-    x: saved.maximized ? undefined : saved.x,
-    y: saved.maximized ? undefined : saved.y,
-    maximized: saved.maximized === true
+    width: size.width,
+    height: size.height,
+    // 最大化过就别用那组假坐标，让系统决定放哪
+    x: saved && !maximized ? saved.x : undefined,
+    y: saved && !maximized ? saved.y : undefined,
+    maximized
+  }
+}
+
+/**
+ * 某应用首次开窗口时的尺寸：清单写了就用它写的，没写的那一维跟壳的默认。
+ * 两个字段各自独立，所以"只调宽度、高度随壳"这种写法是成立的。
+ */
+export function defaultSizeFor(
+  meta: { defaultWidth?: number; defaultHeight?: number },
+  base: { width: number; height: number }
+): { width: number; height: number } {
+  return {
+    width: meta.defaultWidth ?? base.width,
+    height: meta.defaultHeight ?? base.height
   }
 }

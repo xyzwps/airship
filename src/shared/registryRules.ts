@@ -29,6 +29,12 @@ export function manifestProblems(
       out.push(`${file}: 不认识的平台 "${p}"（清单 platforms 只认 ${PLATFORM_IDS.join(' / ')}）`)
     }
   }
+  for (const key of ['defaultWidth', 'defaultHeight'] as const) {
+    const v = meta[key]
+    if (v !== undefined && (!Number.isInteger(v) || v <= 0)) {
+      out.push(`${file}: 清单 ${key} 必须是正整数像素值，收到 ${JSON.stringify(v)}`)
+    }
+  }
   return out
 }
 

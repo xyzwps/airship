@@ -6,4 +6,6 @@ export const app: AppMeta = {
   description: '每天要做的事，勾掉就行',
   capabilities: ['fs.read', 'fs.write', 'dialog', 'settings', 'tray', 'notify', 'log'],
   flush: true,
+  defaultWidth: 600,
+  defaultHeight: 800,
 }
