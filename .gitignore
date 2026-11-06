@@ -7,3 +7,6 @@ shots/
 
 # 用例的临时 userData（各区 tests/ 下）
 **/tests/.tmp/
+
+# 打包产物（安装包与免安装目录）
+release/

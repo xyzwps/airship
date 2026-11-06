@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "飞船 —— 一个 Electron 壳，里面装着 vcp、墨读、打勾勾等自用应用",
+  "author": "xyzwp",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -11,7 +12,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "shot": "electron-vite build && cross-env AIRSHIP_SHOT=1 electron . --shot",
     "test": "vitest run",
-    "casecov": "vitest run spec-coverage"
+    "casecov": "vitest run spec-coverage",
+    "icon": "python code/make-ico.py",
+    "pack": "electron-vite build && electron-builder --win --dir",
+    "dist": "electron-vite build && cross-env ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ electron-builder --win nsis",
+    "verify-installer": "node code/verify-installer.mjs"
   },
   "dependencies": {
     "foliate-js": "^1.0.1",
@@ -24,6 +29,7 @@
     "@vitejs/plugin-react": "^6.2.1",
     "cross-env": "^10.1.0",
     "electron": "^45.2.3",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "jsdom": "^29.1.1",
     "react": "^19.3.1",

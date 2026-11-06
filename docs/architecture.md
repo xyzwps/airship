@@ -426,11 +426,12 @@ export interface AppMeta {
 | 关键库 | foliate-js 1.0.1（自带 mobi.js，MOBI6+KF8+PalmDOC+HUFF/CDIC）· pdfjs-dist 6.5.438 |
 | 版本约束原因 | vitest 5 要求 node ≥26，本机 node 25.9，故钉 4.x；npm registry 与 electron 二进制走 npmmirror |
 | 构建 | 三目标：main / preload / renderer；应用各自懒加载 chunk |
-| 图标 | 母版 `assets/icon-master.png`（用户提供的图形），`python code/make-icons.py` 用 Pillow 重出 `assets/icon.png`（256，窗口图标）与 `assets/tray.png`（16，托盘默认）；标题栏那颗品牌图形是同一张图的 SVG 简化版，写在 `shell/Titlebar.tsx` |
+| 打包 | `npm run dist`：electron-builder 出 NSIS 安装包 `release/airship-Setup-<版本>-x64.exe`，`npm run verify-installer` 自检并写 `.sha256`；细节与未做的事（无代码签名、无自动更新）见 [release-packaging.md](release-packaging.md) |
+| 图标 | 母版 `assets/icon-master.png`（用户提供的图形），`python code/make-icons.py` 重出 `assets/icon.png`（256，窗口图标）与 `assets/tray.png`（16，托盘默认），`python code/make-ico.py` 重出 `assets/icon.ico`（16–256 七档，安装包与 exe 的图标）；标题栏那颗品牌图形是同一张图的 SVG 简化版，写在 `shell/Titlebar.tsx` |
 | 安全 | `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`；CSP 允许 `blob:`（foliate 用 blob iframe 渲章节）与样式 `unsafe-inline`（禁掉书就没排版），脚本只 `'self'` |
 | 外部链接 | 只放行 `http/https`，交给系统浏览器；`file://` 与自定义协议不开新窗 |
 
-命令：`npm run dev` 开发 · `npm run build` 构建 · `npm test` 单测 · `npm run casecov` 册子与用例的双向差集 · `npm run typecheck` 两个 tsconfig · `npm run shot` 逐窗口截图 · `VCP_E2E=1 npx vitest run e2e` 真编码用例 · `AIRSHIP_WSLD_INTEGRATION=1 npx vitest run wsld/tests/real` 真 `wslc` 只读命令。
+命令：`npm run dev` 开发 · `npm run build` 构建 · `npm run dist` 出安装包 · `npm run verify-installer` 出包自检 · `npm test` 单测 · `npm run casecov` 册子与用例的双向差集 · `npm run typecheck` 两个 tsconfig · `npm run shot` 逐窗口截图 · `VCP_E2E=1 npx vitest run e2e` 真编码用例 · `AIRSHIP_WSLD_INTEGRATION=1 npx vitest run wsld/tests/real` 真 `wslc` 只读命令。
 
 ---
 
@@ -476,7 +477,7 @@ export interface AppMeta {
 
 1. **MOBI 仍无真样本可验**。解析走 foliate-js 自带的 `mobi.js`，与 EPUB 同一条 `view.open` 自动识别路径；机器上没有 .mobi/.azw3，这条只能挂着。
 2. **EPUB 翻页延迟未单独采样**。目前只有"打开到首屏"的数字；翻页要另做标记。
-3. **阶段 C（运行时从磁盘加载应用包）与阶段 D（打包分发）未做**。现在应用与壳同仓同构建，改应用要重新构建整个壳——这是"独立修改"已经做到、"独立构建"还没做的地方。
+3. **阶段 D 已做，阶段 C 未做**。`npm run dist` 出 Windows 安装包（见 [release-packaging.md](release-packaging.md)），但应用与壳仍同仓同构建——改一个应用要重出整个安装包："独立修改"已经做到，"独立构建"（运行时从磁盘加载应用包）还没做。安装包也没有代码签名，首次运行会有 SmartScreen 那道提示。
 4. **窗口数不设上限**：五个应用全开约 500 MB。真觉得吃紧再加"同应用多窗口"或闲置回收策略。
 5. **wsld 只移植了核心三块**（容器、镜像、日志）。原版还有而这里先没有的：`run` 命令编排（40 余字段拼装/校验/反解）、
    registry mirror（Docker Hub 路径改写与 pull 后改名）、拉取实时进度。

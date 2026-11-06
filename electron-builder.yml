@@ -1,0 +1,51 @@
+# 打包配置（Windows 安装包）
+#
+# 风格对齐 wslc-desktop：一条命令出一个 setup.exe，拷给别人双击安装；
+# 旁边留一份 .sha256；向导双语（按系统界面语言自动选）；"只为我安装"，不需要管理员权限；
+# 开始菜单 + 桌面快捷方式 + 控制面板里的卸载项。
+#
+# 版本号只在 package.json 的 "version" 一处：它同时决定 exe 的文件版本与安装包文件名。
+
+appId: dev.xyzwp.airship
+productName: 飞船
+copyright: © 2026 xyzwp
+
+directories:
+  output: release
+  buildResources: build
+
+# 装进 app.asar 的东西：electron-vite 的三个构建目标 + 清单 + 壳自己的两张图
+# （windows.ts 与 tray.ts 按 ../../assets/ 相对路径找它们，打包后仍在 asar 内）
+files:
+  - out/**/*
+  - package.json
+  - assets/icon.png
+  - assets/tray.png
+  # 渲染侧的库已经被 vite 打进 out/renderer 了（pdf.worker 走 ?url 也是产物），
+  # node_modules 里这几份只是构建期依赖，装到客户机上纯属占地方
+  - '!node_modules/pdfjs-dist/**'
+  - '!node_modules/foliate-js/**'
+  - '!node_modules/@napi-rs/**'  # pdf.js 的 Node 端画布，Electron 里用不到
+
+compression: maximum
+
+win:
+  icon: assets/icon.ico
+  target:
+    - nsis
+  # 产物名：airship-Setup-<版本>-x64.exe
+  artifactName: airship-Setup-${version}-x64.exe
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 飞船
+  uninstallDisplayName: 飞船
+  # 卸载不动用户数据：%APPDATA%/airship 里是书架与设置，删掉太狠
+  deleteAppDataOnUninstall: false
+  installerLanguages:
+    - zh_CN
+    - en
