@@ -4,16 +4,7 @@ import { APP_MAP, unavailableReason } from './services/appRegistry'
 import { platformIdOf } from '@shared/protocol'
 import { notRegistered, platformUnsupported } from '@shared/errors'
 import { targetsFor, type WindowRef } from './services/routing'
-import {
-  WindowLedger,
-  appUserModelIdFor,
-  boundsForRestore,
-  boundsKeyFor,
-  defaultSizeFor,
-  placeToSave,
-  type WindowPlace
-} from './services/windowLedger'
-import { settings } from './services/settings'
+import { WindowLedger, appUserModelIdFor, defaultSizeFor } from './services/windowLedger'
 import { log } from './services/logging'
 import { proc } from './services/proc'
 import { trayService } from './services/tray'
@@ -83,18 +74,7 @@ function loadEntry(window: BrowserWindow, entry: 'launcher' | 'app', query?: Rec
   })
 }
 
-/** 恢复某归属上次的位置（宽高一律用这一档窗口的默认，不记尺寸） */
-function boundsFor(owner: Owner, size: { width: number; height: number }) {
-  const saved = settings.get<WindowPlace | null>('shell', boundsKeyFor(owner), null)
-  return boundsForRestore(saved, size)
-}
-
-function persistBounds(owner: Owner, window: BrowserWindow): void {
-  if (window.isDestroyed()) return
-  settings.set('shell', boundsKeyFor(owner), placeToSave(window.getBounds(), window.isMaximized()))
-}
-
-function wireWindow(window: BrowserWindow, owner: Owner, title: string, saved: { maximized: boolean }): void {
+function wireWindow(window: BrowserWindow, owner: Owner, title: string): void {
   // closed 事件里 window.webContents 已经销毁，摸它会抛 "Object has been destroyed"，
   // 所以先把 id 记下来
   const contentsId = window.webContents.id
@@ -104,7 +84,6 @@ function wireWindow(window: BrowserWindow, owner: Owner, title: string, saved: {
   window.once('ready-to-show', () => window.show())
   window.on('maximize', () => sendTo(owner, { kind: 'window:maximized', value: true }))
   window.on('unmaximize', () => sendTo(owner, { kind: 'window:maximized', value: false }))
-  window.on('close', () => persistBounds(owner, window))
   window.on('closed', () => {
     ledger.close(contentsId)
     if (owner !== 'shell') {
@@ -126,8 +105,6 @@ function wireWindow(window: BrowserWindow, owner: Owner, title: string, saved: {
   window.webContents.on('console-message', (_e, _level, message) => {
     if (message.startsWith('[airship-dbg]')) log.info(String(owner), message)
   })
-
-  if (saved.maximized) window.maximize()
 }
 
 export function createLauncher(): BrowserWindow {
@@ -137,9 +114,8 @@ export function createLauncher(): BrowserWindow {
     return launcher
   }
 
-  const saved = boundsFor('shell', LAUNCHER_SIZE)
   const window = new BrowserWindow({
-    ...saved,
+    ...LAUNCHER_SIZE,
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
@@ -149,7 +125,7 @@ export function createLauncher(): BrowserWindow {
   })
 
   launcher = window
-  wireWindow(window, 'shell', '飞船', saved)
+  wireWindow(window, 'shell', '飞船')
   loadEntry(window, 'launcher')
   return window
 }
@@ -173,9 +149,10 @@ export function openAppWindow(appId: string): BrowserWindow {
     }
   }
 
-  const saved = boundsFor(appId, defaultSizeFor(meta, APP_SIZE))
+  // 尺寸只认清单（没写就跟壳的默认），位置不记：每次由系统摆
+  const size = defaultSizeFor(meta, APP_SIZE)
   const window = new BrowserWindow({
-    ...saved,
+    ...size,
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
@@ -190,7 +167,7 @@ export function openAppWindow(appId: string): BrowserWindow {
   withModelId.setAppUserModelId?.(appUserModelIdFor(appId))
 
   appWindows.set(appId, window)
-  wireWindow(window, appId, meta.name, saved)
+  wireWindow(window, appId, meta.name)
   loadEntry(window, 'app', { app: appId })
   log.info(appId, '应用窗口已打开')
   return window

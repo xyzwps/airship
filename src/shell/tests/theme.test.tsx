@@ -20,6 +20,7 @@ vi.mock('electron', async () => {
     app: { getPath: () => root, getVersion: () => '0.0.0-test' },
     ipcMain: { handle: () => undefined, on: () => undefined },
     BrowserWindow: Object.assign(class {}, { fromWebContents: () => null }),
+    screen: { getAllDisplays: () => [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }] },
     clipboard: { writeText: () => undefined, readText: () => '' },
     dialog: { showOpenDialog: async () => ({ canceled: true, filePaths: [] }), showSaveDialog: async () => ({ canceled: true }) },
     Notification: class {

@@ -3,9 +3,13 @@
  *
  * "哪个应用现在有活着的窗口"这个事实被抽出来，是因为它是三条用户可见契约的根：
  *   1. 再点一次同一个应用 → 聚焦已有窗口，而不是开出第二个；
- *   2. 窗口状态按应用各记一份 → 重启后各自回到上次的尺寸与位置；
- *   3. 关掉窗口 → 该应用名下的子进程要跟着收掉。
+ *   2. 关掉窗口 → 该应用名下的子进程要跟着收掉；
+ *   3. 主进程所有权限判定都从"这个 webContents 归属谁"出发。
  * 这条规则埋在 BrowserWindow 调用里就没法验证，拎出来就能——和 services/routing.ts 同一个理由。
+ *
+ * 这里**不再有**窗口状态的读写：位置与尺寸都不记（判据见 `src/shell/specs/shell.md` SH-015/016/018）。
+ * 记过一次就改不动、换块屏幕还会把窗口丢到屏外，而换来的只是"下次开在同一个地方"；
+ * 版心宽度本来由清单定，位置交给系统摆已经够用。
  */
 
 /** owner：'shell' 是启动器，其余是应用 id */
@@ -62,59 +66,13 @@ export class WindowLedger {
   }
 }
 
-/** 窗口状态在壳设置里的键：一应用一份，启动器自己一份 */
-export function boundsKeyFor(owner: string): string {
-  return owner === SHELL ? 'launcherWindow' : `appWindow:${owner}`
-}
-
 /** 任务栏身份：每应用一个 AppUserModelId，才能单独固定与预览 */
 export function appUserModelIdFor(owner: string, prefix = 'dev.xyzwp.airship'): string {
   return owner === SHELL ? prefix : `${prefix}.${owner}`
 }
 
 /**
- * 记在壳设置里的窗口状态：**只有位置与最大化**。
- *
- * 宽高刻意不记：版心宽度是应用自己的事（清单 defaultWidth/defaultHeight），
- * 记下过一次就再也改不动——用户调清单值要先把记忆删掉，这不对。
- * 摆到哪个屏幕、是不是最大化，那是这台机器上的习惯，留着。
- */
-export interface WindowPlace {
-  x?: number
-  y?: number
-  maximized: boolean
-}
-
-/** 开窗口要的完整尺寸：宽高来自清单默认，位置来自记下的那一份 */
-export interface WindowBounds extends WindowPlace {
-  width: number
-  height: number
-}
-
-/**
- * 记进设置的窗口状态。
- * 最大化时不写坐标：那是"占满屏幕"的假位置，下次照着恢复会跑到屏幕外。
- */
-export function placeToSave(b: { x: number; y: number }, maximized: boolean): WindowPlace {
-  return maximized ? { maximized: true } : { x: b.x, y: b.y, maximized: false }
-}
-
-/** 恢复时用哪份位置：记下的那一份，尺寸一律用传进来的默认 */
-export function boundsForRestore(place: WindowPlace | null | undefined, size: { width: number; height: number }): WindowBounds {
-  const saved = place && typeof place === 'object' ? place : null
-  const maximized = saved?.maximized === true
-  return {
-    width: size.width,
-    height: size.height,
-    // 最大化过就别用那组假坐标，让系统决定放哪
-    x: saved && !maximized ? saved.x : undefined,
-    y: saved && !maximized ? saved.y : undefined,
-    maximized
-  }
-}
-
-/**
- * 某应用首次开窗口时的尺寸：清单写了就用它写的，没写的那一维跟壳的默认。
+ * 开这个应用的窗口用多大：清单写了就用它写的，没写的那一维跟壳的默认。
  * 两个字段各自独立，所以"只调宽度、高度随壳"这种写法是成立的。
  */
 export function defaultSizeFor(

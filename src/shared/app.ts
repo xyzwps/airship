@@ -35,8 +35,8 @@ export interface AppMeta {
    * 这是应用自身的事实：容器台是两栏表格、打勾勾是一列清单，最佳版心宽度本来就不一样，
    * 让壳去猜每个应用的版式等于壳替应用做决定。
    *
-   * 壳**不记宽高**（只记位置与最大化），所以改这两个数立刻生效，不需要先清掉什么记忆
-   * ——判据见 `src/shell/specs/shell.md` SH-015 / SH-016。
+   * 壳**不记窗口状态**（尺寸与位置都不记），所以改这两个数立刻生效，也不需要先清掉什么记忆
+   * ——判据见 `src/shell/specs/shell.md` SH-015 / SH-016 / SH-018。
    */
   defaultWidth?: number
   defaultHeight?: number

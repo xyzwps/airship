@@ -1,12 +1,11 @@
-import { rmSync, mkdirSync, readFileSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
  * SH-005 ~ SH-010：一个应用一个窗口的规矩。
  *
- * 台账（谁有活窗口、状态记在哪个键、最大化该怎么记）是抽出来的纯逻辑，这里直接对着它验；
+ * 台账（谁有活窗口、归属怎么解除）是抽出来的纯逻辑，这里直接对着它验；
  * "关窗要杀掉这个应用的子进程"用一条**真在跑的子进程**验——观察它真的退场，而不是读代码猜。
+ * 窗口尺寸与摆放对着真的 openAppWindow 验，见 appWindowCreate.test.ts。
  */
 
 vi.mock('electron', async () => {
@@ -26,12 +25,7 @@ vi.mock('electron', async () => {
   }
 })
 
-const USER_DATA = join(__dirname, '.tmp', 'shell-userData')
-
-const { WindowLedger, appUserModelIdFor, boundsForRestore, boundsKeyFor, defaultSizeFor, placeToSave } = await import(
-  '../main/services/windowLedger'
-)
-const { settings } = await import('../main/services/settings')
+const { WindowLedger, appUserModelIdFor } = await import('../main/services/windowLedger')
 const { proc, setProcEmitter } = await import('../main/services/proc')
 const { allowExecutable, resetToolDiscovery } = await import('../main/services/tools')
 const { ownerOfContents } = await import('../main/windows')
@@ -71,39 +65,6 @@ describe('窗口台账：一个应用只有一个窗口', () => {
     expect(ownerOfContents(999_999)).toBeNull()
   })
 
-  it('SH-008 位置一应用记一份，互不串味', () => {
-    expect(boundsKeyFor('shell')).toBe('launcherWindow')
-    expect(boundsKeyFor('vcp')).toBe('appWindow:vcp')
-    expect(boundsKeyFor('pdf')).toBe('appWindow:pdf')
-
-    settings.set('shell', boundsKeyFor('vcp'), placeToSave({ width: 1200, height: 800, x: 40, y: 60 }, false))
-    settings.set('shell', boundsKeyFor('pdf'), placeToSave({ width: 900, height: 700, x: 200, y: 100 }, false))
-
-    const stored = JSON.parse(readFileSync(join(USER_DATA, 'settings.json'), 'utf8')) as Record<string, unknown>
-    const vcp = stored['appWindow:vcp'] as Record<string, number | boolean>
-    expect(vcp).toEqual({ x: 40, y: 60, maximized: false })
-    // 宽高根本不入档：记的是摆哪儿，不是多大
-    expect('width' in vcp).toBe(false)
-    expect((stored['appWindow:pdf'] as { x: number }).x).toBe(200)
-
-    // 恢复：位置来自记下的那一份，尺寸来自传进来的默认
-    const restored = boundsForRestore(settings.get('shell', boundsKeyFor('vcp'), null), { width: 1100, height: 740 })
-    expect(restored).toEqual({ width: 1100, height: 740, x: 40, y: 60, maximized: false })
-  })
-
-  it('SH-009 最大化只记"最大化"，不记那组屏幕外的假坐标', () => {
-    const saved = placeToSave({ width: 1728, height: 1020, x: -8, y: -8 }, true)
-    expect(saved).toEqual({ maximized: true })
-
-    const restored = boundsForRestore(saved, { width: 1100, height: 740 })
-    expect(restored.maximized).toBe(true)
-    expect(restored.x).toBeUndefined()
-    expect(restored.y).toBeUndefined()
-
-    // 没记过时：默认尺寸 + 没有坐标，让系统决定放哪
-    expect(boundsForRestore(null, { width: 1000, height: 680 })).toEqual({ width: 1000, height: 680, maximized: false })
-  })
-
   it('SH-010 任务栏身份一应用一个，启动器自己不带后缀', () => {
     expect(appUserModelIdFor('vcp')).toBe('dev.xyzwp.airship.vcp')
     expect(appUserModelIdFor('pdf')).toBe('dev.xyzwp.airship.pdf')
@@ -111,33 +72,6 @@ describe('窗口台账：一个应用只有一个窗口', () => {
     expect(appUserModelIdFor('shell')).toBe('dev.xyzwp.airship')
   })
 
-  it('SH-015 清单写了尺寸的应用，开出来就是那个尺寸', () => {
-    const base = { width: 1100, height: 740 }
-    expect(defaultSizeFor({ defaultWidth: 980, defaultHeight: 660 }, base)).toEqual({ width: 980, height: 660 })
-    expect(boundsForRestore(null, defaultSizeFor({ defaultWidth: 980, defaultHeight: 660 }, base))).toEqual({
-      width: 980,
-      height: 660,
-      maximized: false
-    })
-  })
-
-  it('SH-016 只写一维时另一维跟壳；拖过的尺寸不留到下次，位置照旧', () => {
-    const base = { width: 1100, height: 740 }
-    expect(defaultSizeFor({ defaultWidth: 1280 }, base)).toEqual({ width: 1280, height: 740 })
-    expect(defaultSizeFor({ defaultHeight: 500 }, base)).toEqual({ width: 1100, height: 500 })
-    expect(defaultSizeFor({}, base)).toEqual({ width: 1100, height: 740 })
-
-    // 清单是 600，上回用户把它拉成 1125 宽并摆在 (30,40)：
-    // 下次开还是 600 宽（清单说了算），但回到 (30,40)
-    const saved = placeToSave({ width: 1125, height: 743, x: 30, y: 40 }, false)
-    expect(boundsForRestore(saved, defaultSizeFor({ defaultWidth: 600 }, base))).toEqual({
-      width: 600,
-      height: 740,
-      x: 30,
-      y: 40,
-      maximized: false
-    })
-  })
 })
 
 describe('关掉应用窗口，它名下的子进程跟着收掉', () => {
