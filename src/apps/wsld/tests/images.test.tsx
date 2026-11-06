@@ -475,7 +475,7 @@ describe('删除与强制删除', () => {
     held[0]!.ctl.exit({ code: 1, stderr: CONFLICT })
     await m.settle()
 
-    expect(removeBtn(m, BUSY).textContent).toBe('强制删除')
+    expect(removeBtn(m, BUSY).getAttribute('title')).toBe('强制删除镜像引用（wslc rmi -f）')
     expect(removeBtn(m, BUSY).getAttribute('title')).toBe('强制删除镜像引用（wslc rmi -f）')
     expect(errorBar(m)).toContain('该镜像正被容器使用，再点一次「强制删除」才能把它从磁盘上移除。')
     expect(errorBar(m)).not.toContain('如果此错误是意外错误')
@@ -503,7 +503,7 @@ describe('删除与强制删除', () => {
     held[0]!.ctl.exit({ code: 1, stderr: NOT_FOUND })
     await m.settle()
 
-    expect(removeBtn(m, BUSY).textContent).toBe('删除')
+    expect(removeBtn(m, BUSY).getAttribute('title')).toBe('删除镜像引用（wslc rmi）')
     expect(errorBar(m)).toContain('未找到镜像')
     expect(errorBar(m)).toContain('WSLC_E_IMAGE_NOT_FOUND')
     expect(errorBar(m)).not.toContain('再点一次「强制删除」')
@@ -552,16 +552,16 @@ describe('删除与强制删除', () => {
     await tap(m, `镜像-删除-${BUSY}`)
     held[0]!.ctl.exit({ code: 1, stderr: CONFLICT })
     await m.settle()
-    expect(removeBtn(m, BUSY).textContent).toBe('强制删除')
+    expect(removeBtn(m, BUSY).getAttribute('title')).toBe('强制删除镜像引用（wslc rmi -f）')
 
     // 它仍被容器引用：刷新前后这颗键都写着"强制删除"
     await tap(m, '镜像-刷新')
-    expect(removeBtn(m, BUSY).textContent).toBe('强制删除')
+    expect(removeBtn(m, BUSY).getAttribute('title')).toBe('强制删除镜像引用（wslc rmi -f）')
 
     // 容器不再引用它了：破坏性入口收回
     stdout = ndjson(both.map((row) => ({ ...row, Containers: '0' })))
     await tap(m, '镜像-刷新')
-    expect(removeBtn(m, BUSY).textContent).toBe('删除')
+    expect(removeBtn(m, BUSY).getAttribute('title')).toBe('删除镜像引用（wslc rmi）')
     expect(errorBar(m)).not.toContain('再点一次「强制删除」')
     m.unmount()
   })

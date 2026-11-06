@@ -116,7 +116,9 @@ async function runShotMode(): Promise<void> {
       // 导入 + 解析 + 首屏渲染比空界面慢得多，给足时间
       await sleep(9000)
     } else {
-      await sleep(1500)
+      // 3 秒：容器台第一屏要等一条真 `wslc list`（冷启动实测 2.5s，热了 0.1s），
+      // 等 1.5s 截出来永远是"尚未刷新"那张空壳
+      await sleep(3000)
     }
 
     const suffix = isAutotestTarget ? '-autotest' : ''

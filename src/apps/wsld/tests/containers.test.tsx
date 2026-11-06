@@ -386,3 +386,30 @@ describe('点一行就是它的详情', () => {
     m.unmount()
   })
 })
+
+describe('纯图标键都念得出来', () => {
+  it('CL-028 动作键与页签都是图标，悬停说明与无障碍名称都在', async () => {
+    const m = await mountList(twoContainers())
+    // 选中一行，详情头部那四颗键与两枚页签才存在
+    const first = m.container.querySelector<HTMLElement>('.wsld__row')!
+    await act(async () => {
+      first.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    await m.settle()
+
+    const keys = Array.from(m.container.querySelectorAll<HTMLElement>('.icon-btn'))
+    // 刷新 + 两行各一颗启动 + 详情四颗 + 两枚页签
+    expect(keys.length).toBeGreaterThanOrEqual(9)
+    for (const btn of keys) {
+      const label = btn.getAttribute('aria-label') ?? ''
+      expect(label, btn.dataset.test + ' 没有无障碍名称').not.toBe('')
+      expect(btn.getAttribute('title'), label + ' 缺悬停说明').toBe(label)
+      // 纯图标：键里不该再有文字
+      expect((btn.textContent ?? '').trim(), label + ' 里还留着文字').toBe('')
+    }
+    expect(m.field('详情-删除')!.classList.contains('icon-btn--danger')).toBe(true)
+    expect(m.field('页签-详情')!.classList.contains('icon-btn--on')).toBe(true)
+    expect(m.field('页签-日志')!.classList.contains('icon-btn--on')).toBe(false)
+    m.unmount()
+  })
+})

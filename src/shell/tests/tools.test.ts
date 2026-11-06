@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -31,6 +31,12 @@ function putExe(dir: string, content = 'not a real exe'): string {
   mkdirSync(dir, { recursive: true })
   const target = join(dir, process.platform === 'win32' ? WSLC_NAMES[0] : WSLC_NAMES[1])
   writeFileSync(target, content, 'utf8')
+  // Windows 上刚写完的文件可能被杀软短暂占住，statSync 一下读不到；
+  // 不让这种抖动变成发现顺序用例的偶发红。
+  const started = Date.now()
+  while (!existsSync(target) || !statSync(target).isFile()) {
+    if (Date.now() - started > 2000) throw new Error(`假 exe 落不下来：${target}`)
+  }
   return target
 }
 

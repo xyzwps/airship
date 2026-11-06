@@ -1,3 +1,4 @@
+import { IconButton } from './IconButton'
 import { Fragment, useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import {
   containerActionArgs,
@@ -141,14 +142,17 @@ export function ContainersView({ runner }: { runner: WslcRunner }): JSX.Element 
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <span className="spacer" />
         <span className="hint">{containersSummary(all)}</span>
         <span className="hint wsld__refreshed">
           最近刷新 {lastRefresh === null ? NEVER_REFRESHED : clockOfDay(lastRefresh)}
         </span>
-        <button type="button" className="btn" data-test="容器-刷新" disabled={pending !== null} onClick={() => void refresh()}>
-          刷新
-        </button>
+        <IconButton
+          icon="refresh"
+          label="刷新容器列表（wslc list -a）"
+          testId="容器-刷新"
+          disabled={pending !== null}
+          onClick={() => void refresh()}
+        />
       </div>
 
       {error !== null && <div className="wsld__bar wsld__bar--error error">{error}</div>}
@@ -177,19 +181,17 @@ export function ContainersView({ runner }: { runner: WslcRunner }): JSX.Element 
                 </span>
                 <span className="wsld__row-image mono">{dash(container.image)}</span>
                 {rowBusy && <span className="spinner" />}
-                <button
-                  type="button"
-                  className="btn btn--ghost wsld__row-action"
-                  data-test={`行-启动-${container.id}`}
+                <IconButton
+                  icon="start"
+                  label="启动容器（wslc start）"
+                  testId={`行-启动-${container.id}`}
+                  className="wsld__row-action"
                   disabled={pending !== null || running}
-                  title="启动容器（wslc start）"
                   onClick={(e) => {
                     e.stopPropagation()
                     void runAction('start', container)
                   }}
-                >
-                  启动
-                </button>
+                />
               </div>
             )
           })}
@@ -213,59 +215,52 @@ export function ContainersView({ runner }: { runner: WslcRunner }): JSX.Element 
                   {stateLabel(detailOf)}
                 </span>
                 <span className="spacer" />
-                <button
-                  type="button"
-                  className="btn"
-                  data-test="详情-启动"
+                <IconButton
+                  icon="start"
+                  label="启动容器（wslc start）"
+                  testId="详情-启动"
                   disabled={pending !== null || isRunning(detailOf.state)}
                   onClick={() => void runAction('start', detailOf)}
-                >
-                  启动
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  data-test="详情-停止"
+                />
+                <IconButton
+                  icon="stop"
+                  label="停止容器（wslc stop）"
+                  testId="详情-停止"
                   disabled={pending !== null || !isRunning(detailOf.state)}
                   onClick={() => void runAction('stop', detailOf)}
-                >
-                  停止
-                </button>
-                <button
-                  type="button"
-                  className="btn"
-                  data-test="详情-重启"
+                />
+                <IconButton
+                  icon="restart"
+                  label="重启容器（wslc restart）"
+                  testId="详情-重启"
                   disabled={pending !== null}
                   onClick={() => void runAction('restart', detailOf)}
-                >
-                  重启
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--danger"
-                  data-test="详情-删除"
+                />
+                <IconButton
+                  icon="remove"
+                  label="删除容器（wslc remove）"
+                  testId="详情-删除"
+                  danger
                   disabled={pending !== null}
                   onClick={() => void runAction('remove', detailOf)}
-                >
-                  删除
-                </button>
+                />
               </div>
 
               <div className="wsld__tabs row">
-                <button
-                  type="button"
-                  className={`wsld__tab${pane === 'detail' ? ' wsld__tab--on' : ''}`}
+                <IconButton
+                  icon="detail"
+                  label="基本信息与运行状态"
+                  testId="页签-详情"
+                  on={pane === 'detail'}
                   onClick={() => setPane('detail')}
-                >
-                  详情
-                </button>
-                <button
-                  type="button"
-                  className={`wsld__tab${pane === 'logs' ? ' wsld__tab--on' : ''}`}
+                />
+                <IconButton
+                  icon="logs"
+                  label="容器日志"
+                  testId="页签-日志"
+                  on={pane === 'logs'}
                   onClick={() => setPane('logs')}
-                >
-                  日志
-                </button>
+                />
               </div>
 
               <div className="wsld__pane" hidden={pane !== 'detail'}>

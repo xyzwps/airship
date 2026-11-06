@@ -55,7 +55,7 @@ async function openLogs(fake: FakeAirship, name = 'zeta'): Promise<Mount> {
   const m = await mountWsld(fake)
   await m.settle()
   await m.press(name)
-  await m.press('日志')
+  await tap(m, '页签-日志')
   await m.settle()
   return m
 }
@@ -141,7 +141,7 @@ describe('两种读法各发各的命令', () => {
     const m = await mountWsld(fake)
     await m.settle()
     await m.press('probe1')
-    await m.press('日志')
+    await tap(m, '页签-日志')
     await m.settle()
 
     await tap(m, '日志-查看')
@@ -413,7 +413,7 @@ describe('只有运行中的容器可以实时，会话各归各', () => {
     const m = await mountWsld(fake)
     await m.settle()
     await m.press('zeta')
-    await m.press('日志')
+    await tap(m, '页签-日志')
     await m.settle()
     askConfirm(true)
 
@@ -461,12 +461,12 @@ describe('只有运行中的容器可以实时，会话各归各', () => {
     held[0]!.ctl.chunk('stdout', '切走之前的一行\n')
     await m.settle()
 
-    await m.press('详情')
+    await tap(m, '页签-详情')
     await m.settle()
     expect(held).toHaveLength(1)
     expect(commands(fake).filter((line) => line.includes(' logs '))).toHaveLength(1)
 
-    await m.press('日志')
+    await tap(m, '页签-日志')
     await m.settle()
     expect(logText(m)).toBe('切走之前的一行')
     expect(commands(fake).filter((line) => line.includes(' logs '))).toHaveLength(1)

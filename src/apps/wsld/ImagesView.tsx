@@ -1,3 +1,4 @@
+import { IconButton } from './IconButton'
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import { loadImages, nextJobId, pullArgs, rmiArgs, type WslcRunner } from './cli'
 import {
@@ -214,9 +215,13 @@ export function ImagesView({ runner }: { runner: WslcRunner }): JSX.Element {
         <span className="hint wsld__refreshed">
           最近刷新 {lastRefresh === null ? NEVER_REFRESHED : clockOfDay(lastRefresh)}
         </span>
-        <button type="button" className="btn" data-test="镜像-刷新" disabled={pending !== null} onClick={() => void refresh(true)}>
-          刷新
-        </button>
+        <IconButton
+          icon="refresh"
+          label="刷新镜像列表（wslc images --format json）"
+          testId="镜像-刷新"
+          disabled={pending !== null}
+          onClick={() => void refresh(true)}
+        />
       </div>
 
       <div className="wsld__pull row">
@@ -266,16 +271,14 @@ export function ImagesView({ runner }: { runner: WslcRunner }): JSX.Element {
                 <span className="wsld__image-usage hint">{imageUsageText(image)}</span>
                 <span className="spacer" />
                 {here && <span className="spinner" />}
-                <button
-                  type="button"
-                  className={`btn${force ? ' btn--danger' : ''}`}
-                  data-test={`镜像-删除-${reference}`}
-                  title={force ? '强制删除镜像引用（wslc rmi -f）' : '删除镜像引用（wslc rmi）'}
+                <IconButton
+                  icon="remove"
+                  label={force ? '强制删除镜像引用（wslc rmi -f）' : '删除镜像引用（wslc rmi）'}
+                  testId={`镜像-删除-${reference}`}
+                  danger={force}
                   disabled={pending !== null}
                   onClick={() => remove(image)}
-                >
-                  {force ? '强制删除' : '删除'}
-                </button>
+                />
               </div>
               <div className="wsld__image-sub hint mono">{imageSubtleLine(image)}</div>
             </div>
