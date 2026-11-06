@@ -426,7 +426,7 @@ export interface AppMeta {
 | 关键库 | foliate-js 1.0.1（自带 mobi.js，MOBI6+KF8+PalmDOC+HUFF/CDIC）· pdfjs-dist 6.5.438 |
 | 版本约束原因 | vitest 5 要求 node ≥26，本机 node 25.9，故钉 4.x；npm registry 与 electron 二进制走 npmmirror |
 | 构建 | 三目标：main / preload / renderer；应用各自懒加载 chunk |
-| 图标 | `scripts/make-icons.mjs` 纯代码生成 PNG，无绘图依赖 |
+| 图标 | 母版 `assets/icon-master.png`（用户提供的图形），`python code/make-icons.py` 用 Pillow 重出 `assets/icon.png`（256，窗口图标）与 `assets/tray.png`（16，托盘默认）；标题栏那颗品牌图形是同一张图的 SVG 简化版，写在 `shell/Titlebar.tsx` |
 | 安全 | `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`；CSP 允许 `blob:`（foliate 用 blob iframe 渲章节）与样式 `unsafe-inline`（禁掉书就没排版），脚本只 `'self'` |
 | 外部链接 | 只放行 `http/https`，交给系统浏览器；`file://` 与自定义协议不开新窗 |
 

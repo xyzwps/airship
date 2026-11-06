@@ -25,9 +25,11 @@ export function Titlebar({ here, icon }: { here?: string | null; icon?: React.Re
       <div className="titlebar__brand">
         {icon ?? (
           <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-            <rect x="0.5" y="0.5" width="15" height="15" rx="4.5" fill="#2e3a54" />
-            <path d="M2 14L14 2" stroke="#f0ece2" strokeWidth="2.2" strokeLinecap="round" />
-            <circle cx="8" cy="5.6" r="1.5" fill="#f0ece2" />
+            <rect x="0" y="0" width="16" height="16" rx="4.2" fill="#e2e1f1" />
+            <rect x="3.4" y="3" width="4.6" height="4.6" rx="1.3" fill="#f86e51" />
+            <rect x="8.9" y="3" width="4.6" height="4.6" rx="1.3" fill="#80b6a8" />
+            <circle cx="5.7" cy="10.6" r="2.3" fill="#98a5e9" />
+            <rect x="8.9" y="8.3" width="4.6" height="4.6" rx="2" fill="#eba6b8" />
           </svg>
         )}
         <span>飞船</span>
