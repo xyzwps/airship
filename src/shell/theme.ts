@@ -14,11 +14,23 @@ import type { ThemeSnapshot } from '@shared/protocol'
 
 export type ThemeMode = ThemeSnapshot['mode']
 
-export const THEME_MODES: { value: ThemeMode; label: string }[] = [
-  { value: 'system', label: '跟随系统' },
-  { value: 'light', label: '亮色' },
-  { value: 'dark', label: '暗色' }
-]
+/**
+ * 三档的名字。启动器上那颗键按这个顺序循环：跟随系统 → 暗 → 亮 → 跟随系统。
+ * 顺序是表现层的决定，写在一处，别散在按钮里。
+ */
+export const THEME_ORDER: ThemeMode[] = ['system', 'dark', 'light']
+
+export const THEME_LABEL: Record<ThemeMode, string> = {
+  system: '跟随系统',
+  dark: '暗色',
+  light: '亮色'
+}
+
+/** 点一下之后该落到哪一档 */
+export function nextThemeMode(mode: ThemeMode): ThemeMode {
+  const i = THEME_ORDER.indexOf(mode)
+  return THEME_ORDER[(i + 1) % THEME_ORDER.length]!
+}
 
 function prefersDark(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches

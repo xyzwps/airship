@@ -49,6 +49,7 @@ export interface Mount {
   /** 有没有这句话（按钮标签、说明文字、错误条都算） */
   has(label: string): boolean
   press(label: string): Promise<void>
+  pressIn(selector: string): Promise<void>
   /** 往某个输入框里写字并触发 change（按 placeholder、aria-label 或 id 找） */
   type(where: string, value: string): Promise<void>
   /** 选下拉的一档 */
@@ -89,6 +90,15 @@ export async function mountUi(node: ReactNode, opts: MountOptions = {}): Promise
       return hit[0]!
     },
     allByText: (label) => matches(label),
+    /** 按 CSS 选择器点一颗键：纯图标键没有可见文字，只能这样点 */
+    pressIn: async (selector: string) => {
+      const el = container.querySelector(selector)
+      if (!el) throw new Error(`界面上没有 ${selector}。当前 HTML：\n${trim(container.innerHTML)}`)
+      await act(async () => {
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      })
+      await mount.settle()
+    },
     press: async (label) => {
       const el = mount.byText(label)
       await act(async () => {

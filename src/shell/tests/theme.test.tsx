@@ -69,17 +69,18 @@ describe('主题只有启动器能改', () => {
     document.documentElement.dataset.theme = ''
   })
 
-  it('TH-001 启动器读得到三档，档位名字就是那三档', async () => {
-    const calls: Array<[string, string | undefined]> = []
-    const { m } = await mountLauncher({ mode: 'system', resolved: 'dark' }, calls)
-    await m.settle()
-
-    const select = m.container.querySelector('select')
-    expect(select).not.toBeNull()
-    const options = Array.from(select!.querySelectorAll('option')).map((o) => o.textContent)
-    expect(options).toEqual(['跟随系统', '亮色', '暗色'])
-    expect((select as HTMLSelectElement).value).toBe('system')
-    m.unmount()
+  it('TH-001 启动器上那颗主题键是图标，不是下拉框', async () => {
+    // 三档各挂一次：画出来的图形必须互不相同，且没有 select
+    const glyphs: string[] = []
+    for (const mode of ['system', 'dark', 'light'] as const) {
+      const { m } = await mountLauncher({ mode, resolved: mode === 'light' ? 'light' : 'dark' }, [])
+      expect(m.container.querySelector('select'), '界面上不该再有主题下拉框').toBeNull()
+      const btn = m.container.querySelector('.theme-toggle')
+      expect(btn, '右上角该有一颗主题图标键').not.toBeNull()
+      glyphs.push(btn!.innerHTML.replace(/\s+/g, ''))
+      m.unmount()
+    }
+    expect(new Set(glyphs).size).toBe(3)
   })
 
   it('TH-002 应用窗口里改不了主题，启动器里才给得出 setter', async () => {
@@ -104,10 +105,10 @@ describe('主题只有启动器能改', () => {
     expect(seen.at(-1)).toBe(true)
     shellSide.unmount()
 
-    // 应用界面里没有任何改主题的入口：只有启动器那一屏有下拉
+    // 启动器那一屏才有那颗键
     const launcher = await mountLauncher({ mode: 'dark', resolved: 'dark' }, [])
     await launcher.m.settle()
-    expect(launcher.m.container.querySelector('select')).not.toBeNull()
+    expect(launcher.m.container.querySelector('.theme-toggle')).not.toBeNull()
     launcher.m.unmount()
   })
 
@@ -117,18 +118,41 @@ describe('主题只有启动器能改', () => {
     const { m } = await mountLauncher({ mode: 'light', resolved: 'light' }, calls)
     await m.settle()
 
-    await m.select('主题', 'system')
+    // 亮色的下一档就是跟随系统，实际亮暗由启动器算出来（系统偏好此时是暗）
+    await m.pressIn('.theme-toggle')
     expect(calls).toEqual([['system', 'dark']])
     m.unmount()
   })
 
   it('TH-004 亮暗两档是直接落定的实际结果', async () => {
     const calls: Array<[string, string | undefined]> = []
+    const { m } = await mountLauncher({ mode: 'dark', resolved: 'dark' }, calls)
+    await m.settle()
+
+    // 暗色的下一档是亮色：mode 与实际结果都是 light，不需要 hint
+    await m.pressIn('.theme-toggle')
+    expect(calls).toEqual([['light', undefined]])
+    m.unmount()
+  })
+
+  it('TH-010 点一下进下一档：跟随系统 → 暗 → 亮 → 跟随系统', async () => {
+    const calls: Array<[string, string | undefined]> = []
     const { m } = await mountLauncher({ mode: 'system', resolved: 'dark' }, calls)
     await m.settle()
 
-    await m.select('主题', 'light')
-    expect(calls).toEqual([['light', undefined]])
+    for (let i = 0; i < 4; i++) await m.pressIn('.theme-toggle')
+    // 第四次回到"跟随系统"，实际亮暗由启动器按系统偏好算（这里 __prefersDark=false → light）
+    expect(calls).toEqual([['dark', undefined], ['light', undefined], ['system', 'light'], ['dark', undefined]])
+    m.unmount()
+  })
+
+  it('TH-011 那颗纯图标键念得出"现在哪档、点一下换成哪档"', async () => {
+    const { m } = await mountLauncher({ mode: 'dark', resolved: 'dark' }, [])
+    await m.settle()
+
+    const btn = m.container.querySelector('.theme-toggle')!
+    expect(btn.getAttribute('title')).toBe('主题：暗色（点一下换成亮色）')
+    expect(btn.getAttribute('aria-label')).toBe('主题：暗色，点一下换成亮色')
     m.unmount()
   })
 })

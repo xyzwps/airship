@@ -164,8 +164,34 @@ button {
   margin-bottom: 6px;
 }
 
-.launcher__theme {
-  min-width: 96px;
+/* 主题键：纯图标，平时不带边框也不带底色（它不是"一颗按钮"，是界面上唯一那颗开关）；
+   悬停才给一块圆形反馈，键盘聚焦留一圈描边——不然焦点看不见 */
+.theme-toggle {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: default;
+}
+
+.theme-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.theme-toggle svg {
+  width: 17px;
+  height: 17px;
 }
 
 .tiles {
