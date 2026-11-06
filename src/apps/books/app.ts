@@ -3,7 +3,7 @@ import type { AppMeta } from '@shared/app'
 export const app: AppMeta = {
   id: 'books',
   name: '墨读',
-  description: 'EPUB / MOBI / TXT 电子书书架与阅读器',
+  description: 'EPUB / MOBI 电子书书架与阅读器',
   capabilities: [
     'fs.read',
     'fs.write',

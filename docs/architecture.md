@@ -91,7 +91,6 @@ airship
 | 应用窗口挂载（冷） | 400–420 ms |
 | 应用窗口挂载（热） | 120–160 ms |
 | EPUB 打开到首屏渲染完 | 598–741 ms |
-| TXT 打开到首屏渲染完 | 180 ms（热） |
 | PDF 首页出图 | 893 ms |
 | vcp 探测一个 4K 文件 | 523 ms |
 | vcp 批量入队 4 个（含逐个探测与字幕抽取） | 486 ms |
@@ -350,7 +349,7 @@ export interface AppMeta {
 | 包 | 公开内容 | 消费者 | 数据 |
 |---|---|---|---|
 | `library` | 书目记录、导入/移除、进度读写、封面路径解析 | books、pdf | `shared/library/` |
-| `textdecode` | `decodeText`：BOM → UTF-8 严格 → GBK 回退 | books（TXT 正文）、vcp（srt/ass 字幕） | 无 |
+| `textdecode` | `decodeText`：BOM → UTF-8 严格 → GBK 回退 | vcp（srt/ass 字幕）——墨读退出 TXT 后没有别的使用者 | 无 |
 
 `textdecode` 上收共享层的原因就是 §8.1 规则 4 的反面：墨读解正文和 vcp 解字幕遇到的是同一套坑（GBK、UTF-16 BOM），留在任何一个应用里都会逼另一个复制一份。
 顺带修掉了 RN 原版的一个真缺陷——UTF-16 排在最后兜底，而 UTF-16 的中文字节能被 UTF-8 严格解"成功"，于是解出乱码永远轮不到 UTF-16；现在 BOM 先判。

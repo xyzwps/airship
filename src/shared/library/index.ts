@@ -24,7 +24,7 @@ import type { AppApi } from '@shared/protocol'
 export const LIBRARY_API_VERSION = 1
 
 /** 格式是书库自己的领域概念（它就是个书库），不算消费者专有 */
-export type BookFormat = 'epub' | 'mobi' | 'txt' | 'pdf'
+export type BookFormat = 'epub' | 'mobi' | 'pdf'
 
 /**
  * 每本书的附加信息。

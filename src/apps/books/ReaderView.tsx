@@ -11,8 +11,6 @@ import { makeBook } from 'foliate-js/view.js'
 import type { AppApi } from '@shared/protocol'
 import { bookPath, type BookProgress, type BookRecord } from '@shared/library'
 import { remoteFile } from './remoteFile'
-import { decodeText } from '@shared/textdecode'
-import { makeTextBook, txtToHtml, type BookTheme } from './txtBook'
 
 /**
  * foliate-js 阅读器视图。
@@ -56,6 +54,12 @@ export interface TocItem {
   label: string
   href: string
   depth: number
+}
+
+/** 纸与墨：阅读器给节文档刷的那两个颜色 */
+interface BookTheme {
+  ink: string
+  paper: string
 }
 
 interface Props {
@@ -255,16 +259,8 @@ export const ReaderView = forwardRef<ReaderHandle, Props>(function ReaderView(
 
       const path = await bookPath(api, book)
 
-      if (book.format === 'epub' || book.format === 'mobi') {
-        const file = remoteFile(api, path, book.size, book.title)
-        await view.open(file)
-      } else {
-        const bytes = await api.fs.read(path)
-        const text = decodeText(bytes)
-        const bodyHtml =
-          book.format === 'txt' ? txtToHtml(text) : (new DOMParser().parseFromString(text, 'text/html').body?.innerHTML ?? text)
-        await view.open(makeTextBook({ title: book.title, bodyHtml, theme: stateRef.current.theme }))
-      }
+      // EPUB 与 MOBI 走同一条：交一个"按范围取字节"的文件出去，解析全在渲染库里
+      await view.open(remoteFile(api, path, book.size, book.title))
 
       if (cancelled) return
 

@@ -14,7 +14,6 @@ import { loadBooks } from '@shared/library'
  * 排版产物、目录、字号、进度落盘、键位与滚轮这些判据都落在我们自己的代码上。
  * 真书渲染的观感归 `just shot`。
  *
- * TXT 的章节切分与分段那五条在 src/apps/books/__tests__/txtBook.test.ts，编号已收进这本。
  */
 
 interface Recorder {
@@ -30,6 +29,12 @@ const foliate = vi.hoisted(() => ({
   views: [] as Recorder[],
   /** 名字里含这段字样的书，元数据读不出来 */
   fails: '',
+  /** 替身「解析」出来的目录与节数：真解析在渲染库里，这里只给我们这条链要用的形状 */
+  toc: [{ label: '第一章 起风了', href: '0' }, { label: '第二章 河上的船', href: '1' }] as Array<{
+    label: string
+    href: string
+  }>,
+  sections: 2,
   meta: { title: '书里的标题', author: '书里的作者' },
   cover: 'image/png'
 }))
@@ -63,7 +68,14 @@ vi.mock('foliate-js/view.js', () => {
 
     async open(book: unknown): Promise<void> {
       this.rec.opened.push(book)
-      this.book = book as Record<string, unknown>
+      // 交出去的东西原样记下来（BK-024 判的就是它）；同时替渲染库「解析」出一本书的形状，
+      // 因为节数与目录是阅读器要用的
+      this.book = {
+        ...(book as Record<string, unknown>),
+        sections: Array.from({ length: foliate.sections }, (_, i) => ({ id: String(i) })),
+        toc: foliate.toc,
+        metadata: foliate.meta
+      }
       // 节文档到位：我们的代码要在这里把键位绑上
       for (const fn of this.loadHandlers) fn({ detail: { doc: document } })
     }
@@ -124,8 +136,8 @@ function record(over: Record<string, unknown> = {}): Record<string, unknown> {
     id: 'b1',
     title: '起风了',
     author: '堀辰雄',
-    format: 'txt',
-    file: 'files/b1.txt',
+    format: 'epub',
+    file: 'files/b1.epub',
     cover: null,
     size: 60,
     addedAt: '2026-11-01T00:00:00.000Z',
@@ -135,7 +147,7 @@ function record(over: Record<string, unknown> = {}): Record<string, unknown> {
   }
 }
 
-const TXT_BODY = '第一章 起风了\n风从河面上过来。\n\n第二章 河上的船\n船是半夜来的。'
+const BOOK_BODY = '第一章 起风了\n风从河面上过来。\n\n第二章 河上的船\n船是半夜来的。'
 
 function seed(fake: FakeAirship, books: unknown[], files: Record<string, string> = {}): void {
   fake.seed(`${SHARED}/library.json`, `${JSON.stringify({ version: 2, books }, null, 2)}\n`)
@@ -146,15 +158,15 @@ async function mount(fake: FakeAirship, confirm?: boolean): Promise<Mount> {
   return mountUi(<BooksApp api={fake.api} />, { fake, confirm })
 }
 
-/** 共享区里就一本 TXT 的状态 */
-function txtShelf(progress: unknown = null): FakeAirship {
+/** 共享区里就一本 EPUB 的状态 */
+function bookShelf(progress: unknown = null): FakeAirship {
   const fake = shelf()
-  seed(fake, [record({ progress })], { 'files/b1.txt': TXT_BODY })
+  seed(fake, [record({ progress })], { 'files/b1.epub': BOOK_BODY })
   return fake
 }
 
 /** 从书架点进一本：返回界面与这一本对应的渲染库替身 */
-async function openBook(title: string, fake = txtShelf()): Promise<{ m: Mount; rec: Recorder }> {
+async function openBook(title: string, fake = bookShelf()): Promise<{ m: Mount; rec: Recorder }> {
   const m = await mount(fake)
   await m.press(title)
   const rec = foliate.views[foliate.views.length - 1]!
@@ -183,7 +195,7 @@ describe('书架只列自家格式，但那份书是共用的', () => {
     seed(fake, [])
     const m = await mount(fake)
     expect(m.text()).toContain('墨读')
-    expect(m.text()).toContain('EPUB / MOBI / TXT，与 PDF 应用共用同一个书架')
+    expect(m.text()).toContain('EPUB / MOBI，与 PDF 应用共用同一个书架')
     expect(m.text()).toContain('导入书籍')
     m.unmount()
   })
@@ -210,19 +222,19 @@ describe('书架只列自家格式，但那份书是共用的', () => {
     const fake = shelf()
     seed(fake, [
       record(),
-      record({ id: 'b2', title: '河上的船', author: '', file: 'files/b2.txt' })
+      record({ id: 'b2', title: '河上的船', author: '', file: 'files/b2.epub' })
     ])
     const m = await mount(fake)
     expect(m.text()).toContain('堀辰雄')
     expect(m.text()).toContain('河上的船')
-    expect(m.allByText('TXT').length).toBe(1)
+    expect(m.allByText('EPUB').length).toBe(1)
     expect(m.container.querySelectorAll('.book-card__no-cover').length).toBe(2)
     m.unmount()
   })
 
   it('BK-005 移除要先确认，答"否"就什么都不动', async () => {
     const fake = shelf()
-    seed(fake, [record()], { 'files/b1.txt': TXT_BODY })
+    seed(fake, [record()], { 'files/b1.epub': BOOK_BODY })
     let asked = ''
     vi.spyOn(window, 'confirm').mockImplementation((message?: string) => {
       asked = message ?? ''
@@ -232,7 +244,7 @@ describe('书架只列自家格式，但那份书是共用的', () => {
     await m.press('移除')
     expect(asked).toBe('从书架移除《起风了》？本地副本和封面会一起删掉。')
     expect(m.has('起风了')).toBe(true)
-    expect(fake.vol.has(`${SHARED}/files/b1.txt`)).toBe(true)
+    expect(fake.vol.has(`${SHARED}/files/b1.epub`)).toBe(true)
     expect((await loadBooks(fake.api)).length).toBe(1)
     m.unmount()
   })
@@ -240,14 +252,14 @@ describe('书架只列自家格式，但那份书是共用的', () => {
   it('BK-006 确认移除后索引与文件一起没了', async () => {
     const fake = shelf()
     seed(fake, [record({ cover: 'covers/b1.jpg' })], {
-      'files/b1.txt': TXT_BODY,
+      'files/b1.epub': BOOK_BODY,
       'covers/b1.jpg': 'JPG'
     })
     const m = await mount(fake, true)
     await m.press('移除')
 
     expect((await loadBooks(fake.api)).length).toBe(0)
-    expect(fake.vol.has(`${SHARED}/files/b1.txt`)).toBe(false)
+    expect(fake.vol.has(`${SHARED}/files/b1.epub`)).toBe(false)
     expect(fake.vol.has(`${SHARED}/covers/b1.jpg`)).toBe(false)
     expect(m.text()).toContain('书架是空的。点右上角导入一本试试。')
     m.unmount()
@@ -255,17 +267,16 @@ describe('书架只列自家格式，但那份书是共用的', () => {
 })
 
 describe('导入把元数据交给书库，读不出来就退化成文件名', () => {
-  it('BK-007 导入 TXT：标题取文件名去后缀，格式记 txt', async () => {
-    const fake = shelf([['/fake/media/起风了.txt']], { '/fake/media/起风了.txt': TXT_BODY })
+  it('BK-007 导入 MOBI：格式记 mobi，本体落进共享区的 files/ 下', async () => {
+    const fake = shelf([['/fake/media/起风了.mobi']], { '/fake/media/起风了.mobi': BOOK_BODY })
     const m = await mount(fake)
     await m.press('导入书籍')
 
     const [book] = await loadBooks(fake.api)
-    expect(book!.title).toBe('起风了')
-    expect(book!.format).toBe('txt')
-    expect(book!.author).toBe('')
-    expect(fake.vol.has(`${SHARED}/files/${book!.id}.txt`)).toBe(true)
-    expect(m.text()).toContain('起风了')
+    expect(book!.format).toBe('mobi')
+    expect(fake.vol.has(`${SHARED}/files/${book!.id}.mobi`)).toBe(true)
+    expect(book!.title).toBe('书里的标题')
+    expect(m.text()).toContain('书里的标题')
     m.unmount()
   })
 
@@ -303,18 +314,18 @@ describe('导入把元数据交给书库，读不出来就退化成文件名', (
 
   it('BK-010 同一本再导一次不增多', async () => {
     const body = '一本很短的书\n正文'
-    const fake = shelf([['/fake/media/重复.txt'], ['/fake/media/副本.txt']], {
-      '/fake/media/重复.txt': body,
-      '/fake/media/副本.txt': body
+    const fake = shelf([['/fake/media/重复.epub'], ['/fake/media/副本.epub']], {
+      '/fake/media/重复.epub': body,
+      '/fake/media/副本.epub': body + '——另一本，字节数不一样'
     })
     const m = await mount(fake)
     await m.press('导入书籍')
     await m.press('导入书籍')
 
-    // 标题取的是文件名，两份文件名不同 → 是两本；同名同大小才是同一本
+    // 两本内容不同 → 两本；同一个文件再导一次不增多（判重认的是大小与标题）
     expect((await loadBooks(fake.api)).length).toBe(2)
 
-    const again = shelf([['/fake/media/重复.txt']], { '/fake/media/重复.txt': body })
+    const again = shelf([['/fake/media/重复.epub']], { '/fake/media/重复.epub': body })
     const m2 = await mount(again)
     await m2.press('导入书籍')
     await m2.press('导入书籍')
@@ -328,7 +339,7 @@ describe('阅读界面那一栏与字号', () => {
   function reader(progress: unknown = null): Promise<Mount> {
     const fake = shelf()
     fake.seed(`${SHARED}/library.json`, `${JSON.stringify({ version: 2, books: [record({ progress })] }, null, 2)}\n`)
-    fake.seed(`${SHARED}/files/b1.txt`, TXT_BODY)
+    fake.seed(`${SHARED}/files/b1.epub`, BOOK_BODY)
     return mountUi(<BooksApp api={fake.api} />, { fake })
   }
 
@@ -361,7 +372,7 @@ describe('阅读界面那一栏与字号', () => {
     const fake = shelf()
     fake.seed(`${SHARED}/library.json`, `${JSON.stringify({ version: 2, books: [record({ progress: null })] }, null, 2)}
 `)
-    fake.seed(`${SHARED}/files/b1.txt`, TXT_BODY)
+    fake.seed(`${SHARED}/files/b1.epub`, BOOK_BODY)
     const m = await mountUi(<BooksApp api={fake.api} />, { fake })
     await m.press('起风了')
     await m.settle()
@@ -401,7 +412,7 @@ describe('阅读界面那一栏与字号', () => {
   it('BK-019 字号改动立刻进设置，重开还是那个值', async () => {
     const fake = shelf()
     fake.seed(`${SHARED}/library.json`, `${JSON.stringify({ version: 2, books: [record()] }, null, 2)}\n`)
-    fake.seed(`${SHARED}/files/b1.txt`, TXT_BODY)
+    fake.seed(`${SHARED}/files/b1.epub`, BOOK_BODY)
     const m = await mountUi(<BooksApp api={fake.api} />, { fake })
     await m.press('起风了')
     await m.press('A＋')
@@ -431,6 +442,7 @@ describe('阅读界面那一栏与字号', () => {
   })
 
   it('BK-021 还没读出章的时候目录那颗点不动', async () => {
+    foliate.toc = []
     const fake = shelf()
     fake.seed(
       `${SHARED}/library.json`,
@@ -440,42 +452,12 @@ describe('阅读界面那一栏与字号', () => {
     const m = await mount(fake)
     await m.press('一本EPUB')
     expect(m.byText('目录').disabled).toBe(true)
+    foliate.toc = [{ label: '第一章 起风了', href: '0' }, { label: '第二章 河上的船', href: '1' }]
     m.unmount()
   })
 })
 
-describe('TXT 交出去的是排好的书，EPUB 交出去的是取字节的文件', () => {
-  it('BK-022 打开 TXT 时交出去的书是按章切好的，目录用章名', async () => {
-    const { m, rec } = await openBook('起风了')
-    const book = rec.opened[0] as { key: string; metadata: { title: string }; toc: Array<{ label: string }>; sections: unknown[] }
-    expect(book.key).toBe('html')
-    expect(book.metadata.title).toBe('起风了')
-    expect(book.sections.length).toBe(2)
-    expect(book.toc.map((t) => t.label)).toEqual(['第一章 起风了', '第二章 河上的船'])
-    m.unmount()
-  })
-
-  it('BK-023 GBK 的 TXT 也切得出章（编码那一层与正文解码共用）', async () => {
-    const fake = shelf()
-    // 「第一章 起风了 / 第二章 河上的船」的 GBK 字节
-    const gbk = new Uint8Array([
-      0xb5, 0xda, 0xd2, 0xbb, 0xd5, 0xc2, 0x20, 0xc6, 0xf0, 0xb7, 0xe7, 0xc1, 0xcb, 0x0a,
-      0xd6, 0xd0, 0xbc, 0xe4, 0xce, 0xc4, 0x0a, 0x0a,
-      0xb5, 0xda, 0xb6, 0xfe, 0xd5, 0xc2, 0x20, 0xba, 0xd3, 0xc9, 0xcf, 0xb5, 0xc4, 0xb4, 0xac, 0x0a,
-      0xb4, 0xac, 0xca, 0xc7, 0xb0, 0xeb, 0xd2, 0xb9, 0xc0, 0xb4, 0xb5, 0xc4
-    ])
-    fake.seed(`${SHARED}/library.json`, `${JSON.stringify({ version: 2, books: [record()] }, null, 2)}\n`)
-    fake.vol.set(`${SHARED}/files/b1.txt`, gbk)
-    const m = await mount(fake)
-    await m.press('起风了')
-    await m.settle()
-
-    const rec = lastRec()
-    const book = rec.opened[0] as { toc: Array<{ label: string }> }
-    expect(book.toc.map((t) => t.label)).toEqual(['第一章 起风了', '第二章 河上的船'])
-    m.unmount()
-  })
-
+describe('交出去的是按范围取字节的文件', () => {
   it('BK-024 打开 EPUB 时交出去的是一个按范围取字节的文件，不是整本内容', async () => {
     const fake = shelf()
     const bytes = 'PK' + 'x'.repeat(118)
@@ -516,18 +498,18 @@ describe('TXT 交出去的是排好的书，EPUB 交出去的是取字节的文�
 
 describe('续读落在上次的位置，翻页写回共用索引', () => {
   it('BK-026 上次留有 CFI 就交那串 CFI，没有才交节号', async () => {
-    const withCfi = await openBook('起风了', txtShelf({ section: 4, fraction: 0.5, cfi: 'epubcfi(/6/12!)', updatedAt: '2026-11-03T00:00:00.000Z' }))
+    const withCfi = await openBook('起风了', bookShelf({ section: 4, fraction: 0.5, cfi: 'epubcfi(/6/12!)', updatedAt: '2026-11-03T00:00:00.000Z' }))
     expect(withCfi.rec.goTo).toEqual(['epubcfi(/6/12!)'])
     withCfi.m.unmount()
 
-    const noCfi = await openBook('起风了', txtShelf({ section: 1, fraction: 0, cfi: null, updatedAt: '2026-11-03T00:00:00.000Z' }))
+    const noCfi = await openBook('起风了', bookShelf({ section: 1, fraction: 0, cfi: null, updatedAt: '2026-11-03T00:00:00.000Z' }))
     expect(noCfi.rec.goTo).toEqual([1])
     noCfi.m.unmount()
   })
 
   it('BK-027 翻过一页再回书架，进度已经写进共用索引', async () => {
     const fake = shelf()
-    seed(fake, [record()], { 'files/b1.txt': TXT_BODY })
+    seed(fake, [record()], { 'files/b1.epub': BOOK_BODY })
     const m = await mount(fake)
     await m.press('起风了')
     await m.key('ArrowRight')
@@ -578,8 +560,8 @@ describe('翻页输入', () => {
     const fake = shelf()
     seed(fake, [
       record(),
-      record({ id: 'b2', title: '河上的船', file: 'files/b2.txt' })
-    ], { 'files/b1.txt': TXT_BODY, 'files/b2.txt': '第一章 船\n正文' })
+      record({ id: 'b2', title: '河上的船', file: 'files/b2.epub' })
+    ], { 'files/b1.epub': BOOK_BODY, 'files/b2.epub': '第一章 船\n正文' })
     const m = await mount(fake)
 
     await m.press('起风了')

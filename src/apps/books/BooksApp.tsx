@@ -11,6 +11,7 @@ import {
   loadBooks,
   removeBook,
   setProgress,
+  type BookFormat,
   type BookProgress,
   type BookRecord
 } from '@shared/library'
@@ -19,7 +20,7 @@ import { ReaderView, type ReaderHandle, type TocItem } from './ReaderView'
 import './books.css'
 
 /**
- * 墨读 —— EPUB / MOBI / TXT。
+ * 墨读 —— EPUB / MOBI。
  *
  * 书架与阅读器两个视图。书库在壳级共享区，pdf 应用看到的是同一份索引，
  * 这里只按格式筛出非 PDF 的。
@@ -162,10 +163,9 @@ export default function BooksApp({ api }: { api: AppApi }): JSX.Element {
       const name = path.split(/[\\/]/).pop() ?? path
       const fallback = name.replace(/\.[a-z0-9]{1,5}$/i, '')
       const ext = (name.split('.').pop() ?? '').toLowerCase()
-      const format = ext === 'mobi' || ext === 'azw3' ? 'mobi' : ext === 'txt' ? 'txt' : 'epub'
+      const format: BookFormat = ext === 'mobi' ? 'mobi' : 'epub'
 
-      let meta: ImportedMeta = { title: fallback, author: '' }
-      if (format !== 'txt') meta = await readMeta(api, path, stat.size, fallback)
+      const meta: ImportedMeta = await readMeta(api, path, stat.size, fallback)
 
       return addBook(api, {
         sourcePath: path,
@@ -187,7 +187,7 @@ export default function BooksApp({ api }: { api: AppApi }): JSX.Element {
       const picked = await api.dialog.openFiles({
         title: '选择要导入的书',
         filters: [
-          { name: '电子书', extensions: ['epub', 'mobi', 'azw3', 'txt'] },
+          { name: '电子书', extensions: ['epub', 'mobi'] },
           { name: '所有文件', extensions: ['*'] }
         ]
       })
@@ -314,7 +314,7 @@ export default function BooksApp({ api }: { api: AppApi }): JSX.Element {
       <header className="books-shelf__head">
         <div>
           <h1 className="books-shelf__title">墨读</h1>
-          <p className="hint">EPUB / MOBI / TXT，与 PDF 应用共用同一个书架</p>
+          <p className="hint">EPUB / MOBI，与 PDF 应用共用同一个书架</p>
         </div>
         <button type="button" className="btn btn--primary" disabled={importing} onClick={() => void runImport()}>
           {importing ? '导入中…' : '导入书籍'}
