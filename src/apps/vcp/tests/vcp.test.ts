@@ -138,14 +138,13 @@ describe('处理链进命令', () => {
   it('VC-014 开关开着的才进 -vf，顺序是缩放、补边、色彩、水印、帧率', () => {
     const s = opened()
     s.scale.on = true
-    s.scale.w = 1280
-    s.scale.h = -2
+    s.scale.p = 1080
     s.fps.on = true
     s.fps.v = 30
     s.eq.on = true
     const vf = videoFilters(s)
-    expect(vf).toEqual(['scale=w=1280:h=-2', 'eq=brightness=0:contrast=1:saturation=1', 'fps=fps=30'])
-    expect(display(build(s))).toContain('-vf scale=w=1280:h=-2,eq=brightness=0:contrast=1:saturation=1,fps=fps=30')
+    expect(vf).toEqual(['scale=-2:1080', 'eq=brightness=0:contrast=1:saturation=1', 'fps=fps=30'])
+    expect(display(build(s))).toContain('-vf scale=-2:1080,eq=brightness=0:contrast=1:saturation=1,fps=fps=30')
 
     const off = opened()
     expect(videoFilters(off)).toEqual([])
@@ -270,38 +269,18 @@ describe('编码、容器与输出名', () => {
     expect(display(['-y', '-an'])).toBe('ffmpeg -y -an')
   })
 
-  it('VC-023 输出名里的高度：写了按写的，留 -2 按源算偶数高，读不到源信息回落 1080', () => {
-    const given = opened()
-    given.scale.on = true
-    given.scale.w = 1280
-    given.scale.h = 720
-    defaultOutPath(given)
-    expect(given.out.path).toBe('T:/media/片源_720p.mp4')
+  it('VC-023 输出名里的档位：开着写 _1080p 或 _2160p，关着不带那一截', () => {
+    const p1080 = opened()
+    p1080.scale.on = true
+    p1080.scale.p = 1080
+    defaultOutPath(p1080)
+    expect(p1080.out.path).toBe('T:/media/片源_1080p.mp4')
 
-    // 源是 3840×2160，宽 1280 → 高 720（偶数）
-    const auto = opened()
-    auto.scale.on = true
-    auto.scale.w = 1280
-    auto.scale.h = -2
-    defaultOutPath(auto)
-    expect(auto.out.path).toBe('T:/media/片源_720p.mp4')
-
-    // 源是 3840×2177（奇数）→ 折出来还是偶数
-    const odd = opened(probe([st(0, 0, 'video', 'hevc', { w: 3840, h: 2177 })]))
-    odd.scale.on = true
-    odd.scale.w = 1000
-    odd.scale.h = -2
-    defaultOutPath(odd)
-    expect(odd.out.path).toBe('T:/media/片源_566p.mp4')
-
-    // 没保留画面 → 没有源信息可读，回落 1080
-    const blind = opened()
-    blind.keep.videoRel = null
-    blind.scale.on = true
-    blind.scale.w = 640
-    blind.scale.h = -2
-    defaultOutPath(blind)
-    expect(blind.out.path).toBe('T:/media/片源_1080p.mp4')
+    const p2160 = opened()
+    p2160.scale.on = true
+    p2160.scale.p = 2160
+    defaultOutPath(p2160)
+    expect(p2160.out.path).toBe('T:/media/片源_2160p.mp4')
 
     // 没开缩放 → 名字里不带那一截
     const plain = opened()
@@ -397,8 +376,9 @@ describe('检查', () => {
 
   it('VC-040 源是 4K 又没开缩放，提醒 CPU 编码会慢', () => {
     const s = opened()
-    expect(noteOf(checks(s, null), 'info', '4K')?.fixLabel).toBe('开启缩放')
+    expect(noteOf(checks(s, null), 'info', '4K')?.fixLabel).toBe('降到 1080p')
     s.scale.on = true
+    s.scale.p = 1080
     expect(noteOf(checks(s, null), 'info', '4K')).toBeUndefined()
   })
 

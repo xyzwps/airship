@@ -3,6 +3,9 @@ import {
   mainVideo,
   subKey,
   type AppState,
+  type ProbeInfo,
+  type ScaleChoice,
+  type ScaleLevel,
   type SubRef
 } from './state'
 
@@ -42,7 +45,7 @@ function posXY(p: string): string {
 
 export function videoFilters(s: AppState): string[] {
   const f: string[] = []
-  if (s.scale.on && s.scale.w !== 0) f.push(`scale=w=${s.scale.w}:h=${s.scale.h}`)
+  if (s.scale.on) f.push(`scale=-2:${s.scale.p}`)
   if (s.pad.on) f.push(`pad=${s.pad.w}:${s.pad.h}:(ow-iw)/2:(oh-ih)/2:color=black`)
   if (s.eq.on) f.push(`eq=brightness=${n(s.eq.b)}:contrast=${n(s.eq.c)}:saturation=${n(s.eq.s)}`)
   if (s.text.on)
@@ -153,17 +156,32 @@ export function display(args: string[]): string {
 export function defaultOutPath(s: AppState): void {
   if (!s.probe) return
   const stem = s.probe.name.replace(/\.[^.]+$/, '')
-  const mv = mainVideo(s)
-  const tag = s.scale.on
-    ? `_${
-        s.scale.h > 0
-          ? s.scale.h
-          : mv && mv.w > 0
-            ? Math.round((s.scale.w * mv.h) / mv.w / 2) * 2
-            : 1080
-      }p`
-    : ''
+  // 档位就两档，名字里那一截直接照档位写，不再从宽度反算高度
+  const tag = s.scale.on ? `_${s.scale.p}p` : ''
   s.out.path = `${s.probe.dir}/${stem}${tag}.${s.out.container}`
+}
+
+/** 两档都在这儿，界面上照这份列，别处不再抄一遍 */
+export const SCALE_LEVELS = [1080, 2160] as const
+
+/** 源高决定哪几档可用：比源还高的那一档是放大 */
+export function usableLevels(srcH: number): ScaleLevel[] {
+  return SCALE_LEVELS.filter((p) => p <= srcH)
+}
+
+/** 选中与灰掉念的是同一份原因，所以只在这一处写 */
+export function levelReason(p: ScaleLevel, probe: ProbeInfo | null, srcH: number): string {
+  if (!probe) return `${p}p：还没打开视频，读不到源高`
+  if (srcH === 0) return `${p}p：没保留画面，缩放无处生效`
+  if (p > srcH) return `${p}p 大于源高 ${srcH}，是放大，不给选`
+  return `缩放到 ${p}p（源高 ${srcH}）`
+}
+
+/** 两档都比源高时不是"某一档灰掉"而是整条无处可用，那句说在开关上 */
+export function scaleSwitchReason(probe: ProbeInfo | null, srcH: number): string {
+  if (!probe) return '还没打开视频，缩放无处生效'
+  if (srcH === 0) return '没保留画面，缩放无处生效'
+  return `源高 ${srcH}，1080p 与 2160p 都是放大，不给选`
 }
 
 /**
@@ -204,10 +222,9 @@ export function syncOutPath(s: AppState, containerBefore: string): void {
 export type Fix =
   | { kind: 'vcodec'; value: string }
   | { kind: 'acodec'; value: string }
-  | { kind: 'scale-reset' }
+  | { kind: 'scale-level'; value: ScaleChoice }
   | { kind: 'container'; value: string }
   | { kind: 'submode-soft' }
-  | { kind: 'scale-on' }
   | { kind: 'out-rename' }
   | { kind: 'out-ext' }
 
@@ -245,12 +262,12 @@ export function checks(s: AppState, outStat: OutStat | null): Note[] {
       fix: { kind: 'vcodec', value: 'libx264' }
     })
 
-  if (main && s.scale.on && s.scale.w > main.w)
+  if (main && s.scale.on && s.scale.p > main.h)
     v.push({
       level: 'warn',
-      msg: `目标宽 ${s.scale.w} 大于源宽 ${main.w}，放大只会更糊、更大。`,
-      fixLabel: '改回 1920',
-      fix: { kind: 'scale-reset' }
+      msg: `目标高 ${s.scale.p} 大于源高 ${main.h}，放大只会更糊、更大。`,
+      fixLabel: '关掉缩放',
+      fix: { kind: 'scale-level', value: 0 }
     })
 
   if (main && s.pad.on && (s.pad.w < main.w || s.pad.h < main.h))
@@ -339,8 +356,8 @@ export function checks(s: AppState, outStat: OutStat | null): Note[] {
     v.push({
       level: 'info',
       msg: '源是 4K 又没开缩放，CPU 编码会非常慢。',
-      fixLabel: '开启缩放',
-      fix: { kind: 'scale-on' }
+      fixLabel: '降到 1080p',
+      fix: { kind: 'scale-level', value: 1080 }
     })
 
   return v

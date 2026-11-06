@@ -177,6 +177,33 @@
   background: var(--bg-hover);
 }
 
+/* 缩放档位键：键上写的就是当前档位，点一下换下一档（关 → 1080p → 2160p → 关） */
+.vcp__level {
+  min-width: 54px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--fg-dim);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.vcp__level:not(.vcp__level--on):hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.vcp__level--on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.vcp__level:disabled {
+  opacity: 0.5;
+}
+
 .vcp__toggle {
   width: 34px;
   height: 18px;
@@ -201,6 +228,11 @@
 
 .vcp__toggle--on {
   background: var(--accent);
+}
+
+/* 无处可用的整条处理链：灰的是开关，悬停念出为什么 */
+.vcp__toggle:disabled {
+  opacity: 0.45;
 }
 
 .vcp__toggle--on .vcp__toggle-knob {

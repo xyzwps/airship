@@ -76,18 +76,18 @@ function applyFix(s: AppState, fix: Fix): void {
     case 'acodec':
       s.out.acodec = fix.value
       break
-    case 'scale-reset':
-      s.scale.w = 1920
-      s.scale.h = -2
+    case 'scale-level':
+      if (fix.value === 0) s.scale.on = false
+      else {
+        s.scale.on = true
+        s.scale.p = fix.value
+      }
       break
     case 'container':
       s.out.container = fix.value
       break
     case 'submode-soft':
       s.keep.subMode = 'soft'
-      break
-    case 'scale-on':
-      s.scale.on = true
       break
     case 'out-ext':
       s.out.path = swapExt(s.out.path, s.out.container)
@@ -104,8 +104,7 @@ describe('[5] 命令生成', () => {
     s.keep.videoRel = 0
     s.keep.audioRels.push(0)
     s.scale.on = true
-    s.scale.w = 1920
-    s.scale.h = -2
+    s.scale.p = 1080
     s.out.path = 'T:/_selftest.mp4'
 
     const args = build(s)
@@ -114,7 +113,7 @@ describe('[5] 命令生成', () => {
     expect(cmd).toContain('-map 0:v:0')
     // 用同类型相对序号，不是全局流号
     expect(cmd).toContain('-map 0:a:0')
-    expect(cmd).toContain('-vf scale=w=1920:h=-2')
+    expect(cmd).toContain('-vf scale=-2:1080')
     expect(cmd).toContain('-pix_fmt yuv420p')
     expect(args[args.length - 1]).toBe(s.out.path)
   })
@@ -124,6 +123,7 @@ describe('[5] 命令生成', () => {
     s.keep.videoRel = 0
     s.keep.audioRels.push(0)
     s.scale.on = true
+    s.scale.p = 1080
     s.out.path = 'T:/_selftest.mp4'
     s.out.vcodec = 'copy'
 
@@ -146,10 +146,19 @@ describe('[5] 命令生成', () => {
     expect(findFix(checks(s, null), 'error', 'Padded dimensions')).toBeTruthy()
     s.pad.on = false
 
-    s.scale.on = true
-    s.scale.w = 7680
-    expect(findFix(checks(s, null), 'warn', '大于源宽')).toBeTruthy()
-    s.scale.w = 1920
+    // 放大这一档界面上不给选（比源高的档位会跳过），批量套用到小源上时由检查区兜底念出来
+    const small = withProbe({
+      ...demoProbe(),
+      streams: [st(0, 0, 'video', 'hevc', 'und', true, false, 854, 480)]
+    })
+    small.keep.videoRel = 0
+    small.out.path = 'T:/_selftest.mp4'
+    small.scale.on = true
+    small.scale.p = 1080
+    const up = findFix(checks(small, null), 'warn', '大于源高')
+    expect(up?.msg).toBe('目标高 1080 大于源高 480，放大只会更糊、更大。')
+    applyFix(small, up!.fix!)
+    expect(small.scale.on).toBe(false)
 
     s.out.path = s.probe!.path
     expect(findFix(checks(s, null), 'error', '毁掉源文件')).toBeTruthy()
@@ -289,6 +298,7 @@ describe('输出名永远跟着容器走', () => {
     kept.out.path = 'T:/media/我起的名字.avi'
     kept.out.pathTouched = true
     kept.scale.on = true
+    kept.scale.p = 1080
     syncOutPath(kept, 'mp4')
     expect(kept.out.path).toBe('T:/media/我起的名字.avi')
   })

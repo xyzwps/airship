@@ -83,10 +83,15 @@ export function subMap(s: SubRef): string {
   return s.embedded ? `s:${s.rel}` : `in:${s.extId}`
 }
 
+/** 缩放只有两档可挑 */
+export type ScaleLevel = 1080 | 2160
+
+/** 一键修正里 0 表示"关掉缩放" */
+export type ScaleChoice = 0 | ScaleLevel
+
 export interface ScaleProc {
   on: boolean
-  w: number
-  h: number
+  p: ScaleLevel
 }
 export interface FpsProc {
   on: boolean
@@ -181,7 +186,7 @@ export function createState(): AppState {
       pixFmt: true,
       pathTouched: false
     },
-    scale: { on: false, w: 1920, h: -2 },
+    scale: { on: false, p: 1080 },
     fps: { on: false, v: 30 },
     trim: { on: false, ss: '', to: '', fast: true },
     eq: { on: false, b: 0, c: 1, s: 1 },

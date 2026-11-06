@@ -44,6 +44,28 @@ export type HelpKey =
   | 'extra'
   | 'outpath'
 
+/**
+ * 编码选项与"怎么选"那一截（视频与音频各一份）：下拉里每一项后面都跟着念，选到哪一项就在框里看见哪一项。
+ * 顺序就是界面上的顺序；note 只讲"什么时候挑它"，不复述整格参数的作用（那在 HELP.vcodec / HELP.acodec 里）。
+ */
+export const VCODECS: Array<{ v: string; note: string }> = [
+  { v: 'libx264', note: 'CPU 编码，兼容性最好' },
+  { v: 'libx265', note: '同画质省两三成体积，慢好几倍' },
+  { v: 'copy', note: '不重编码原样搬，任何画面处理都不生效' },
+  { v: 'h264_nvenc', note: '显卡编码，快得多，同画质体积略大' },
+  { v: 'hevc_nvenc', note: '显卡 + 更省，但比 x265 大一些' },
+  { v: 'libsvtav1', note: '最省体积，慢，播放器认不认看设备' }
+]
+
+/** 音频编码照视频编码同一个缀法 */
+export const ACODECS: Array<{ v: string; note: string }> = [
+  { v: 'aac', note: '兼容性最好，网页与手机都认' },
+  { v: 'libopus', note: '同码率更省，老设备与 mp4 不太认' },
+  { v: 'copy', note: '不重编码原样搬，音量与响度都不生效' },
+  { v: 'ac3', note: '杜比 5.1，家庭影院与老碟机认它' },
+  { v: 'eac3', note: '杜比+，比 ac3 省，认它的设备更少' }
+]
+
 export const HELP: Record<HelpKey, HelpEntry> = {
   video: {
     title: '视频（保留哪条轨）',
@@ -67,8 +89,8 @@ export const HELP: Record<HelpKey, HelpEntry> = {
   },
   scale: {
     title: '缩放',
-    what: '把画面重画成指定宽度；高填 -2 就按源比例折算并取偶数（1920×-2 配 3840×2160 得 1080）。',
-    cost: '重画必须重编码，画面不能选「直接复制」；4K 往下折是整条命令里最慢的一段，CPU 编码按分钟算。'
+    what: '开了之后在两档里挑一个：1080p 或 2160p。高按档位定，宽跟着源的比例算并取偶数（4K 折 1080p 得 1920×1080）。',
+    cost: '折档必须重编码，画面不能选「直接复制」；4K 折 1080p 是整条命令里最慢的一段。比源还高的那一档灰着不给选——放大只会更糊、更大。'
   },
   pad: {
     title: '补边',
@@ -145,7 +167,7 @@ export const HELP: Record<HelpKey, HelpEntry> = {
   },
   outpath: {
     title: '输出到',
-    what: '产物落哪、叫什么。没手敲过时自动跟源同目录、主名照抄，缩放高度与容器都写进名字里（`片源_720p.mkv`）。',
+    what: '产物落哪、叫什么。没手敲过时自动跟源同目录、主名照抄，缩放档位与容器都写进名字里（`片源_1080p.mkv`）。',
     cost: '手敲过之后主名不再被覆盖，但后缀永远跟着容器换；撞上队列里已有的名字会自动让路成 `_2`、`_3`。'
   }
 }

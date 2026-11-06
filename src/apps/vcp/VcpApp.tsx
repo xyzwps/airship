@@ -3,7 +3,8 @@ import type { AppApi } from '@shared/protocol'
 import { useAppAutotest } from '../../shell/autotest'
 import { markPerf } from '../../shell/shot'
 import { Help } from './HelpTip'
-import { build, checks, display, swapExt, syncOutPath, type Fix, type Note } from './command'
+import { ACODECS, VCODECS } from './help'
+import { build, checks, display, levelReason, scaleSwitchReason, swapExt, syncOutPath, usableLevels, type Fix, type Note } from './command'
 import {
   buildBatchSpec,
   detailText,
@@ -27,6 +28,7 @@ import {
   subTitle,
   type AppState,
   type ProbeInfo,
+  type ScaleLevel,
   type StreamInfo,
   type SubRef
 } from './state'
@@ -148,6 +150,10 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
       st.keep.audioRels = defAudio ? [defAudio.rel] : []
       st.keep.subs = []
       st.out.pathTouched = false
+      // 换源之后档位可能变成放大：自己落到还能用的那一档，一档都不剩就关掉缩放
+      const usable = usableLevels(video?.h ?? 0)
+      if (!usable.includes(st.scale.p)) st.scale.p = usable[usable.length - 1] ?? st.scale.p
+      st.scale.on = st.scale.on && usable.length > 0
     })
   }
 
@@ -346,9 +352,12 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
         case 'acodec':
           st.out.acodec = fix.value
           break
-        case 'scale-reset':
-          st.scale.w = 1920
-          st.scale.h = -2
+        case 'scale-level':
+          if (fix.value === 0) st.scale.on = false
+          else {
+            st.scale.on = true
+            st.scale.p = fix.value
+          }
           break
         case 'container':
           // 只换容器：名字交给 mut 那一条规矩去收拾（没手敲过重算，手敲过换后缀）
@@ -356,9 +365,6 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
           break
         case 'submode-soft':
           st.keep.subMode = 'soft'
-          break
-        case 'scale-on':
-          st.scale.on = true
           break
         case 'out-ext':
           st.out.path = swapExt(st.out.path, st.out.container)
@@ -399,11 +405,7 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
         const base = media[0]!
         const probe = await probeFile(base.path)
         autoSelect(probe)
-        mut((s) => {
-          s.scale.on = true
-          s.scale.w = 1280
-          s.scale.h = -2
-        })
+        mut((st) => void (st.scale.on = true))
 
         for (const m of media.slice(1)) await enqueueForTarget(m.path)
         bump()
@@ -694,7 +696,33 @@ interface PanelProps {
   mut: (fn: (s: AppState) => void) => void
 }
 
+/**
+ * 一颗档位键：写着 1080p 或 2160p，选中那档亮着。
+ * 比源还高的那一档是放大，灰掉，原因就挂在悬停与无障碍名称上（灰掉与选中念的是同一份文案）。
+ */
+function LevelKey({ s, mut, p }: PanelProps & { p: ScaleLevel }): JSX.Element {
+  const srcH = mainVideo(s)?.h ?? 0
+  const why = levelReason(p, s.probe, srcH)
+  return (
+    <button
+      type="button"
+      className={`vcp__level${s.scale.p === p ? ' vcp__level--on' : ''}`}
+      data-test={`缩放档位-${p}`}
+      disabled={p > srcH}
+      title={why}
+      aria-label={why}
+      onClick={() => mut((st) => void (st.scale.p = p))}
+    >
+      {p}p
+    </button>
+  )
+}
+
 function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
+  const srcH = mainVideo(s)?.h ?? 0
+  // 两档都比源高时整条无处可用：灰掉的应该是开关，而不是留两颗灰键等用户去试
+  const noLevel = usableLevels(srcH).length === 0
+
   return (
     <section className="card">
       <h2 className="card__title">处理链</h2>
@@ -704,11 +732,18 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
           <Help k="scale" />
         </div>
         <div className="row">
-          <Toggle on={s.scale.on} onChange={(v) => mut((st) => void (st.scale.on = v))} />
-          <input className="input vcp__num" type="number" value={s.scale.w} onChange={(e) => mut((st) => void (st.scale.w = Number(e.target.value)))} />
-          <span className="hint">×</span>
-          <input className="input vcp__num" type="number" value={s.scale.h} onChange={(e) => mut((st) => void (st.scale.h = Number(e.target.value)))} />
-          <span className="hint">-2 表示按宽度自动算偶数高</span>
+          <Toggle
+            on={s.scale.on}
+            onChange={(v) => mut((st) => void (st.scale.on = v))}
+            disabled={noLevel}
+            disabledHint={scaleSwitchReason(s.probe, srcH)}
+          />
+          {s.scale.on && (
+            <>
+              <LevelKey s={s} mut={mut} p={1080} />
+              <LevelKey s={s} mut={mut} p={2160} />
+            </>
+          )}
         </div>
 
         <div className="field-label">
@@ -717,9 +752,13 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
         </div>
         <div className="row">
           <Toggle on={s.pad.on} onChange={(v) => mut((st) => void (st.pad.on = v))} />
-          <input className="input vcp__num" type="number" value={s.pad.w} onChange={(e) => mut((st) => void (st.pad.w = Number(e.target.value)))} />
-          <span className="hint">×</span>
-          <input className="input vcp__num" type="number" value={s.pad.h} onChange={(e) => mut((st) => void (st.pad.h = Number(e.target.value)))} />
+          {s.pad.on && (
+            <>
+              <input className="input vcp__num" type="number" value={s.pad.w} onChange={(e) => mut((st) => void (st.pad.w = Number(e.target.value)))} />
+              <span className="hint">×</span>
+              <input className="input vcp__num" type="number" value={s.pad.h} onChange={(e) => mut((st) => void (st.pad.h = Number(e.target.value)))} />
+            </>
+          )}
         </div>
 
         <div className="field-label">
@@ -728,7 +767,9 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
         </div>
         <div className="row">
           <Toggle on={s.fps.on} onChange={(v) => mut((st) => void (st.fps.on = v))} />
-          <input className="input vcp__num" type="number" value={s.fps.v} onChange={(e) => mut((st) => void (st.fps.v = Number(e.target.value)))} />
+          {s.fps.on && (
+            <input className="input vcp__num" type="number" value={s.fps.v} onChange={(e) => mut((st) => void (st.fps.v = Number(e.target.value)))} />
+          )}
         </div>
 
         <div className="field-label">
@@ -737,13 +778,17 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
         </div>
         <div className="row">
           <Toggle on={s.trim.on} onChange={(v) => mut((st) => void (st.trim.on = v))} />
-          <input className="input vcp__time" placeholder="开始 00:01:00" value={s.trim.ss} onChange={(e) => mut((st) => void (st.trim.ss = e.target.value))} />
-          <span className="hint">→</span>
-          <input className="input vcp__time" placeholder="结束 00:02:30" value={s.trim.to} onChange={(e) => mut((st) => void (st.trim.to = e.target.value))} />
-          <label className="vcp__pick">
-            <input type="checkbox" checked={s.trim.fast} onChange={(e) => mut((st) => void (st.trim.fast = e.target.checked))} />
-            <span>快速定位</span>
-          </label>
+          {s.trim.on && (
+            <>
+              <input className="input vcp__time" placeholder="开始 00:01:00" value={s.trim.ss} onChange={(e) => mut((st) => void (st.trim.ss = e.target.value))} />
+              <span className="hint">→</span>
+              <input className="input vcp__time" placeholder="结束 00:02:30" value={s.trim.to} onChange={(e) => mut((st) => void (st.trim.to = e.target.value))} />
+              <label className="vcp__pick">
+                <input type="checkbox" checked={s.trim.fast} onChange={(e) => mut((st) => void (st.trim.fast = e.target.checked))} />
+                <span>快速定位</span>
+              </label>
+            </>
+          )}
         </div>
 
         <div className="field-label">
@@ -752,12 +797,16 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
         </div>
         <div className="row">
           <Toggle on={s.eq.on} onChange={(v) => mut((st) => void (st.eq.on = v))} />
-          <span className="hint">亮</span>
-          <input className="input vcp__num" type="number" step="0.05" value={s.eq.b} onChange={(e) => mut((st) => void (st.eq.b = Number(e.target.value)))} />
-          <span className="hint">对比</span>
-          <input className="input vcp__num" type="number" step="0.05" value={s.eq.c} onChange={(e) => mut((st) => void (st.eq.c = Number(e.target.value)))} />
-          <span className="hint">饱和</span>
-          <input className="input vcp__num" type="number" step="0.05" value={s.eq.s} onChange={(e) => mut((st) => void (st.eq.s = Number(e.target.value)))} />
+          {s.eq.on && (
+            <>
+              <span className="hint">亮</span>
+              <input className="input vcp__num" type="number" step="0.05" value={s.eq.b} onChange={(e) => mut((st) => void (st.eq.b = Number(e.target.value)))} />
+              <span className="hint">对比</span>
+              <input className="input vcp__num" type="number" step="0.05" value={s.eq.c} onChange={(e) => mut((st) => void (st.eq.c = Number(e.target.value)))} />
+              <span className="hint">饱和</span>
+              <input className="input vcp__num" type="number" step="0.05" value={s.eq.s} onChange={(e) => mut((st) => void (st.eq.s = Number(e.target.value)))} />
+            </>
+          )}
         </div>
 
         <div className="field-label">
@@ -766,8 +815,12 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
         </div>
         <div className="row">
           <Toggle on={s.vol.on} onChange={(v) => mut((st) => void (st.vol.on = v))} />
-          <input className="input vcp__num" type="number" step="0.1" value={s.vol.v} onChange={(e) => mut((st) => void (st.vol.v = Number(e.target.value)))} />
-          <span className="hint">倍</span>
+          {s.vol.on && (
+            <>
+              <input className="input vcp__num" type="number" step="0.1" value={s.vol.v} onChange={(e) => mut((st) => void (st.vol.v = Number(e.target.value)))} />
+              <span className="hint">倍</span>
+            </>
+          )}
         </div>
 
         <div className="field-label">
@@ -782,13 +835,17 @@ function ProcessPanel({ s, mut }: PanelProps): JSX.Element {
         </div>
         <div className="row">
           <Toggle on={s.text.on} onChange={(v) => mut((st) => void (st.text.on = v))} />
-          <input className="input" value={s.text.t} onChange={(e) => mut((st) => void (st.text.t = e.target.value))} />
-          <input className="input vcp__num" type="number" value={s.text.size} onChange={(e) => mut((st) => void (st.text.size = Number(e.target.value)))} />
-          <select className="select" value={s.text.pos} onChange={(e) => mut((st) => void (st.text.pos = e.target.value))}>
-            {['右下', '左下', '右上', '左上'].map((p) => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
+          {s.text.on && (
+            <>
+              <input className="input" value={s.text.t} onChange={(e) => mut((st) => void (st.text.t = e.target.value))} />
+              <input className="input vcp__num" type="number" value={s.text.size} onChange={(e) => mut((st) => void (st.text.size = Number(e.target.value)))} />
+              <select className="select" value={s.text.pos} onChange={(e) => mut((st) => void (st.text.pos = e.target.value))}>
+                {['右下', '左下', '右上', '左上'].map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
       </div>
     </section>
@@ -822,8 +879,8 @@ function OutputPanel({ s, mut, api }: PanelProps & { api: AppApi }): JSX.Element
           <Help k="vcodec" />
         </div>
         <select className="select" value={o.vcodec} onChange={(e) => mut((st) => void (st.out.vcodec = e.target.value))}>
-          {['libx264', 'libx265', 'copy', 'h264_nvenc', 'hevc_nvenc', 'libsvtav1'].map((c) => (
-            <option key={c} value={c}>{c}</option>
+          {VCODECS.map((c) => (
+            <option key={c.v} value={c.v}>{`${c.v} · ${c.note}`}</option>
           ))}
         </select>
 
@@ -847,8 +904,8 @@ function OutputPanel({ s, mut, api }: PanelProps & { api: AppApi }): JSX.Element
         </div>
         <div className="row">
           <select className="select" value={o.acodec} onChange={(e) => mut((st) => void (st.out.acodec = e.target.value))}>
-            {['aac', 'libopus', 'copy', 'ac3', 'eac3'].map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {ACODECS.map((c) => (
+              <option key={c.v} value={c.v}>{`${c.v} · ${c.note}`}</option>
             ))}
           </select>
           <input className="input vcp__num" value={o.abitrate} onChange={(e) => mut((st) => void (st.out.abitrate = e.target.value))} />
@@ -913,9 +970,27 @@ function OutputPanel({ s, mut, api }: PanelProps & { api: AppApi }): JSX.Element
   )
 }
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }): JSX.Element {
+function Toggle({
+  on,
+  onChange,
+  disabled,
+  disabledHint
+}: {
+  on: boolean
+  onChange: (v: boolean) => void
+  /** 这一整条处理链对这个源无处可用时，开关自己灰掉；原因写在悬停与无障碍名称上 */
+  disabled?: boolean
+  disabledHint?: string
+}): JSX.Element {
   return (
-    <button type="button" className={`vcp__toggle${on ? ' vcp__toggle--on' : ''}`} onClick={() => onChange(!on)}>
+    <button
+      type="button"
+      className={`vcp__toggle${on ? ' vcp__toggle--on' : ''}`}
+      disabled={disabled}
+      title={disabled ? disabledHint : undefined}
+      aria-label={disabled ? disabledHint : undefined}
+      onClick={() => onChange(!on)}
+    >
       <span className="vcp__toggle-knob" />
     </button>
   )

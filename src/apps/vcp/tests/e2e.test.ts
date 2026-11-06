@@ -117,7 +117,7 @@ describe.skipIf(!enabled)('[e2e] 真素材与真编码', () => {
     expect(readFileSync(dest, 'utf8')).toContain('第一条字幕')
   })
 
-  it('[7] 真实编码 4K → 360p + 烧入字幕', async () => {
+  it('[7] 真实编码 4K → 1080p 档位 + 烧入字幕', async () => {
     const subPath = join(FIXTURES, '_e2e_sub.srt')
     if (!existsSync(subPath)) {
       const r = run(['-y', '-hide_banner', '-loglevel', 'error', '-i', join(FIXTURES, 'with_sub.mkv'), '-map', '0:s:0', subPath])
@@ -131,8 +131,7 @@ describe.skipIf(!enabled)('[e2e] 真素材与真编码', () => {
     s.keep.videoRel = 0
     s.keep.audioRels.push(0)
     s.scale.on = true
-    s.scale.w = 640
-    s.scale.h = -2
+    s.scale.p = 1080
     s.keep.subMode = 'burn'
     s.keep.subs.push({ embedded: true, rel: 0, extId: 0, path: '', name: '' })
     s.extracted['s0'] = subPath
@@ -161,7 +160,9 @@ describe.skipIf(!enabled)('[e2e] 真素材与真编码', () => {
 
     const out = probe(s.out.path)
     const cv = out.streams.find((x) => x.type === 'video')!
-    expect(`${cv.w}x${cv.h}`).toBe('640x360')
+    // 档位落在高上，宽按比例算并取偶数（scale=-2:1080）
+    expect(cv.h).toBe(1080)
+    expect(cv.w % 2).toBe(0)
     expect(out.streams.find((x) => x.type === 'audio')?.lang).toBe('chi')
     expect(out.streams.filter((x) => x.type === 'subtitle').length).toBe(0)
   }, 120000)

@@ -44,8 +44,7 @@ function cfg(): AppState {
   s.keep.videoRel = 0
   s.keep.audioRels.push(0)
   s.scale.on = true
-  s.scale.w = 1920
-  s.scale.h = -2
+  s.scale.p = 1080
   s.out.path = 'T:/_q_a.mp4'
   return s
 }
@@ -60,14 +59,15 @@ describe('[10] 任务队列', () => {
     q.enqueue(first.spec!)
 
     c.out.crf = '30'
-    c.scale.w = 1280
+    c.scale.on = true
+    c.scale.p = 2160
     const second = fromState(c, q, {})
     q.enqueue(second.spec!)
 
     expect(first.spec!.args).toContain('20')
-    expect(first.spec!.args.some((a) => a.includes('scale=w=1920'))).toBe(true)
+    expect(first.spec!.args.some((a) => a.includes('scale=-2:1080'))).toBe(true)
     expect(second.spec!.args).toContain('30')
-    expect(second.spec!.args.some((a) => a.includes('scale=w=1280'))).toBe(true)
+    expect(second.spec!.args.some((a) => a.includes('scale=-2:2160'))).toBe(true)
   })
 
   it('VC-058 同路径没跑完 → 自动改名 _2', () => {

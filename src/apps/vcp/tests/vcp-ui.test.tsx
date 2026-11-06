@@ -5,7 +5,7 @@ import { FakeAirship, type StartCall, type StreamCtl } from '@tests/helpers/fake
 import { mountUi, type Mount } from '@tests/helpers/mount'
 import VcpApp from '@apps/vcp/VcpApp'
 import { placeCard } from '@apps/vcp/HelpTip'
-import { HELP, type HelpKey } from '@apps/vcp/help'
+import { ACODECS, HELP, VCODECS, type HelpKey } from '@apps/vcp/help'
 import type { AppApi, ShellEventListener } from '@shared/protocol'
 
 /**
@@ -42,6 +42,8 @@ interface Options {
   picks?: Array<string[] | string | null>
   ffmpeg?: string | null
   stderr?: string
+  /** 按探测的路径给不同的 ffmpeg 输出：一份界面里换源才验得出档位回落 */
+  stderrFor?: Record<string, string>
   files?: Record<string, string>
 }
 
@@ -59,7 +61,8 @@ function rig(opts: Options = {}): { fake: FakeAirship; api: AppApi; calls: strin
       calls.push(args)
       // 探测以外的调用（抽字幕、写文件）都是干净退出
       if (args.includes('-f') || args.includes('-y')) return { code: 0, stdout: '', stderr: '' }
-      return { stderr: opts.stderr ?? PROBE_STDERR }
+      const byPath = opts.stderrFor?.[args[args.length - 1] ?? '']
+      return { stderr: byPath ?? opts.stderr ?? PROBE_STDERR }
     },
     start: (call, ctl) => {
       jobs.set(call.jobId, ctl)
@@ -77,10 +80,23 @@ async function openVideo(m: Mount): Promise<void> {
   await m.settle(12)
 }
 
-/** 处理链上那一排开关：顺序就是界面上的顺序 */
+/** 处理链上那一排开关：顺序就是界面上的顺序（缩放是第 0 颗） */
 async function pressToggle(m: Mount, index: number): Promise<void> {
   const el = m.container.querySelectorAll<HTMLButtonElement>('.vcp__toggle')[index]
   if (!el) throw new Error(`处理链上没有第 ${index + 1} 个开关`)
+  await act(async () => {
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  })
+  await m.settle()
+}
+
+/** 缩放的两颗档位键 */
+const levelKey = (m: Mount, p: 1080 | 2160): HTMLButtonElement =>
+  m.container.querySelector<HTMLButtonElement>(`[data-test="缩放档位-${p}"]`)!
+
+async function pickLevel(m: Mount, p: 1080 | 2160): Promise<void> {
+  const el = levelKey(m, p)
+  if (!el) throw new Error(`界面上没有 ${p}p 那颗档位键`)
   await act(async () => {
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
   })
@@ -144,10 +160,10 @@ async function pastGrace(m: Mount): Promise<void> {
 
 const command = (m: Mount): string => (m.container.querySelector('.vcp__cmd') as HTMLElement).textContent ?? ''
 
-/** 按"这一格里有哪个选项"找到那一下拉，选一项 */
+/** 按"这一格里有哪个选项"找到那一下拉，选一项：给可见文字或给选项的值都算 */
 async function chooseBy(m: Mount, oneOf: string, value: string): Promise<void> {
   const select = [...m.container.querySelectorAll('select')].find((el) =>
-    [...el.querySelectorAll('option')].some((o) => o.textContent === oneOf)
+    [...el.querySelectorAll('option')].some((o) => o.value === oneOf || o.textContent === oneOf)
   ) as HTMLSelectElement | undefined
   if (!select) throw new Error(`界面上找不到含「${oneOf}」的下拉`)
   await act(async () => {
@@ -209,11 +225,13 @@ describe('打开一个文件，界面念得出 ffmpeg 说的话', () => {
     await openVideo(m)
     const field = (): string => (m.container.querySelector('.vcp__path') as HTMLInputElement).value
 
-    // 开缩放（1920×-2，源 3840×2160 → 1080）→ 高度那一截自己长出来
+    // 打开缩放（默认落在 1080p）→ 名字里那一截自己长出来
     await pressToggle(m, 0)
     expect(field()).toBe('T:/media/4k_demo_1080p.mp4')
 
-    // 关掉 → 那一截自己收回去
+    // 换到 2160p → 那一截跟着换；关掉缩放 → 那一截自己收回去
+    await pickLevel(m, 2160)
+    expect(field()).toBe('T:/media/4k_demo_2160p.mp4')
     await pressToggle(m, 0)
     expect(field()).toBe(OUT)
 
@@ -279,7 +297,7 @@ describe('命令、检查与修正都在同一屏上', () => {
     expect(command(m)).toContain(OUT)
 
     await pressToggle(m, 0)
-    expect(command(m)).toContain('-vf scale=w=1920:h=-2')
+    expect(command(m)).toContain('-vf scale=-2:1080')
     m.unmount()
   })
 
@@ -462,8 +480,8 @@ describe('参数旁边那颗 ?：悬停念出作用与代价', () => {
     await hoverHelp(m, 'scale')
     const card = helpCard(m, 'scale')
     expect(card?.textContent).toContain('缩放')
-    expect(card?.textContent).toContain('把画面重画成指定宽度')
-    expect(card?.textContent).toContain('重画必须重编码')
+    expect(card?.textContent).toContain('在两档里挑一个：1080p 或 2160p')
+    expect(card?.textContent).toContain('折档必须重编码')
     m.unmount()
   })
 
@@ -578,5 +596,143 @@ describe('说明卡摆在哪、箭头指着谁', () => {
     const atEdge = placeCard(at(100, 8), SIZE, VIEW)
     expect(atEdge.left).toBe(8) // 本想以问号为中心（-144），被夹到边上
     expect(atEdge.caretX).toBe(14) // 尖贴到最小距离，仍旧朝着问号那边
+  })
+})
+
+/** 只有一张 854×480 视频轨的探测输出，用来验"源比档位小" */
+const STD_480 = `Input #0, matroska,webm, from 'T:/media/4k_demo.mkv':
+  Duration: 00:01:40.00, start: 0.000000, bitrate: 5000 kb/s
+  Stream #0:0: Video: h264 (High), yuv420p(tv), 854x480, 25 fps, 25 tbr, 1k tbn
+  Stream #0:1(chi): Audio: aac (LC), 48000 Hz, stereo, fltp, 128 kb/s (default)
+`
+
+/** 源高正好 1080：2160p 那一档是放大 */
+const STD_1080 = STD_480.replace('854x480', '1920x1080')
+
+describe('处理链：关着的行不摆后面的控件，缩放只有两档', () => {
+  /** 处理链那一格：数输入框只数这一格里的 */
+  function chain(m: Mount): HTMLElement {
+    const card = [...m.container.querySelectorAll('section.card')].find((c) =>
+      (c.querySelector('.card__title')?.textContent ?? '').includes('处理链')
+    )
+    if (!card) throw new Error('界面上没有处理链那一格')
+    return card as HTMLElement
+  }
+
+  const nums = (m: Mount): number => chain(m).querySelectorAll('.vcp__num').length
+
+  it('VC-082 开关关着时那一行只剩开关，打开后后面的控件才出现', async () => {
+    const { fake, api } = rig()
+    const m = await mount(api, fake)
+    await openVideo(m)
+
+    // 八行全关着：处理链里一个输入框都没有，连说明文字都不出现
+    // （只数这一格：编码项的说明里也带「倍」这种字，整页去比会误判）
+    expect(nums(m)).toBe(0)
+    expect(chain(m).querySelectorAll('.vcp__time').length).toBe(0)
+    expect(chain(m).textContent ?? '').not.toContain('快速定位')
+    expect(chain(m).textContent ?? '').not.toContain('倍')
+
+    // 第二颗开关是补边（缩放占第 0 颗）：打开才有那两个数
+    await pressToggle(m, 1)
+    expect(nums(m)).toBe(2)
+    await pressToggle(m, 1)
+    expect(nums(m)).toBe(0)
+    m.unmount()
+  })
+
+  it('VC-083 缩放有开关：打开后两档键才出现，选一档，选中那档亮着', async () => {
+    const { fake, api } = rig()
+    const m = await mount(api, fake)
+    await openVideo(m)
+
+    // 关着时两档键都不出现——跟其余七行同一个规矩
+    expect(levelKey(m, 1080)).toBeFalsy()
+    expect(command(m)).not.toContain('scale=')
+
+    await pressToggle(m, 0)
+    expect(levelKey(m, 1080).className).toContain('vcp__level--on')
+    expect(command(m)).toContain('-vf scale=-2:1080')
+
+    await pickLevel(m, 2160)
+    expect(levelKey(m, 2160).className).toContain('vcp__level--on')
+    expect(levelKey(m, 1080).className).not.toContain('vcp__level--on')
+    expect(command(m)).toContain('-vf scale=-2:2160')
+
+    await pressToggle(m, 0)
+    expect(command(m)).not.toContain('scale=')
+    expect(levelKey(m, 1080)).toBeFalsy()
+    m.unmount()
+  })
+
+  it('VC-084 两档都比源高时开关自己灰掉并念出原因；只有一档比源高时那一档灰掉', async () => {
+    // 480 的源：整条无处可用，灰的是开关，两颗档位键根本不出现
+    const a = rig({ stderr: STD_480 })
+    const m = await mount(a.api, a.fake)
+    await openVideo(m)
+    const sw = m.container.querySelectorAll<HTMLButtonElement>('.vcp__toggle')[0] as HTMLButtonElement
+    expect(sw.disabled).toBe(true)
+    expect(sw.getAttribute('aria-label')).toBe('源高 480，1080p 与 2160p 都是放大，不给选')
+    expect(levelKey(m, 1080)).toBeFalsy()
+    m.unmount()
+
+    // 1080 的源：开关能开，开起来只有 1080p 能选，2160p 灰着说清原因
+    const b = rig({ stderr: STD_1080 })
+    const m2 = await mount(b.api, b.fake)
+    await openVideo(m2)
+    expect((m2.container.querySelectorAll('.vcp__toggle')[0] as HTMLButtonElement).disabled).toBe(false)
+    await pressToggle(m2, 0)
+    expect(levelKey(m2, 1080).disabled).toBe(false)
+    expect(levelKey(m2, 2160).disabled).toBe(true)
+    expect(levelKey(m2, 2160).getAttribute('aria-label')).toBe('2160p 大于源高 1080，是放大，不给选')
+    m2.unmount()
+
+    // 开着 2160p 换到 1080 的源：档位自己落到 1080p，名字跟着改
+    const SMALL = 'T:/media/小片.mp4'
+    const c = rig({ picks: [[SOURCE], [SMALL]], stderrFor: { [SMALL]: STD_1080 }, files: { [SMALL]: 'k'.repeat(1048576) } })
+    const m3 = await mount(c.api, c.fake)
+    await openVideo(m3)
+    await pressToggle(m3, 0)
+    await pickLevel(m3, 2160)
+    expect((m3.container.querySelector('.vcp__path') as HTMLInputElement).value).toBe('T:/media/4k_demo_2160p.mp4')
+    await openVideo(m3)
+    expect(levelKey(m3, 2160).disabled).toBe(true)
+    expect((m3.container.querySelector('.vcp__path') as HTMLInputElement).value).toBe('T:/media/小片_1080p.mp4')
+    m3.unmount()
+  })
+})
+
+describe('编码选项都自带"怎么选"', () => {
+  const selectWith = (m: Mount, oneValue: string): HTMLSelectElement =>
+    [...m.container.querySelectorAll('select')].find((el) =>
+      [...el.querySelectorAll('option')].some((o) => o.value === oneValue)
+    ) as HTMLSelectElement
+
+  /** 一份选项表对着界面念一遍：每项都是"编码名 · 取舍"，一项不落、一字不差 */
+  function checkNotes(m: Mount, oneValue: string, list: Array<{ v: string; note: string }>): void {
+    expect([...selectWith(m, oneValue).options].map((o) => o.textContent ?? '')).toEqual(
+      list.map((c) => `${c.v} · ${c.note}`)
+    )
+  }
+
+  it('VC-085 视频与音频编码的每一项后面都跟着这一项的取舍，选中那项在框里也念得出', async () => {
+    const { fake, api } = rig()
+    const m = await mount(api, fake)
+    await openVideo(m)
+
+    checkNotes(m, 'hevc_nvenc', VCODECS)
+    checkNotes(m, 'libopus', ACODECS)
+
+    // 选中那一项在框里也带着这一截念出来
+    await chooseBy(m, 'copy', 'copy')
+    const v = selectWith(m, 'hevc_nvenc')
+    expect(v.value).toBe('copy')
+    expect(v.selectedOptions[0]?.textContent).toContain('不重编码原样搬')
+
+    await chooseBy(m, 'libopus', 'libopus')
+    const a = selectWith(m, 'libopus')
+    expect(a.value).toBe('libopus')
+    expect(a.selectedOptions[0]?.textContent).toContain('老设备与 mp4 不太认')
+    m.unmount()
   })
 })
