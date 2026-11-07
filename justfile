@@ -46,7 +46,10 @@ clean-apps:
 # 应用的文档走 dev server（改一行即热更），清单与图标走 dist-apps 里的包——
 # 所以改了 app.ts 要重跑一次 just build-apps
 dev: build-apps
-    AIRSHIP_APPS_ROOT=dist-apps {{vite}} dev src/shell
+    # electron-vite 的 dev/preview 用 process.cwd() 找"壳的 package.json 的 main"当入口——
+    # 必须在 src/shell 里跑（8ea19b3 把它从仓库根挪来后一直没人对过这条链）。
+    # 包根变量随之传绝对路径：electron 的 cwd 变了，相对 dist-apps 会指错地方。
+    cd src/shell && AIRSHIP_APPS_ROOT="{{justfile_directory()}}/dist-apps" ../../node_modules/.bin/electron-vite dev
 
 # 编译壳的三个目标 → src/shell/out/{main,preload,renderer}（不出安装包）
 # 项目根是壳那个包：配置、素材、产物都在 src/shell 里，与应用的包互不相干
@@ -55,7 +58,7 @@ compile:
 
 # 跑构建好的产物（不重启 dev server）：应用从 dist-apps 的包里加载
 start: compile build-apps
-    AIRSHIP_APPS_ROOT=dist-apps {{vite}} preview src/shell
+    cd src/shell && AIRSHIP_APPS_ROOT="{{justfile_directory()}}/dist-apps" ../../node_modules/.bin/electron-vite preview
 
 # 类型检查：node 侧与 web 侧两个 tsconfig
 typecheck:

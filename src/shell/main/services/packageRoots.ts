@@ -47,8 +47,8 @@ export function packageRoots(input: PackageRootInput): PackageRoot[] {
 
   const dev = input.env.AIRSHIP_APPS_ROOT
   if (!input.isPackaged && dev && dev.trim() !== '') {
-    // justfile 传的是相对路径 dist-apps；按 cwd 解成绝对路径再扫，
-    // 免得同一个变量在 from-仓库根 与 from-别处 两种跑法下指两个地方
+    // justfile 传的是绝对路径（dev/preview 的 cwd 在 src/shell，相对写法会指错地方）；
+    // 这里仍按 cwd 解一次——绝对路径原样，相对路径也不至于留成歧义
     out.push({ dir: resolve(dev), origin: 'dev' })
   }
 
