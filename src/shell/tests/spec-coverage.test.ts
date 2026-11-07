@@ -21,7 +21,9 @@ import { describe, expect, it } from 'vitest'
  */
 
 const ROOT = join(__dirname, '..', '..', '..')
-const SKIP = new Set(['node_modules', 'out', 'dist', 'shots', 'fixtures', '.git', '.tmp', 'bin', 'obj'])
+// templates/ 是给别人复制的范本：那里的册子与用例都还没落到某个真实应用上，
+// 拿双向差集去套它只会红一片。复制进 src/apps/<id>/ 之后才归这套规矩管。
+const SKIP = new Set(['node_modules', 'out', 'dist', 'dist-apps', 'shots', 'fixtures', '.git', '.tmp', 'bin', 'obj', 'templates'])
 
 interface Scenario {
   id: string

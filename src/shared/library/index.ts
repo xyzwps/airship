@@ -1,10 +1,10 @@
-import type { AppApi } from '@shared/protocol'
+import type { AppApi } from '@airship/contract'
 
 /**
  * 壳级共享书库——一个按外部依赖规则管理的共享包。
  *
  * 规则（见 docs/architecture.md §8）：
- *   1. 单一入口：外部只 import `@shared/library`，不摸包内文件。
+ *   1. 单一入口：外部只 import `@airship/library`，不摸包内文件。
  *   2. 契约带版本：公开 API 变更要升 `LIBRARY_API_VERSION`；
  *      持久结构自己也有 version（library.json 里那个）。
  *   3. 不含消费者专有概念：包内不许出现"只有某个应用才有的字段"。

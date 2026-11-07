@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { act } from 'react'
-import WsldApp from '@apps/wsld/WsldApp'
-import { FakeAirship, type FakeOptions } from '@tests/helpers/fakeAirship'
-import { mountUi, type Mount } from '@tests/helpers/mount'
-import type { AppApi } from '@shared/protocol'
-import type { ProcResult } from '@shared/protocol'
+import WsldApp from '../WsldApp'
+import { FakeAirship, type FakeOptions } from '@airship/sdk/testing'
+import { mountUi, type Mount } from '@airship/sdk/testing'
+import type { AppApi } from '@airship/contract'
+import type { ProcResult } from '@airship/contract'
 
 /**
  * 容器台用例的公共工装。

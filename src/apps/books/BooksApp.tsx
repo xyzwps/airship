@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { makeBook } from 'foliate-js/view.js'
-import { useTheme } from '../../shell/theme'
-import { IconButton } from '../../shell/IconButton'
-import { useAppAutotest } from '../../shell/autotest'
-import { markPerf } from '../../shell/shot'
-import type { AppApi } from '@shared/protocol'
+import { useTheme } from '@airship/sdk'
+import { IconButton } from '@airship/sdk'
+import { useAppAutotest } from '@airship/sdk'
+import { markPerf } from '@airship/sdk'
+import type { AppApi } from '@airship/contract'
 import {
   addBook,
   coverUrl,
@@ -14,7 +14,7 @@ import {
   type BookFormat,
   type BookProgress,
   type BookRecord
-} from '@shared/library'
+} from '@airship/library'
 import { remoteFile } from './remoteFile'
 import { ReaderView, type ReaderHandle, type TocItem } from './ReaderView'
 import './books.css'

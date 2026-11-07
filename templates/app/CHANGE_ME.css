@@ -1,0 +1,14 @@
+/* 应用自己的版心。配色一律用宿主给的变量，别在这里写死颜色（主题三档只有启动器能改）。 */
+
+.change-me {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 640px;
+}
+
+.change-me h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--fg);
+}

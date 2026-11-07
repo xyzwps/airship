@@ -1,0 +1,54 @@
+# 打包配置（Windows 安装包）——**这个文件属于壳那个包**：项目根是 src/shell，
+# 版本号读 src/shell/package.json，安装包仍落仓库根的 release/，六个应用包读仓库根的 dist-apps/。
+#
+# 风格对齐 wslc-desktop：一条命令出一个 setup.exe，拷给别人双击安装；
+# 旁边留一份 .sha256；向导双语（按系统界面语言自动选）；"只为我安装"，不需要管理员权限；
+# 开始菜单 + 桌面快捷方式 + 控制面板里的卸载项。
+
+appId: dev.xyzwp.airship
+productName: 飞船
+copyright: © 2026 xyzwp
+
+directories:
+  # 相对本包：安装包与解包目录回到仓库根
+  output: ../../release
+  buildResources: build
+
+# 装进 app.asar 的东西：electron-vite 的三个构建目标 + 壳的清单 + 壳自己的两张图
+# （windows.ts 与 tray.ts 按 ../../assets/ 相对路径找它们——out 在本包下一层，
+# 所以那两条相对路径正好指到本包的 assets/，打包后仍在 asar 内）
+files:
+  - out/**/*
+  - package.json
+  - assets/icon.png
+  - assets/tray.png
+  # 根 package.json 已经没有 dependencies 了：foliate-js 与 pdfjs-dist 各自记在
+  # 用它的那个应用名下，而且都是 devDependencies（构建期打进各家的包，运行时不需要）。
+  # 所以这里不再需要"排除某个 node_modules 目录"那几条——没有生产依赖会跟着进 asar。
+
+# 安装包是**纯壳**：不带任何 airship 包（2026-11-07 定）。
+# 分发单位只有 airship 包，装应用只有拖放这一条入口——装完打开是空格子，那是预期行为不是坏了。
+# 所以这里没有 extraResources 那一档；verify-installer 反过来钉"安装包里不该有 airship-apps"。
+
+compression: maximum
+
+win:
+  icon: assets/icon.ico
+  target:
+    - nsis
+  # 产物名：airship-Setup-<版本>-x64.exe
+  artifactName: airship-Setup-${version}-x64.exe
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 飞船
+  uninstallDisplayName: 飞船
+  # 卸载不动用户数据：%APPDATA%/airship 里是书架与设置，删掉太狠
+  deleteAppDataOnUninstall: false
+  installerLanguages:
+    - zh_CN
+    - en

@@ -8,8 +8,8 @@ import {
 // 注册 <foliate-view> 自定义元素；makeBook 负责按文件头识别 EPUB / MOBI / FB2
 import 'foliate-js/view.js'
 import { makeBook } from 'foliate-js/view.js'
-import type { AppApi } from '@shared/protocol'
-import { bookPath, type BookProgress, type BookRecord } from '@shared/library'
+import type { AppApi } from '@airship/contract'
+import { bookPath, type BookProgress, type BookRecord } from '@airship/library'
 import { remoteFile } from './remoteFile'
 
 /**

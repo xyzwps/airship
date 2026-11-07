@@ -1,0 +1,16 @@
+{
+  "name": "@airship/shell",
+  "version": "0.3.0",
+  "private": true,
+  "description": "飞船的壳：窗口、能力实现、运行期扫包与启动器",
+  "main": "out/main/index.js",
+  "author": "xyzwp",
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  }
+}

@@ -14,23 +14,34 @@
 
 ## 1. 系统组成
 
+**每个区都是一个 npm 包**（根 `package.json` 声明 `workspaces`），所以"谁可以引谁"由 node 的解析器执行，
+不再靠四份手写别名表维持：
+
 ```
 airship
-├── 壳 src/shell/
-│   ├── main/          主进程：窗口管理、IPC、能力实现（存储/授权/子进程/托盘/工具发现）
+├── 壳 src/shell/                    @airship/shell（private；main、version、electron-builder 配置都在这儿）
+│   ├── main/          主进程：窗口管理、IPC、能力实现（存储/授权/子进程/托盘/工具发现）、
+│   │                  运行期扫包（packageRegistry / packageRoots）、包的文件面（packageProtocol）
 │   ├── preload/       桥：按契约白名单暴露 window.airship 与 window.airshipShell
-│   └── *.tsx / *.html 壳界面：启动器（应用列表）、单应用宿主、标题栏、主题、测试钩子
-├── 应用 src/apps/<id>/    每个应用由一份清单完整定义
-└── 共享 src/shared/
-    ├── protocol.ts / app.ts   契约：类型、能力、事件（依赖图最下层）
-    ├── errors.ts              拒绝原因措辞的唯一真源（主进程、启动器、测试替身共用）
-    ├── registryRules.ts       应用注册的校验规矩（主进程与渲染侧共用一份）
-    └── <name>/                共享包：library、textdecode（各自单一入口）
+│   ├── assets/        壳自己的图标（母版、icon.png、tray.png、icon.ico）
+│   └── launcher.*     壳界面：只有启动器一份文档。应用窗口加载的是包自己的文档
+├── SDK src/sdk/                     @airship/sdk：应用面向的那一面
+│   ├── host / api / Titlebar / IconButton / theme / shot / autotest / trayIcon
+│   ├── csp + cspPlugin（子入口 ./vite）· styles/airship.css（子入口 ./styles.css）
+│   └── fakeAirship + mount（子入口 ./testing）——应用的测试替身住在这儿，不住在壳里
+├── 应用 src/apps/<id>/              @airship/<id>：package.json + 清单 + 自持的 index.html + main.tsx + 一张图标
+│                                    产出来是一个 zip 归档 dist-apps/<id>.airship
+└── 契约与共享 src/shared/
+    ├── contract/      @airship/contract：protocol / app / errors / registryRules / packageRules（依赖图最下层）
+    ├── library/       @airship/library：墨读与 PDF 共用的那份书库
+    └── textdecode/    @airship/textdecode：中文解码
 ```
 
-三者关系一句话：**应用声明能力 → 壳按声明放行 → 共享包只通过入口暴露契约 → 数据由壳托管**。
+四者关系一句话：**应用声明能力 → 壳按声明放行 → SDK 把契约接到界面上 → 共享包只通过入口暴露契约 → 数据由壳托管**。
 
-目录按**角色**而不是按 Electron 的执行上下文切。理由：读代码的人关心的是"这是壳、这是应用、这是共享"，而架构规则也是按角色表述的；上下文（main / preload / renderer）只在 `shell/` 内部再分，因为**特权代码只存在于壳里**——`apps/**` 和 `shared/**` 按契约全是渲染侧代码，这条不变量比按上下文切目录更强、也更好审计。
+目录按**角色**而不是按 Electron 的执行上下文切。理由：读代码的人关心的是"这是壳、这是 SDK、这是应用、这是共享"，而架构规则也是按角色表述的；上下文（main / preload / renderer）只在 `shell/` 内部再分，因为**特权代码只存在于壳里**——`apps/**`、`sdk/**` 和 `shared/**` 按契约全是渲染侧代码，这条不变量比按上下文切目录更强、也更好审计。
+
+一个应用怎么被装进壳：`just new-app <id> [显示名]` 从 `templates/app/` 造出来 → `just build-apps` 逐应用构建并装成 `dist-apps/<id>.airship`（一个 zip 归档）→ 壳启动时扫包根得到名单。详见 §7.3 与 §12。
 
 ---
 
@@ -80,23 +91,30 @@ airship
 
 | 窗口 | 内存（空闲） | 内存（开着内容） |
 |---|---|---|
-| 启动器 | 86.7–87.2 MB | — |
-| vcp | 96.9–100.8 MB | — |
-| 墨读 | 105.3 MB | 163.9 MB（《第一推动》15 册套装） |
-| PDF | 101.3–103.9 MB | 318.5 MB（2 页执照，125% 缩放） |
-| 打勾勾 | 97.8–101.1 MB | — |
+| 启动器 | 85.1 MB | — |
+| vcp | 101.1 MB | — |
+| 墨读 | 98.0 MB | 163.9 MB（《第一推动》15 册套装） |
+| PDF | 96.8 MB | 318.5 MB（2 页执照，125% 缩放） |
+| 打勾勾 | 94.9 MB | — |
+| 生命游戏 | 99.2 MB | — |
+| 容器台 | 96.8 MB | — |
 
 | 可感知耗时 | 数字 |
 |---|---|
-| 应用窗口挂载（冷） | 400–420 ms |
-| 应用窗口挂载（热） | 120–160 ms |
+| 应用窗口挂载（热） | 134–167 ms |
 | EPUB 打开到首屏渲染完 | 598–741 ms |
 | PDF 首页出图 | 893 ms |
 | vcp 探测一个 4K 文件 | 523 ms |
 | vcp 批量入队 4 个（含逐个探测与字幕抽取） | 486 ms |
 
-结论：每个渲染进程约 90–105 MB 是窗口化的真实代价，四个应用全开约 400 MB。
+两批数字的来源：空闲内存与"挂载（热）"是 2026-11-07 拆包后端到端跑 `just shot` 采的
+（七个窗口全开过一轮，`[metrics]` / `[perf]` 两行原文）；带内容那两列与四条 EPUB/PDF/vcp 耗时
+是拆包前测的，还没在新架构下重采——**拆包改的是文档来源与构建方式，不改这些操作的路径**，
+但没重采就是没重采，别当已验证。
+
+结论：每个渲染进程约 95–101 MB 是窗口化的真实代价，六个应用全开约 600 MB。
 架构接受这个代价换隔离；PDF 是内存大头（pdf.js 位图 + 画布），不是壳的开销。
+拆包前后每窗口内存同档——多出来的那几 MB 是每包自带一份 React，不是壳变重了。
 
 ---
 
@@ -105,41 +123,51 @@ airship
 ```
 src/
   shared/
-    protocol.ts        契约：能力、事件、AppApi、启动器面        ← 依赖图叶子
-    app.ts             AppMeta（清单类型，纯数据）              ← 依赖图叶子
+    protocol.ts        契约：能力、事件、AppApi、启动器面（含 apps() 与 InstalledApp）  ← 依赖图叶子
+    app.ts             AppMeta + APP_ID_PATTERN（清单类型与 id 形状）                  ← 依赖图叶子
     errors.ts          拒绝原因的措辞        → 只依赖 protocol / app
-    registryRules.ts   注册校验规矩          → 只依赖 protocol / app / errors
+    registryRules.ts   清单校验规矩          → 只依赖 protocol / app / errors
+    packageRules.ts    包清单的形状判据      → 只依赖 app / errors（与 code/pack-app.mjs 各判一遍）
     library/index.ts   共享包：书库        → 只依赖 protocol
     textdecode/index.ts 共享包：中文解码    → 无依赖
+  sdk/                 应用面向的那一面：host / api / Titlebar / IconButton / theme / shot /
+                       autotest / trayIcon / csp + cspPlugin / styles/airship.css
   shell/
-    main/              主进程：index windows ipc services/*
+    main/              主进程：index windows ipc services/*（含 packageRoots / packageRegistry / packageProtocol）
     preload/           桥：身份注入、两套面、事件单频道
-    *.tsx *.ts *.html  启动器与单应用宿主、标题栏、主题、测试钩子、样式
+    Launcher.tsx …     壳自己的界面：只有启动器 + launcher.css + launcher.html
   apps/
-    index.ts           注册表：glob 收集清单与组件
-    vcp/ books/ pdf/ dagogo/
+    <id>/              每个应用：app.ts + index.html + main.tsx + icon.* + 组件与私有模块
 ```
 
-别名（`electron.vite.config.ts` 与两个 tsconfig 同步定义）：
-`@shared/*` → `src/shared/*`，`@apps/*` → `src/apps/*`，`@shell/*` → `src/shell/*`。
+包与包之间用 npm 名互相引用（`@airship/sdk`、`@airship/contract`…），由根 `package.json` 的
+`workspaces` 建软链解析——**没有别名表**：2026-11-07 之前这里是四份手写配置
+（两份 tsconfig、vitest、两份 vite 配置），拆掉之后边界由 node 的解析器执行，
+`AP-013` / `AP-016` 与"旧别名不该回来"三条用例钉住它不再回去。
+被 Node 直接加载的那几个源码包（`@airship/sdk`、`@airship/contract` 等）内部相对 import
+**必须带扩展名**（`./csp.ts`），因为 Node 的 ESM 解不了省略写法；症状是拿到空模块而不是报错。
 
 允许（单向）：
 
 ```
-apps          ──→ shared          ──→ protocol / app
-apps          ──→ shell（渲染侧库：theme / shot / autotest / api）
-shell         ──→ apps（只走注册表 apps/index.ts，不摸应用内部模块）
-shell/main    ──→ apps/<id>/app.ts（纯数据清单；两侧同一个真源）
-shell/main · shell/preload ──→ shared
+apps          ──→ sdk（宿主、观感、工装钩子）
+apps          ──→ shared（契约类型与共享包）
+sdk           ──→ shared
+shell         ──→ sdk（启动器复用同一套标题栏与主题落地，不另画一份）
+shell         ──→ shared
+shell/main    ──→ 磁盘上的包（运行期读 manifest.json；不再 import 任何应用源文件）
 ```
 
 主进程读清单是**必要的**：能力校验必须在主进程做，若由渲染侧把能力传过来，等于没有校验。
-清单被设计成纯数据（不 import 组件），所以这条边不会把渲染侧代码拖进主进程构建。
+现在这条边跨的是进程与文件系统，不再是构建期——`app.ts` 由产包器投影成包根的 `manifest.json`，
+主进程读的是那份 JSON。
 
-禁止：`apps ↔ apps`、`shared → apps`、`shared → shell`、应用绕过共享包入口 import 其内部文件、
-壳 import `apps/<id>/…`（只能走注册表）。
+禁止：`apps ↔ apps`、`shared → apps`、`shared → shell`、`apps → shell`、`sdk → shell`、`sdk → apps`、
+应用绕过共享包入口 import 其内部文件、壳 import 某个应用目录内部。
+前四条由 `tests/architecture.test.ts` 扫 import 图挡住（AP-013）。
 
-`shared/protocol.ts` 与 `shared/app.ts` 是依赖图的叶子：只定义类型与常量，不 import 任何东西，
+`shared/protocol.ts` 与 `shared/app.ts` 是依赖图的叶子：只定义类型与常量，不 import 任何东西
+（`app.ts` 反过来被 protocol 以 `import type` 引用，编译期擦除，不构成运行时环），
 因此能被主进程、preload、渲染侧同时引用而不引入平台差异。
 `shared/<包>` 只允许依赖同层与叶子，这条由 `tests/architecture.test.ts` 挡住。
 
@@ -236,19 +264,23 @@ preload 用 `contextBridge.exposeInMainWorld('airship', bridge)` 挂一个对象
 ### 7.1 一个应用的全部对外形状
 
 ```
-apps/vcp/
+apps/life/
   app.ts          ← 纯数据清单：这个应用对外形状的全部
+  index.html      ← 包自持的入口文档（不写 CSP，构建时注入）
+  main.tsx        ← 一行：createAirshipApp({ meta: app, component: LifeApp, icon: './icon.svg' })
   icon.svg        ← 图标文件（png/jpg/jpeg/webp 也行，只能有一张）
-  index.tsx       ← 组件入口（默认导出），壳按目录约定解析
-  VcpApp.tsx      ← 组件本体
-  state.ts command.ts probe.ts jobs.ts runner.ts   ← 应用私有，壳不知道
-  vcp.css
-  tests/
+  LifeApp.tsx     ← 组件本体
+  patterns.ts …   ← 应用私有，壳不知道
+  life.css
+  specs/ tests/
 ```
 
-清单**不含组件引用**，是刻意的：主进程也要读同一批 `app.ts` 做能力校验和目录布局，
-清单里一旦 import 组件，主进程就会把渲染侧代码拖进构建。组件由目录约定（`index.tsx`）解析，
-应用不用在清单里写路径。
+`app.ts` 仍是**纯数据**（只 `import type`）：产包器要把它的值序列化成包根的 `manifest.json`，
+主进程要按它做能力校验和目录布局，清单里一旦 import 组件，这两条都会把渲染侧代码拖进来。
+
+组件不再由壳按目录约定解析——**包自己引自己那份**：`main.tsx` 把 `app.ts` 与组件一起交给 SDK 宿主。
+于是"壳怎么知道这个应用存在"与"壳怎么拿到它的界面"彻底分开了：前者是运行期扫包（§7.3），
+后者根本不存在了——壳加载的是 `airship://<id>/index.html`，界面从包里长出来。
 
 ### 7.2 AppManifest
 
@@ -271,11 +303,12 @@ export interface AppMeta {
 清单里**没有**图标字段，也**没有**顺序字段：
 
 - 图标是**文件约定**：往 `apps/<id>/` 扔一张 `icon.svg`（也接受 png / jpg / jpeg / webp），
-  有且只能有一张，缺了或多张都在注册期直接报错。壳不解析它的内部结构，
+  有且只能有一张，缺了或多张都在产包期直接报错。壳不解析它的内部结构，
   也不规定它是几条 path、有没有 circle/渐变、甚至是不是位图。
   清单里写 `iconPath: string` 那种做法等于假定"图标必须是单条 path 的 SVG"，两个假定都错。
-  图标单独成文件而不是跟组件同处 `index.tsx`，是因为启动器要给四个应用画图标，
-  同 chunk 就得把 pdf 那 800KB 一起拉进来，懒加载白做。
+  图标单独成文件而不是从组件模块里引，是因为启动器要给每个应用画图标：
+  走模块图就得把应用本体（pdf 那 800KB）拉进启动器，格子第一屏就慢了。
+  现在它是包根那一张文件，启动器经 `airship://<id>/icon.*` 直接读。
   代价：文件图标拿不到 `currentColor`，颜色得烘进图里。小于 4KB 的 SVG 会被 Vite 内联成 `data:` URL（CSP 的 `img-src` 已允许），
   大图则作为文件走 `'self'`。
 - 顺序是应用之间的**关系**，任何单个应用都不可能"自己决定"自己的排位。
@@ -284,37 +317,68 @@ export interface AppMeta {
 与上面两条相反，`tools` 与 `platforms` 是**应用自己的事实**，所以它们进清单：
 依赖 `wslc.exe` 的东西在别的平台上根本跑不起来（`platforms: ['windows']` → 非 Windows 不进格子、硬开被拒），
 要用外部工具就得说清是哪一个（`tools: ['wslc']` → 壳才给路径，也才可审计"谁能跑子进程、跑的是什么"）。
-两个字段的合法值都由壳定义（`TOOL_NAMES` / `PLATFORM_IDS`），清单里写了不认识的名字在注册期直接报错。
+两个字段的合法值都由壳定义（`TOOL_NAMES` / `PLATFORM_IDS`），清单里写了不认识的名字在产包期直接报错。
 
-组件入口不在清单里，由约定解析：`apps/<id>/index.tsx` 默认导出 `ComponentType<{ api: AppApi }>`。
+组件入口不在清单里，由包自持：`apps/<id>/main.tsx` 把 `app.ts` 那份清单与
+`ComponentType<{ api: AppApi }>` 一起交给 `createAirshipApp`。清单里不写组件路径——
+写与不写都是同一份约定，而约定只有一处（`code/build-apps.mjs` 认这四份文件）。
 
 展示信息（图标、强调色、说明）属于 manifest：它们是"这个应用是什么"的一部分，壳统一排版等于壳替应用做决定。壳只提供 CSS 变量与控件类，应用可覆盖自己区域内的样式。
 
 ### 7.3 发现与注册 `[已实现]`
 
-两侧抓的是**同一批清单文件**，不存在两份名单对不齐：
+**名单只有一份，住在主进程，来自运行期扫包。**
 
-- 渲染侧 `apps/index.ts`：三个 glob——`app.ts` 拿清单（急切）、`icon.{svg,png,jpg,jpeg,webp}` 拿图标 URL（急切，`?url`）、`index.tsx` 拿组件（懒，每应用一个 chunk）。
-- 主进程 `services/appRegistry.ts`：`import.meta.glob('../../../apps/*/app.ts', { eager: true })` 派生能力表、目录布局、共享命名空间授权。
+```
+包根（顺序就是优先级，先扫到的占住这个 id）。每个包是一个 zip 归档 `<id>.airship`：
+  1 开发/测试根   AIRSHIP_APPS_ROOT → dist-apps/<id>.airship   （发布版忽略这个变量）
+  2 自装根        %LOCALAPPDATA%\airship\apps\<id>.airship      （非 Windows 退回 userData 旁边）
 
-壳从清单派生：应用列表、能力校验、数据目录、懒加载入口；显示顺序由壳按名字典序定。目录名与清单 id 不一致、缺图标或多张图标、缺组件入口、id 重复——注册表构建期直接抛错，不留"注册了一半"的应用。
+没有第三个"出厂根"：安装包是纯壳，一个应用都不带（2026-11-07 定）。分发单位只有 airship 包，
+装它的入口只有启动器上的拖放。`just build` 两条都跑，但产物互不包含。```
 
-**加一个应用 = 新建 `apps/<id>/` 写 `app.ts`、`icon.svg`、`index.tsx` 三个文件，壳侧零改动。**（不变量 I-5；已用临时 `apps/hello/` 演练证实——只加新目录就出现在启动器并能打开，随后删除）
+- `services/packageRoots.ts`：把这三处算成一张有序表。不 import electron——判定条件当参数收进来，
+  所以"发布版忽略 env"这种规矩测得了。
+- `services/packageRegistry.ts`：扫一级文件名以 `.airship` 结尾的归档，从归档里读 `manifest.json`，
+  过 `@airship/contract` 的两份判据，收下合格的、记下不合格的原因。
+  **坏包不占名**：不合格的那一份连 id 都拿不到，压不住同 id 能用的那一份。
+- `services/packageArchive.ts`：读归档。用 fflate 的 `unzipSync(data, { filter })`——
+  列条目名时 filter 返回 false（一个字节都不解压），取文件时只解那一条。不整包展开。
+- `services/appRegistry.ts`：对外函数名与拆包前那份 glob 注册表一一对得上（`appIds` / `capabilitiesOf` /
+  `canAccessShared` / `appsAvailableOn`…），所以 `ipc.ts`、`grants`、`paths.ts`、`windows.ts` 没跟着改。
+  **能力边界不在这次改动里。**
+- 渲染侧不再扫任何东西：启动器问 `airshipShell.apps()` 拿名单（`InstalledApp` = 清单 + 图标地址），
+  应用窗口连名单都不需要——它的清单在自己包里。
 
-代价：应用 id 的类型从 `as const` 联合降级为 `string` + 运行时校验（`isKnownApp`），因为清单成了唯一真源。可接受——应用从不传自己的 id，id 由壳绑定注入。
+壳从清单派生：应用列表、能力校验、数据目录、窗口尺寸与标题；显示顺序由壳按名字典序定。
+清单 id 与目录名不一致、id 重复、缺图标或多张图标、缺入口文档、`schemaVersion` 对不上——
+都不进注册表，并且每条原因落一行日志（`这个包没装进来`）。一个都没扫到时日志喊
+`一个应用都没装进来` 并把找过的包根列出来，界面上那句提示见 SH-020。
+
+**加一个应用 = 新建 `apps/<id>/` 写四份文件（`app.ts` / `index.html` / `main.tsx` / 一张 `icon.*`），
+`just build-apps` 产包，壳侧零改动。**（不变量 I-5，AP-010 与 AP-001 守着）
+
+装包只有一条入口：把归档拖到启动器上（PK-015~020）。主进程侧是
+`services/packageInstall.ts` —— 复用 validateArchive 同一份判据、写暂存名再改名、失败把旧包挪回来；落点固定是自装根。同 id 已在自装根里时必须确认才换（覆盖是唯一不可逆的动作：下次打开跑的是新代码，而 `%APPDATA%/airship/apps/<id>/` 那份数据会被新代码接着读）。装完不自动开窗口——装与跑是两件事。
+
+拆掉的旧机制：渲染侧 `apps/index.ts` 那份 glob（清单 + 图标 + 组件三遍 glob）与主进程那份 glob 清单。
+两侧曾经各扫一遍、靠用例 `AP-008` 钉"集合一致"——现在只剩一份真源，`AP-008` 改成钉
+"注册表 = 包根目录 = 仓库清单"三处一致（同一批判据，对象变了）。
 
 ### 7.4 生命周期
 
 | 阶段 | 行为 |
 |---|---|
-| 注册 | 启动时读清单，建目录，登记能力 |
-| 打开 | 懒加载组件 chunk → 建窗口 → 注入 `AppApi` → 组件挂载 |
-| 运行 | 应用自持状态；壳不介入业务 |
-| 关闭 | 组件卸载（清理放卸载钩子）→ 销毁窗口与进程 → 杀该应用的子进程 → 清它占的托盘 |
+| 启动 | 扫两个包根（开发根、自装根）→ 合格的进注册表、不合格的一条原因一行日志 → 挂 `airship://` 处理器 |
+| 注册 | 清单进注册表，建该应用的数据目录，登记能力（能力表来自包清单，不来自渲染侧） |
+| 打开 | 建窗口（尺寸按清单）→ 注入 `--airship-app=<id>` 的 preload → 加载 `airship://<id>/<entry>` → 包里的 `main.tsx` 调 `createAirshipApp` 装出宿主与界面 |
+| 运行 | 应用自持状态；壳不介入业务，只按能力表应答桥调用 |
+| 关闭 | 销毁窗口与进程 → 杀该应用的子进程 → 清它占的托盘 |
 
 清单里没有 `onOpen/onClose` 钩子：组件的挂载/卸载已经承担了这个职责，再加一层是多余的间接。真出现"挂载前必须做完的壳级动作"再引入。
 
-`[待达]` 当前实现是单窗口内常驻挂载（切走只隐藏，不卸载），目的是阅读器翻页进度、vcp 跑着的转码任务不因切换应用而丢。窗口化后这个需求由"窗口不关就不销毁"承接。
+截图工装等的"就绪"信号来自 SDK 宿主（`useReportShotReady`，画完下一帧才报）——
+等"脚本加载完"会截出一张占位，看着像跑起来了其实什么都没验。
 
 ### 7.5 现有六个应用
 
@@ -362,10 +426,17 @@ export interface AppMeta {
 
 ## 9. 数据与存储
 
+**代码根与数据根是分开的两类东西**，各管各的寿命：
+
 ```
+代码根（airship 包 = zip 归档，见 §7.3）
+  %LOCALAPPDATA%\airship\apps\<id>.airship      自装：拖进启动器装的那些；卸载壳不碰它，将来商店也装这儿
+  dist-apps\<id>.airship                          开发：just build-apps 的落点，只被开发根扫到
+
+数据根
 %APPDATA%/airship/                    Electron userData
 ├── settings.json                     壳级：主题、工具路径（toolPath:<name>）——不存窗口状态
-├── logs/airship-YYYY-MM-DD.log       按天
+├── logs/airship-YYYY-MM-DD.log       按天；"这个包没装进来"的每一条原因在这里
 ├── shared/library/                   壳托管共享区
 │   ├── library.json                  { version: 1, books: [...] }
 │   ├── files/<id>.<ext>              书本体（导入时拷入，不依赖原路径）
@@ -376,14 +447,20 @@ export interface AppMeta {
     └── cache/                        可整体删除重建
 ```
 
+自装根选 `%LOCALAPPDATA%` 而不是 `%APPDATA%`：企业环境会漫游 AppData，几百 MB 的包跟着漫游是灾难；
+而且 `%APPDATA%\airship` 在这台机器上是"用户数据"的语义，备份它的人不该顺带把可执行代码备份走。
+外部工具发现早就同时探这两处（`services/tools.ts`），这条不算新规矩。
+
 | 规则 | 说明 |
 |---|---|
 | 落盘 | 临时文件 + `rename`，中途崩溃不损坏原文件 |
+| 装包 | 先写 `<id>.airship.tmp-…` 再 `rename` 成正式名；Windows 上刚写下的文件常被短暂占用，改名带三轮重试，试满还是不成就照原样抛（不留"看着装上了"） |
 | 坏设置 | 解析失败则改名 `.bad`、记日志、从空开始，不致命 |
 | 设置模型 | 扁平字符串键 + 可 JSON 序列化值；每应用一个文件，互不可见 |
 | 写并发 | 串行队列（内存缓存 + 队列化写盘），连续操作后一次不覆盖前一次 |
 | 日志 | `时间 级别 [来源] 消息 [详情单行化]`，详情截 4000 字；写日志失败不抛 |
-| 清理 | 删 `apps/<id>/` 即彻底清掉该应用；删 `shared/library/` 清掉书库 |
+| 清理 | 删 `apps/<id>/` 即彻底清掉该应用的数据；**删包不删数据**（包目录删掉，`apps/<id>/` 留着，装回来接得上）；删 `shared/library/` 清掉书库 |
+| 名单 | 磁盘上的归档文件就是名单，没有 `installed.json` 那种账本——卸载等于删文件 |
 
 ---
 
@@ -391,16 +468,20 @@ export interface AppMeta {
 
 | 部分 | 归属 | 规则 |
 |---|---|---|
-| 标题栏 | 壳 | 无边框窗口自绘；整条可拖拽，按钮区显式排除 |
-| 应用列表 | 壳 | 从 manifest 生成；选中态只表示"此刻真的在这个应用里" |
-| 主题 | 壳 | 跟随系统/亮/暗三档，CSS 变量下发，全局记忆 |
-| 内容区 | 应用 | 壳给内边距与滚动，`flush` 应用自己排版 |
-| 控件 | 壳提供、应用可用可不用 | 按钮/输入/卡片/字段网格等类与 CSS 变量 |
+| 标题栏 | SDK 宿主（`src/sdk`），随包走 | 无边框窗口自绘；整条可拖拽，按钮区显式排除。应用名来自包清单，中段来自 `api.window.setTitle` |
+| 应用列表 | 壳 | 从运行期扫包得到（`airshipShell.apps()`）；选中态只表示"此刻真的在这个应用里" |
+| 主题 | 壳定档，SDK 落地 | 跟随系统/亮/暗三档，CSS 变量下发，全局记忆；每个包的文档里由宿主调 `useTheme` 落 `data-theme` |
+| 内容区 | 应用 | 宿主按清单给内边距与滚动，`flush` 的应用自己排版 |
+| 控件 | SDK 提供、应用可用可不用 | `src/sdk/styles/airship.css` 里那份基线与通用控件类，构建时打进每个包 |
+
+`src/sdk/styles/airship.css` 是**公开面**：类名（`.app-window__body--flush`、`.btn`、`.card`、`.titlebar__*`…）
+一旦被应用依赖就不能随手改。本轮 SDK 与壳同仓同版本、六个包一起重编，所以改得起；
+真要独立发布，这份样式表的名字与类要跟着版本协商一起定（TD-013）。
 
 表单两条硬规则：标签在控件左边同一行；同组字段共用一个星号列，不写死宽度。
 
 主题传播 `[已实现]`：应用窗口只读 `airship.theme()` 并订阅 `theme:changed`；改主题只有启动器能做（`airshipShell.setTheme`），主进程落盘后广播到所有窗口。"跟随系统"的实际亮暗由启动器用 `matchMedia` 算好传给壳——主进程没有 `matchMedia`，不该猜。
-每个窗口自己必须有人调 `useTheme` 把 `data-theme` 落到文档上，否则整窗 CSS 变量为空（这条是踩过才知道的：拆窗口的第一版应用窗口就没主题）。
+每个窗口自己必须有人调 `useTheme` 把 `data-theme` 落到文档上，否则整窗 CSS 变量为空（这条是踩过才知道的：拆窗口的第一版应用窗口就没主题）。现在这一调用固定在 SDK 宿主里，包不需要记得做。
 
 ---
 
@@ -425,13 +506,19 @@ export interface AppMeta {
 | 工具链 | electron 45.2.3 · electron-vite 6.0.0 · vite 8.3.5 · react 19.3.1 · TypeScript 5.9.3 · vitest 4.1.12 |
 | 关键库 | foliate-js 1.0.1（自带 mobi.js，MOBI6+KF8+PalmDOC+HUFF/CDIC）· pdfjs-dist 6.5.438 |
 | 版本约束原因 | vitest 5 要求 node ≥26，本机 node 25.9，故钉 4.x；npm registry 与 electron 二进制走 npmmirror |
-| 构建 | 三目标：main / preload / renderer；应用各自懒加载 chunk |
-| 打包 | `just dist`：electron-builder 出 NSIS 安装包 `release/airship-Setup-<版本>-x64.exe`，`just verify-installer` 自检并写 `.sha256`；细节见 [release-packaging.md](release-packaging.md)，还没做的那几件在 [todo.md](todo.md) |
-| 图标 | 母版 `assets/icon-master.png`（用户提供的图形），`python code/make-icons.py` 重出 `assets/icon.png`（256，窗口图标）与 `assets/tray.png`（16，托盘默认），`python code/make-ico.py` 重出 `assets/icon.ico`（16–256 七档，安装包与 exe 的图标）；标题栏那颗品牌图形是同一张图的 SVG 简化版，写在 `shell/Titlebar.tsx` |
-| 安全 | `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`；CSP 允许 `blob:`（foliate 用 blob iframe 渲章节）与样式 `unsafe-inline`（禁掉书就没排版），脚本只 `'self'` |
+| 构建 | 两条独立的链。**壳**：`just compile` = `electron-vite build src/shell` → `src/shell/out/{main,preload,renderer}`（renderer 只剩启动器一份 html）。**应用**：`just build-apps` → `code/build-apps.mjs` 逐应用跑一次 vite 构建（`root` 就是那个应用目录、`base: './'`），再用 `code/pack-app.mjs` 打成 `dist-apps/<id>.airship`（zip 归档，条目名就是包内路径） |
+| 谁钉住 Electron 版本 | 壳的 `package.json` 写**固定值** `45.2.3`（不带 `^`）：electron-builder 按它下载对应平台的二进制，写范围会被直接拒 |
+| 版本号 | 安装包文件名与 exe 的文件版本都取自 `src/shell/package.json`；包清单里的 `sdkVersion` 取自 `src/sdk/package.json` |
+| 为什么每应用各构建一次 | 一次构建里放六份 html，Rollup 会把 React 抽成一份共享 chunk，六个包就互相依赖了——那正是这次要拆掉的东西。分开构建才是"一个包自带全部东西" |
+| 两份 React 的坑 | workspace 软链进 `node_modules` 后，rollup 的 commonjs 互操作会把 `react` 各包一遍，现象是 `useState` 读到 `null`。三份构建配置与 vitest 都写了 `resolve.dedupe: ['react','react-dom','react/jsx-runtime']`，别摘 |
+| 打包 | `just build` = `build-apps` + `build-shell`；后者是清场 → 编译壳 → `electron-builder --projectDir src/shell`（NSIS，**纯壳：不带任何 airship 包**）→ 自检并写 `.sha256`；细节见 [release-packaging.md](release-packaging.md)，还没做的那几件在 [todo.md](todo.md) |
+| 体积实测 | 拆包**不减安装包体积**：`app.asar` 从 3.4 MB 降到壳自己的约 0.7 MB，六个归档合计约 1.2 MB（zip 压过，实测 life 240 KB → 79 KB）；安装包 122.2 MB → 122.6 MB。换来的是"改一个应用只重出一个包"与"应用能独立分发"，不是体积 |
+| 图标 | 母版 `src/shell/assets/icon-master.png`（用户提供的图形），`python code/make-icons.py` 重出 `src/shell/assets/icon.png`（256，窗口图标）与 `src/shell/assets/tray.png`（16，托盘默认），`python code/make-ico.py` 重出 `src/shell/assets/icon.ico`（16–256 七档，安装包与 exe 的图标）；标题栏那颗品牌图形在 `src/sdk/Titlebar.tsx`，应用自己的图标由 `main.tsx` 的 `icon` 参数交给宿主 |
+| 数据目录名 | 主进程开头 `app.setName('airship')` 钉死：Electron 的 userData 默认取 package.json 的 name，而壳的 name 是 `@airship/shell`——不钉住，`%APPDATA%/airship` 里的书架与设置看着像"凭空消失"了 |
+| 安全 | `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`；CSP 由 `src/sdk/csp.ts` 一份、构建时注入每个包的入口 html（AP-014），允许 `blob:`（foliate 用 blob iframe 与 blob 样式表）与样式 `unsafe-inline`，脚本只 `'self'`；`airship://` 处理器只读、只到自己那一个包目录（PK-014） |
 | 外部链接 | 只放行 `http/https`，交给系统浏览器；`file://` 与自定义协议不开新窗 |
 
-命令：`just dev` 开发 · `just build` 构建 · `just dist` 出安装包 · `just verify-installer` 出包自检 · `just test` 单测 · `just casecov` 册子与用例的双向差集 · `just typecheck` 两个 tsconfig · `just shot` 逐窗口截图 · `just e2e` 真编码用例 · `just wsld-real` 真 `wslc` 只读命令。
+命令：`just new-app` 造应用 · `just build-apps` 产包 · `just compile` 编译壳 · `just build-shell` 出安装包 · `just build` 两条一起跑 · `just dev` 开发（先 build-apps） · `just verify-installer` 出包自检 · `just test` 单测 · `just casecov` 册子与用例的双向差集 · `just typecheck` 两个 tsconfig · `just shot` 逐窗口截图（先 compile + build-apps） · `just e2e` 真编码用例 · `just wsld-real` 真 `wslc` 只读命令。
 
 ---
 
@@ -439,7 +526,7 @@ export interface AppMeta {
 
 判据是"看到可观察结果"，不接受"构建成功=能用"。
 
-**册子是契约，用例是它的影子。** `docs/specs/` 一本册子管一块用户可见的东西（壳 9 本 + 共享包 2 本 + 每应用一本），
+**册子是契约，用例是它的影子。** 全库 21 本册子（壳 8 本 + 应用区 2 本：`app-model` 与 `package` + 共享包 2 本 + 六个应用 9 本），
 四档结构（Purpose / Requirement / Scenario / WHEN-THEN-AND）、稳定编号、只写可观察结果、不写实现。
 规矩与能力索引见 [specs/index.md](specs/index.md)。
 
@@ -471,13 +558,20 @@ export interface AppMeta {
 **已定（原待定项）**
 
 - 共享记录的附加信息用通用 `meta` 键值，不给单个格式开专属字段。
-- 窗口化的共享依赖：构建已自然分成"每应用一个 chunk + 一个公共 chunk（React 等）"，各窗口共用公共 chunk，不需要额外处理。实测空闲窗口 90–105 MB，见 §3.1。
+- 应用与壳**不同构建**（2026-11-07 落地）：壳的产物里只有壳与 SDK，六个应用各自是一个 `dist-apps/<id>.airship/` 包，
+  运行期被扫出来。旧的"每应用一个 chunk + 一份公共 chunk（React 等）"随构建期 glob 一起退场——
+  现在每应用各构建一次，React 各带一份，代价是包总量微升、换来的是改一个应用只重出一个包（§12）。
+  实测空闲窗口 87–104 MB（拆包前后同一档），见 §3.1。
+- 一个 id 只有一份活动包，版本写进 `manifest.json` 不写进目录名：数据目录按 id 分（`apps/<id>/data`），
+  两版并存就是共享同一个数据目录而没人仲裁 schema。要并存得是一次显式契约变更。
+- 包的文档面是 `airship://<id>/<相对路径>`，可达范围钉死在那一个包目录（PK-014）。
 
 **未尽**
 
-全部移到 [待办清单](todo.md)（TD-001 到 TD-012），这本里不再抄一份。
-其中与架构直接相关的三条：TD-001 任务栏身份还没真做到一应用一个、TD-002 阶段 C（应用与壳同仓同构建）、
-TD-009 拉取实时进度是 `proc` 缺伪终端造成的**能力缺口**而不是省事。
+全部移到 [待办清单](todo.md)（TD-001 到 TD-014），这本里不再抄一份。
+其中与架构直接相关的三条：TD-001 任务栏身份还没真做到一应用一个、
+TD-009 拉取实时进度是 `proc` 缺伪终端造成的**能力缺口**而不是省事、
+TD-013 SDK 独立发布与版本协商（拆包留下的最贵的一条：包按某个 SDK 版本构建、跑在用户机器上任意一个壳版本里）。
 
 ---
 

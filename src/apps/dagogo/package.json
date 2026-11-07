@@ -1,0 +1,15 @@
+{
+  "name": "@airship/dagogo",
+  "version": "0.3.0",
+  "private": true,
+  "description": "打勾勾：每日清单与托盘徽标",
+  "type": "module",
+  "devDependencies": {
+    "@airship/contract": "*",
+    "@airship/sdk": "*",
+    "@vitejs/plugin-react": "^6.2.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vite": "^8.3.5"
+  }
+}

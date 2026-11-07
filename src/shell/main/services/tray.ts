@@ -2,7 +2,7 @@ import { Menu, Tray, nativeImage, type NativeImage } from 'electron'
 import { join } from 'node:path'
 import { log } from './logging'
 import { sendTo } from '../windows'
-import type { TrayState } from '@shared/protocol'
+import type { TrayState } from '@airship/contract'
 
 /**
  * 托盘。

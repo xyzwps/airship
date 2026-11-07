@@ -1,4 +1,4 @@
-import type { AppApi } from '@shared/protocol'
+import type { AppApi } from '@airship/contract'
 import type { JobQueue, JobSpec } from './jobs'
 
 /**

@@ -1,4 +1,4 @@
-import type { AppMeta } from '@shared/app'
+import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
   id: 'books',

@@ -39,3 +39,8 @@
 #### Scenario: ST-007 一次拿全是副本，改它不影响壳里那份
 - **WHEN** 应用 dump 自己的设置后改返回对象
 - **THEN** 再读某个键拿到的还是壳里记的那份值
+
+#### Scenario: ST-008 装好之后第一次读写就能落进自己的目录，不看启动时刻
+- **WHEN** 壳已经跑起来了，之后才装进一个应用，它头一次读写自己的数据
+- **THEN** 读到的路径落在 `userData/apps/<id>/data`，目录不存在就当场建出来，设置文件同样可写
+- **AND** 不出现 `Cannot read properties of undefined (reading 'data')` 这类"目录表里没有它"的失败

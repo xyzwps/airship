@@ -2,10 +2,12 @@ import { app, ipcMain, type WebContents } from 'electron'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { registerIpc, readTheme } from './ipc'
+import { registerAirshipScheme, serveAirshipPackages } from './services/packageProtocol'
 import { log } from './services/logging'
 import { proc, setProcEmitter } from './services/proc'
 import { trayService } from './services/tray'
 import { toolStatus } from './services/tools'
+import { packageProblemLines, scanInstalledPackages } from './services/appRegistry'
 import { appsAvailableOn } from './services/appRegistry'
 import {
   bringLauncherToFront,
@@ -17,7 +19,7 @@ import {
   setCachedTheme,
   windowMetrics
 } from './windows'
-import type { ThemeSnapshot } from '@shared/protocol'
+import type { ThemeSnapshot } from '@airship/contract'
 
 /**
  * 飞船主进程。
@@ -27,7 +29,18 @@ import type { ThemeSnapshot } from '@shared/protocol'
  * 都等渲染侧报就绪再 capturePage——"真的跑起来看到了"才算交付。
  */
 
+// 数据目录的名字钉死为 airship：Electron 的 userData 默认取 package.json 的 name，
+// 而那个 name 现在是 @airship/shell——不钉住的话，%APPDATA%/airship 里的书架与设置
+// 会在某次升级后突然"空了"，其实是换了一个目录。这个名字是用户数据的一部分，不是包名。
+app.setName('airship')
+
 const SHOT_MODE = process.env.AIRSHIP_SHOT === '1' && process.argv.includes('--shot')
+
+/**
+ * `airship://` 的方案属性必须在 app ready 之前注册，所以这一句留在模块顶层。
+ * 处理器在 `whenReady` 里挂（Electron 要求协议注册与窗口创建都在 ready 之后）。
+ */
+registerAirshipScheme()
 
 /**
  * 截图模式用独立的 userData，且不参与单实例。
@@ -75,8 +88,28 @@ async function runShotMode(): Promise<void> {
     marks.push({ app: owner, name: String(name), ms: Date.now() - start })
   })
 
-  const waitReady = async (sender: WebContents): Promise<void> => {
-    while (!readySenders.has(sender.id)) await sleep(50)
+  /** 页面上现在写着什么——加载失败时这是唯一看得见的线索 */
+  const pagePeek = async (sender: WebContents): Promise<string> => {
+    const probe = 'document.body ? document.body.innerText.slice(0, 200) : ""'
+    try {
+      return JSON.stringify(await sender.executeJavaScript(probe))
+    } catch (e) {
+      return `读不到（${e instanceof Error ? e.message : String(e)}）`
+    }
+  }
+
+  const waitReady = async (sender: WebContents, label: string): Promise<void> => {
+    // 有界等待：加载不出来的时候必须喊出来并说出它在等哪个 URL，
+    // 静默转圈等于把一次失败变成一次看不懂的挂死
+    const deadline = Date.now() + 30_000
+    while (!readySenders.has(sender.id)) {
+      if (Date.now() > deadline) {
+        throw new Error(
+          `${label} 在 30 秒内没有报就绪。当前 URL：${sender.getURL()}；页面文本开头：${await pagePeek(sender)}`
+        )
+      }
+      await sleep(50)
+    }
   }
   const waitListener = async (appId: string): Promise<void> => {
     while (!listenersReady.has(appId)) {
@@ -95,7 +128,7 @@ async function runShotMode(): Promise<void> {
   }
 
   const launcher = createLauncher()
-  await waitReady(launcher.webContents)
+  await waitReady(launcher.webContents, "启动器")
   await sleep(1200)
   await capture(launcher.webContents, join(outDir, 'launcher.png'))
   const metrics: { label: string; workingSetKB: number }[] = [...windowMetrics()]
@@ -107,7 +140,7 @@ async function runShotMode(): Promise<void> {
 
     // 就绪信号：该窗口的应用组件 chunk 已 resolve。
     // 不能等"注册了 autotest 监听"——普通应用根本没有那个钩子，会死等。
-    await waitReady(window.webContents)
+    await waitReady(window.webContents, meta.id)
 
     if (isAutotestTarget && autotest) {
       // 自动导入要往应用里推事件，得等它把监听注册上
@@ -160,13 +193,20 @@ async function capture(sender: WebContents, file: string): Promise<void> {
 
 app.whenReady().then(() => {
   app.setAppUserModelId('dev.xyzwp.airship')
+  // 包的文档面：airship://<id>/… 只读到那一个包目录（处理器要在 ready 之后挂）
+  serveAirshipPackages()
+
+  // 扫包先于第一行日志：装了哪些、哪个包没装进来，都要能在日志里读到
+  const installed = scanInstalledPackages()
 
   log.info('shell', '启动', {
     version: app.getVersion(),
     shotMode: SHOT_MODE,
     platform: process.platform,
-    userData: app.getPath('userData')
+    userData: app.getPath('userData'),
+    装进来的应用: installed.map((p) => p.meta.id)
   })
+  for (const line of packageProblemLines()) log.warn('shell', '这个包没装进来', { reason: line })
 
   registerIpc({ shotMode: SHOT_MODE })
 
@@ -181,7 +221,13 @@ app.whenReady().then(() => {
   log.info('shell', '工具发现结果', toolStatus())
 
   if (SHOT_MODE) {
-    void runShotMode()
+    // 截图工装自己失败就必须响亮退出：挂在这儿比报错难查十倍
+    void runShotMode().catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err)
+      log.error('shell', '截图模式失败', { message })
+      console.error(`[shot] 失败：${message}`)
+      app.exit(1)
+    })
     return
   }
 

@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import * as pdfjs from 'pdfjs-dist'
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist'
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { useTheme } from '../../shell/theme'
-import type { AppApi } from '@shared/protocol'
+import { useTheme } from '@airship/sdk'
+import type { AppApi } from '@airship/contract'
 import {
   addBook,
   bookPath,
@@ -12,9 +12,9 @@ import {
   removeBook,
   setProgress,
   type BookRecord
-} from '@shared/library'
-import { useAppAutotest } from '../../shell/autotest'
-import { markPerf } from '../../shell/shot'
+} from '@airship/library'
+import { useAppAutotest } from '@airship/sdk'
+import { markPerf } from '@airship/sdk'
 import './pdf.css'
 
 /**

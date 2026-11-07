@@ -17,9 +17,9 @@ import {
   twoTags,
   unmountAll
 } from './support'
-import type { FakeAirship, StartCall, StreamCtl } from '@tests/helpers/fakeAirship'
-import type { Mount } from '@tests/helpers/mount'
-import type { ProcResult } from '@shared/protocol'
+import type { FakeAirship, StartCall, StreamCtl } from '@airship/sdk/testing'
+import type { Mount } from '@airship/sdk/testing'
+import type { ProcResult } from '@airship/contract'
 
 /**
  * IM-001 ~ IM-039：镜像页那一列，与拉取 / 删除 / 强制删除。

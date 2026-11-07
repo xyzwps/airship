@@ -1,20 +1,25 @@
 import { app } from 'electron'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { SHARED_NAMESPACES, type AppId, type SharedNamespace } from '@shared/protocol'
-import { pathEscape } from '@shared/errors'
-import { appIds } from './appRegistry'
+import { SHARED_NAMESPACES, pathEscape, type AppId, type SharedNamespace } from '@airship/contract'
 
 /**
  * 目录布局（全部在 Electron 的 userData 下）：
  *
  *   userData/
- *     settings.json                壳级设置（主题、最近应用、窗口状态、ffmpeg 路径）
+ *     settings.json                壳级设置（主题、最近应用、ffmpeg 路径）
  *     logs/airship-YYYY-MM-DD.log
  *     shared/library/              壳级共享区：books 与 pdf 共用的书库
  *     apps/<appId>/settings.json   应用私有设置
  *     apps/<appId>/data/           应用私有数据
  *     apps/<appId>/cache/          可随时整体删除重建
+ *
+ * **每个应用的目录是按 id 现算的，不是启动时的一张快照。**
+ * 这条是踩过来的：原来 `build()` 会遍历当时的注册表建一张 `apps` 表并缓存，
+ * 于是拖放装进来的应用——注册表重扫了、这张表没重扫——第一次读写自己的数据就撞在
+ * `Cannot read properties of undefined (reading 'data')` 上：格子里看得见、点得开，
+ * 一开机就读失败。目录布局只依赖 userData 根与 id，本来就不需要知道"现在有哪些应用"。
+ * 顺带也断了 `paths → appRegistry → logging → paths` 这个环。
  */
 
 interface AppDirs {
@@ -23,27 +28,12 @@ interface AppDirs {
   settings: string
 }
 
-let cached: {
-  root: string
-  logs: string
-  apps: Record<string, AppDirs>
-  shared: Record<string, string>
-} | null = null
+let cached: { root: string; logs: string; shared: Record<string, string> } | null = null
 
 function build() {
   const root = app.getPath('userData')
   const logs = join(root, 'logs')
   mkdirSync(logs, { recursive: true })
-
-  const apps: Record<string, AppDirs> = {}
-  for (const id of appIds()) {
-    const base = join(root, 'apps', id)
-    const data = join(base, 'data')
-    const cache = join(base, 'cache')
-    mkdirSync(data, { recursive: true })
-    mkdirSync(cache, { recursive: true })
-    apps[id] = { data, cache, settings: join(base, 'settings.json') }
-  }
 
   const shared: Record<string, string> = {}
   for (const ns of SHARED_NAMESPACES) {
@@ -52,7 +42,7 @@ function build() {
     shared[ns] = dir
   }
 
-  return { root, logs, apps, shared }
+  return { root, logs, shared }
 }
 
 export function paths() {
@@ -60,16 +50,26 @@ export function paths() {
   return cached
 }
 
+/** 这个应用的三个目录；不存在就地建。所以"什么时候装的包"不影响它能不能用 */
+function dirsFor(id: AppId): AppDirs {
+  const base = join(paths().root, 'apps', id)
+  const data = join(base, 'data')
+  const cache = join(base, 'cache')
+  mkdirSync(data, { recursive: true })
+  mkdirSync(cache, { recursive: true })
+  return { data, cache, settings: join(base, 'settings.json') }
+}
+
 export function appDataDir(id: AppId): string {
-  return paths().apps[id]!.data
+  return dirsFor(id).data
 }
 
 export function appCacheDir(id: AppId): string {
-  return paths().apps[id]!.cache
+  return dirsFor(id).cache
 }
 
 export function appSettingsFile(id: AppId): string {
-  return paths().apps[id]!.settings
+  return dirsFor(id).settings
 }
 
 export function sharedDir(ns: SharedNamespace): string {

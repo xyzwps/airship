@@ -1,7 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Launcher } from '../shell/Launcher'
-import './styles.css'
+import { Launcher } from './Launcher'
+import '@airship/sdk/styles.css'
+import './launcher.css'
 
 const container = document.getElementById('root')
 if (!container) throw new Error('#root 不存在，检查 launcher.html')

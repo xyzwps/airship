@@ -109,4 +109,32 @@ describe('连续写与副本', () => {
     dump['keep'] = '被外面改了'
     expect(settings.get('vcp', 'keep', '?')).toBe('原值')
   })
+
+  /**
+   * ST-008：装好之后第一次读写就能落进自己的目录。
+   *
+   * 这条钉的是 paths.ts 不许再把"当前有哪些应用"缓存成一张启动时的快照——
+   * 拖放装包会重扫注册表，那张缓存不会跟着变，于是新装的应用一读写就撞
+   * undefined (reading 'data')（2026-11-07 真机撞过，每个应用都中招）。
+   * 这里故意用一个注册表从来没见过的 id：老实现拿不到目录，新实现当场建出来。
+   */
+  it('ST-008 壳跑起来之后才装的应用，第一次读写就有自己的目录', async () => {
+    const late = 'late-installed'
+    resetDisk(late)
+    const { paths, appDataDir, appCacheDir, appSettingsFile } = await import('../main/services/paths')
+    // 先把缓存打出来：这一步模拟"壳刚启动、还不知道有这个应用"的那一刻
+    const before = paths()
+    expect(before.shared['library'], '共享区照旧在').toBeTruthy()
+
+    const data = appDataDir(late)
+    expect(data).toBe(join(before.root, 'apps', late, 'data'))
+    expect(existsSync(data), '目录要当场建出来').toBe(true)
+    expect(existsSync(appCacheDir(late)), 'cache 同理').toBe(true)
+
+    settings.set(late, 'first', '装好之后写的第一笔')
+    expect(settings.get(late, 'first', '?')).toBe('装好之后写的第一笔')
+    expect(existsSync(appSettingsFile(late)), '设置文件落在它自己那份上').toBe(true)
+    // 第二次拿同一个 id 还是同一条路径：现算不等于每次换地方
+    expect(appDataDir(late)).toBe(data)
+  })
 })

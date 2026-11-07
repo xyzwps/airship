@@ -1,0 +1,21 @@
+{
+  "name": "@airship/sdk",
+  "version": "0.3.0",
+  "private": true,
+  "description": "airship 应用面向的那一面：宿主、观感、CSP、工装钩子与测试替身",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./testing": "./testing.ts",
+    "./styles.css": "./styles/airship.css",
+    "./vite": "./cspPlugin.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  }
+}

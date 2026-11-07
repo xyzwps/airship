@@ -1,14 +1,14 @@
 import { BrowserWindow, app } from 'electron'
 import { join } from 'node:path'
-import { APP_MAP, unavailableReason } from './services/appRegistry'
-import { platformIdOf } from '@shared/protocol'
-import { notRegistered, platformUnsupported } from '@shared/errors'
+import { packageFor, unavailableReason } from './services/appRegistry'
+import { platformIdOf } from '@airship/contract'
+import { notRegistered, platformUnsupported } from '@airship/contract'
 import { targetsFor, type WindowRef } from './services/routing'
 import { WindowLedger, appUserModelIdFor, defaultSizeFor } from './services/windowLedger'
 import { log } from './services/logging'
 import { proc } from './services/proc'
 import { trayService } from './services/tray'
-import type { ShellEvent, ThemeSnapshot } from '@shared/protocol'
+import type { ShellEvent, ThemeSnapshot } from '@airship/contract'
 
 /**
  * 窗口管理：一个启动器窗口 + 每个应用一个独立窗口。
@@ -21,6 +21,9 @@ import type { ShellEvent, ThemeSnapshot } from '@shared/protocol'
  *
  * "哪个应用现在有活窗口"这件事由 services/windowLedger.ts 那份纯逻辑管，
  * 这里只负责把它接到 BrowserWindow 上。
+ *
+ * 应用窗口加载的是**那个包自己的入口文档**（`airship://<id>/index.html`），
+ * 不再是壳里的一个 html：壳的产物里没有任何应用代码，窗口之间只剩这条 preload 接缝。
  */
 
 export type Owner = string | 'shell'
@@ -59,19 +62,29 @@ export function currentPlatform(): ReturnType<typeof platformIdOf> {
   return platformIdOf(process.platform)
 }
 
-/** 渲染根是 src/，两个 html 在 shell/ 下，产物也带这一层目录 */
+/** 壳自己的渲染产物住在 out/renderer/shell/ 下（launcher 一份，没有别的） */
 const RENDERER_ENTRY_DIR = 'shell'
 
-function loadEntry(window: BrowserWindow, entry: 'launcher' | 'app', query?: Record<string, string>): void {
+function loadLauncher(window: BrowserWindow): void {
   const devUrl = process.env.ELECTRON_RENDERER_URL
-  const search = query ? `?${new URLSearchParams(query).toString()}` : ''
   if (devUrl) {
-    void window.loadURL(`${devUrl}/${RENDERER_ENTRY_DIR}/${entry}.html${search}`)
+    void window.loadURL(`${devUrl}/${RENDERER_ENTRY_DIR}/launcher.html`)
     return
   }
-  void window.loadFile(join(__dirname, `../renderer/${RENDERER_ENTRY_DIR}/${entry}.html`), {
-    search: search.replace(/^\?/, '')
-  })
+  void window.loadFile(join(__dirname, `../renderer/${RENDERER_ENTRY_DIR}/launcher.html`))
+}
+
+/**
+ * 应用窗口加载的是包自己的入口文档。
+ *
+ * dev 与产包只在这一处不同：dev 走 vite dev server（源码那一份，热更才有效），
+ * 产包走 `airship://<id>/<entry>`（那一份在包根，由 `packageProtocol.ts` 供）。
+ * preload 注入的身份两边完全一样——`--airship-app=<id>` 跟文档来源无关。
+ */
+function loadPackageEntry(window: BrowserWindow, id: string, entryUrl: string): void {
+  const devUrl = process.env.ELECTRON_RENDERER_URL
+  const target = devUrl ? `${devUrl}/apps/${id}/index.html` : entryUrl
+  void window.loadURL(target)
 }
 
 function wireWindow(window: BrowserWindow, owner: Owner, title: string): void {
@@ -105,6 +118,20 @@ function wireWindow(window: BrowserWindow, owner: Owner, title: string): void {
   window.webContents.on('console-message', (_e, _level, message) => {
     if (message.startsWith('[airship-dbg]')) log.info(String(owner), message)
   })
+
+  /**
+   * 截图模式把渲染侧的声音全记下：加载中卡住时，唯一看得见的线索就在这边。
+   * 正常启动不挂这些监听——渲染侧的 console 不该往壳的日志里灌。
+   */
+  if (process.env.AIRSHIP_SHOT === '1') {
+    const tag = String(owner)
+    window.webContents.on('console-message', (_e, level, message, line, source) => {
+      log.warn(tag, `渲染侧 console（档 ${level}）：${message} @ ${source}:${line}`)
+    })
+    window.webContents.on('did-fail-load', (_e, code, description, validatedUrl, isMainFrame) => {
+      log.error(tag, `加载失败 ${code} ${description}：${validatedUrl}（主框架 ${isMainFrame}）`)
+    })
+  }
 }
 
 export function createLauncher(): BrowserWindow {
@@ -126,14 +153,15 @@ export function createLauncher(): BrowserWindow {
 
   launcher = window
   wireWindow(window, 'shell', '飞船')
-  loadEntry(window, 'launcher')
+  loadLauncher(window)
   return window
 }
 
 /** 打开（或聚焦）某应用的独立窗口 */
 export function openAppWindow(appId: string): BrowserWindow {
-  const meta = APP_MAP.get(appId)
-  if (!meta) throw new Error(notRegistered(appId))
+  const pkg = packageFor(appId)
+  if (!pkg) throw new Error(notRegistered(appId))
+  const meta = pkg.meta
 
   // 清单里声明了只跑在某些平台的应用，在这台机器上根本不开窗口
   const blocked = unavailableReason(appId, currentPlatform())
@@ -168,7 +196,7 @@ export function openAppWindow(appId: string): BrowserWindow {
 
   appWindows.set(appId, window)
   wireWindow(window, appId, meta.name)
-  loadEntry(window, 'app', { app: appId })
+  loadPackageEntry(window, appId, pkg.entryUrl)
   log.info(appId, '应用窗口已打开')
   return window
 }
@@ -245,13 +273,13 @@ export function windowMetrics(): { label: string; workingSetKB: number }[] {
 
   if (launcher && !launcher.isDestroyed()) push('启动器', launcher.webContents.getOSProcessId())
   for (const [id, window] of appWindows) {
-    if (!window.isDestroyed()) push(APP_MAP.get(id)?.name ?? id, window.webContents.getOSProcessId())
+    if (!window.isDestroyed()) push(packageFor(id)?.meta.name ?? id, window.webContents.getOSProcessId())
   }
   return out
 }
 
 export function isRegistered(appId: string): boolean {
-  return APP_MAP.has(appId)
+  return packageFor(appId) !== null
 }
 
 export function themeSnapshotCache(): ThemeSnapshot | null {

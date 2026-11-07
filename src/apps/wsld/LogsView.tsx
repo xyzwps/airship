@@ -11,7 +11,7 @@ import {
 import { cleanWslcError, errorMessage, prettyLine, prepareLogLines } from './parse'
 import { clockOfDay } from './model'
 import { useShellEvents } from './hooks'
-import type { ProcResult } from '@shared/protocol'
+import type { ProcResult } from '@airship/contract'
 
 /**
  * 容器详情的「日志」页签：两种读法各发各的命令，各有一份文本。

@@ -1,4 +1,4 @@
-import type { AppApi } from '@shared/protocol'
+import type { AppApi } from '@airship/contract'
 
 /**
  * 把壳的范围读包装成 foliate-js 需要的 File-like。

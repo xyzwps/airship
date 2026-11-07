@@ -6,7 +6,7 @@
 
 正文是《金刚经》（姚秦鸠摩罗什译本）的**节选**，只取开篇与几段人人认得的四句偈，
 不是全本；这个文件的用途是测试样本，别当经文读。
-封面图直接用仓库里真实的 assets/icon.png——不自己画图。
+封面图直接用仓库里真实的 src/shell/assets/icon.png——不自己画图。
 
 用法：python code/make-jingang-epub.py
 产物：src/apps/books/tests/fixtures/金刚经.epub
@@ -18,7 +18,7 @@ import zipfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(REPO, 'src', 'apps', 'books', 'tests', 'fixtures', '金刚经.epub')
-COVER = os.path.join(REPO, 'assets', 'icon.png')
+COVER = os.path.join(REPO, 'src', 'shell', 'assets', 'icon.png')
 
 BOOK_ID = 'urn:uuid:6b9d2f4a-1f0e-4c1a-9d3b-0d6e2f7a1b55'
 TITLE = '金刚经（测试节选）'

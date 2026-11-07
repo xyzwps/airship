@@ -17,9 +17,9 @@ import {
   unmountAll,
   askConfirm
 } from './support'
-import type { FakeAirship, StartCall, StreamCtl } from '@tests/helpers/fakeAirship'
-import type { Mount } from '@tests/helpers/mount'
-import type { ProcResult } from '@shared/protocol'
+import type { FakeAirship, StartCall, StreamCtl } from '@airship/sdk/testing'
+import type { Mount } from '@airship/sdk/testing'
+import type { ProcResult } from '@airship/contract'
 
 /**
  * WL-001 ~ WL-028：容器详情的「日志」那一档。

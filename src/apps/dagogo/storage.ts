@@ -1,4 +1,4 @@
-import type { AppApi } from '@shared/protocol'
+import type { AppApi } from '@airship/contract'
 import { formatFileStamp } from './time'
 import { isTask, normalizeImportedTasks, type ExportFile, type Task, type TaskFile } from './types'
 

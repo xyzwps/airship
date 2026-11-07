@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { act } from 'react'
-import { FakeAirship, type StartCall, type StreamCtl } from '@tests/helpers/fakeAirship'
-import { mountUi, type Mount } from '@tests/helpers/mount'
-import VcpApp from '@apps/vcp/VcpApp'
-import { placeCard } from '@apps/vcp/HelpTip'
-import { ACODECS, HELP, VCODECS, type HelpKey } from '@apps/vcp/help'
-import type { AppApi, ShellEventListener } from '@shared/protocol'
+import { FakeAirship, type StartCall, type StreamCtl } from '@airship/sdk/testing'
+import { mountUi, type Mount } from '@airship/sdk/testing'
+import VcpApp from '../VcpApp'
+import { placeCard } from '../HelpTip'
+import { ACODECS, HELP, VCODECS, type HelpKey } from '../help'
+import type { AppApi, ShellEventListener } from '@airship/contract'
 
 /**
  * VC 册子（src/apps/vcp/specs/vcp.md）里"界面看得见什么"那几条：真挂载、真点、真喂输出流。
@@ -338,7 +338,7 @@ describe('命令、检查与修正都在同一屏上', () => {
     const cmd = command(m)
 
     await m.press('复制命令')
-    expect(fake.clipboard).toBe(cmd)
+    expect(fake.clipboardText).toBe(cmd)
     expect(m.text()).toContain('已复制')
     m.unmount()
   })

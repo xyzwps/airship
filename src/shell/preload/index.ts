@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AirshipBridge,
   AppId,
@@ -12,7 +12,7 @@ import type {
   ShellEventListener,
   TrayState,
   ToolName
-} from '@shared/protocol'
+} from '@airship/contract'
 
 /**
  * preload —— 壳暴露给渲染进程的唯一入口。
@@ -169,8 +169,17 @@ contextBridge.exposeInMainWorld('airship', bridge)
 
 if (IS_SHELL) {
   const shellBridge: ShellBridge = {
+    apps: () => call('launcher:apps'),
     openApp: (id: string) => call('launcher:openApp', id),
     openApps: () => call('launcher:openApps'),
+    /**
+     * 拖放装包：File → 真实路径只有 preload 办得到（`webUtils.getPathForFile`）。
+     * 渲染侧从此拿不到绝对路径，也拿不到 ipcRenderer——它递过来的是一个 File，
+     * 主进程收到的是这一条通道换出来的那一个字符串。
+     */
+    inspectPackage: (file: File) => call('launcher:inspectPackage', webUtils.getPathForFile(file)),
+    installPackage: (file: File, overwrite: boolean) =>
+      call('launcher:installPackage', webUtils.getPathForFile(file), overwrite),
     setTheme: (mode, resolvedHint) => call('launcher:setTheme', mode, resolvedHint),
     theme: () => call('theme:get'),
     settings: {

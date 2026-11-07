@@ -1,0 +1,16 @@
+{
+  "name": "@airship/library",
+  "version": "0.3.0",
+  "private": true,
+  "description": "壳托管的共享书库：索引、导入判重、封面、进度（墨读与 PDF 共用一份）",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@airship/contract": "*"
+  },
+  "devDependencies": {
+    "@airship/contract": "*"
+  }
+}

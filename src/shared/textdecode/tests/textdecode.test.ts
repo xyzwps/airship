@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeText } from '@shared/textdecode'
+import { decodeText } from '@airship/textdecode'
 
 /**
  * TD 册子（docs/specs/textdecode.md）里那三条"没有 BOM 就露馅"的场景。

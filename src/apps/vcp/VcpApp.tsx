@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type JSX } from 'react'
-import type { AppApi } from '@shared/protocol'
-import { useAppAutotest } from '../../shell/autotest'
-import { markPerf } from '../../shell/shot'
+import type { AppApi } from '@airship/contract'
+import { useAppAutotest } from '@airship/sdk'
+import { markPerf } from '@airship/sdk'
 import { Help } from './HelpTip'
 import { ACODECS, VCODECS } from './help'
 import { build, checks, display, levelReason, scaleSwitchReason, swapExt, syncOutPath, usableLevels, type Fix, type Note } from './command'
@@ -16,7 +16,7 @@ import {
   type JobSpec
 } from './jobs'
 import { parseProbe, subSnippet } from './probe'
-import { decodeText } from '@shared/textdecode'
+import { decodeText } from '@airship/textdecode'
 import { Runner } from './runner'
 import {
   createState,

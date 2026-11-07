@@ -15,7 +15,7 @@ import {
   twoContainers,
   unmountAll
 } from './support'
-import type { Mount } from '@tests/helpers/mount'
+import type { Mount } from '@airship/sdk/testing'
 
 /**
  * CL-001 ~ CL-027：容器页那一列容器，与点一行之后右边那块详情。

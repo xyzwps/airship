@@ -10,8 +10,8 @@ import {
   saveBooks,
   setProgress,
   type BookRecord
-} from '@shared/library'
-import { FakeAirship } from '@tests/helpers/fakeAirship'
+} from '@airship/library'
+import { FakeAirship } from '@airship/sdk/testing'
 
 /**
  * LB 册子（docs/specs/library.md）。
@@ -26,11 +26,15 @@ const INDEX = `${SHARED}/library.json`
 /**
  * 应用窗口那条 CSP 里 `img-src` 明确允许的图片来源。
  * 封面能不能画出来由它决定，所以这条契约要对着真策略判，不是对着记忆判。
+ *
+ * 策略的唯一真源是 `src/sdk/csp.ts`：它由 cspPlugin 在构建时注入每个包的入口 html，
+ * 所以"读产线上的那一条"就是读这一份（`AIRSHIP_CSP_DEV` 是 dev 专用的那一条，排在后面，
+ * `exec` 取到的第一条正是收紧的产线版）。
  */
 function appImgSchemes(): string[] {
-  const html = readFileSync(join(__dirname, '..', '..', '..', 'shell', 'app.html'), 'utf8')
-  const m = /img-src\s+([^;]+);/.exec(html.replace(/\s+/g, ' '))
-  if (!m) throw new Error('src/shell/app.html 里找不到 img-src，这条判据没依据了')
+  const html = readFileSync(join(__dirname, '..', '..', '..', 'sdk', 'csp.ts'), 'utf8').replace(/\s+/g, ' ')
+  const m = /img-src\s+([^;]+);/.exec(html)
+  if (!m) throw new Error('src/sdk/csp.ts 里找不到 img-src，这条判据没依据了')
   return m[1]!
     .split(/\s+/)
     .filter((s) => s !== "'self'")

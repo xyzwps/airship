@@ -1,5 +1,5 @@
-import type { AppId } from '@shared/protocol'
-import { readDenied, writeDenied } from '@shared/errors'
+import type { AppId } from '@airship/contract'
+import { readDenied, writeDenied } from '@airship/contract'
 import { sharedNamespacesOf } from './appRegistry'
 import { appCacheDir, appDataDir, isInside, sharedDirsFor } from './paths'
 import { log } from './logging'

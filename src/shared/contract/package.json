@@ -1,0 +1,10 @@
+{
+  "name": "@airship/contract",
+  "version": "0.3.0",
+  "private": true,
+  "description": "壳与应用之间的契约：能力表、清单类型、拒绝措辞、注册与包形状的规矩",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  }
+}

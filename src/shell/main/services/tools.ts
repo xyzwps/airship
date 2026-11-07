@@ -3,8 +3,8 @@ import { delimiter, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { settings } from './settings'
 import { log } from './logging'
-import { toolNotVerified } from '@shared/errors'
-import { TOOL_NAMES, type ToolName } from '@shared/protocol'
+import { toolNotVerified } from '@airship/contract'
+import { TOOL_NAMES, type ToolName } from '@airship/contract'
 
 /**
  * 外部工具发现与可执行文件白名单。

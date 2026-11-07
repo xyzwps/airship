@@ -1,4 +1,4 @@
-import { IconButton } from '@shell/IconButton'
+import { IconButton } from '@airship/sdk'
 import { Fragment, useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import {
   containerActionArgs,

@@ -1,8 +1,8 @@
 """从母版图重出壳用的图标尺寸，并顺手把主色取出来给标题栏那颗品牌图形用。
 
 用法：python code/make-icons.py
-输入：assets/icon-master.png（用户给的 800×800 母版）
-产物：assets/icon.png（256×256，窗口图标）、assets/tray.png（16×16，托盘默认图标）
+输入：src/shell/assets/icon-master.png（用户给的 800×800 母版）
+产物：src/shell/assets/icon.png（256×256，窗口图标）、src/shell/assets/tray.png（16×16，托盘默认图标）
 """
 
 import io
@@ -11,7 +11,7 @@ import os
 from PIL import Image
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MASTER = os.path.join(REPO, 'assets', 'icon-master.png')
+MASTER = os.path.join(REPO, 'src', 'shell', 'assets', 'icon-master.png')
 
 
 def center_square(im: Image.Image) -> Image.Image:
@@ -28,10 +28,10 @@ def main() -> None:
     print('母版', src.size)
 
     # 窗口图标：256 够任务栏与 Alt-Tab 用，Electron 自己会再缩
-    src.resize((256, 256), Image.LANCZOS).save(os.path.join(REPO, 'assets', 'icon.png'), optimize=True)
+    src.resize((256, 256), Image.LANCZOS).save(os.path.join(REPO, 'src', 'shell', 'assets', 'icon.png'), optimize=True)
 
     # 托盘 16×16：先盒式缩小（保留四块色的存在感），再转最近邻避免糊成一团灰
-    src.resize((16, 16), Image.BOX).save(os.path.join(REPO, 'assets', 'tray.png'), optimize=True)
+    src.resize((16, 16), Image.BOX).save(os.path.join(REPO, 'src', 'shell', 'assets', 'tray.png'), optimize=True)
 
     # 取四个象限的主色，给标题栏那颗 SVG 当常量
     big = src.resize((200, 200), Image.LANCZOS)
@@ -46,7 +46,7 @@ def main() -> None:
         r, g, b, _ = big.getpixel(xy)
         print(f'  {name}: #{r:02x}{g:02x}{b:02x}')
 
-    for f in ('assets/icon.png', 'assets/tray.png'):
+    for f in ('src/shell/src/shell/assets/icon.png', 'src/shell/src/shell/assets/tray.png'):
         p = os.path.join(REPO, f)
         i = Image.open(p)
         print(f, i.size, os.path.getsize(p), '字节')

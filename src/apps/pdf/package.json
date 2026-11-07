@@ -1,0 +1,17 @@
+{
+  "name": "@airship/pdf",
+  "version": "0.3.0",
+  "private": true,
+  "description": "PDF：与墨读共用书架的 PDF 阅读",
+  "type": "module",
+  "devDependencies": {
+    "@airship/contract": "*",
+    "@airship/library": "*",
+    "@airship/sdk": "*",
+    "@vitejs/plugin-react": "^6.2.1",
+    "pdfjs-dist": "^6.5.438",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vite": "^8.3.5"
+  }
+}

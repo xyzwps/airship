@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
-import { FakeAirship } from '@tests/helpers/fakeAirship'
-import { mountUi, type Mount } from '@tests/helpers/mount'
-import DagogoApp from '@apps/dagogo/DagogoApp'
-import { isToday } from '@apps/dagogo/time'
-import { normalizeImportedTasks } from '@apps/dagogo/types'
-import { loadTasks } from '@apps/dagogo/storage'
-import type { Task } from '@apps/dagogo/types'
+import { FakeAirship } from '@airship/sdk/testing'
+import { mountUi, type Mount } from '@airship/sdk/testing'
+import DagogoApp from '../DagogoApp'
+import { isToday } from '../time'
+import { normalizeImportedTasks } from '../types'
+import { loadTasks } from '../storage'
+import type { Task } from '../types'
 
 /**
  * DG 册子（docs/specs/dagogo.md）。
@@ -19,7 +19,9 @@ import type { Task } from '@apps/dagogo/types'
  * 所以只把它换成一张假图，断言仍落在壳收到的 `tray.set` 入参上。
  */
 
-vi.mock('@shell/trayIcon', () => ({
+vi.mock('@airship/sdk', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@airship/sdk')>()),
+  // 只替这一颗：jsdom 没有 2D 上下文，图上的字归 just shot
   renderTrayIcon: async (text: string): Promise<string> => `data:image/png;base64,FAKE${text}`
 }))
 

@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>显示名</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      这里不写 CSP：那一条由 @airship/sdk 在构建时注入（src/sdk/csp.ts 是唯一真源）。
+      六个应用各抄一条权限字符串，就会有第六个版本悄悄少一个 worker-src。
+    -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- 必须是相对路径：dev 时这份文档在 /apps/CHANGE_ME/ 下，产包后在 airship://CHANGE_ME/ 下 -->
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

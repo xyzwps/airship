@@ -47,6 +47,21 @@ function sources(dir: string, exts = ['.ts', '.tsx']): string[] {
   return out
 }
 
+// 仓库根（src 的上一层）：包声明与构建工装都在这一层看
+const REPO = join(__dirname, '..', '..', '..')
+const ROOT = REPO
+
+/** 一棵目录下的全部源码文件（含测试工装自己） */
+function files(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    if (name === 'node_modules' || name === 'out' || name === '.tmp') continue
+    const p = join(dir, name)
+    if (statSync(p).isDirectory()) files(p, out)
+    else if (/.(ts|tsx|mjs|mts)$/.test(name)) out.push(p)
+  }
+  return out
+}
+
 /** 只取某目录顶层的文件（壳的渲染侧代码就在 src/shell 顶层） */
 function topLevelSources(dir: string): string[] {
   if (!existsSync(dir)) return []
@@ -82,23 +97,58 @@ function resolveSpec(file: string, spec: string): string | null {
 const srcPosix = (p: string): string => p.replace(/\\/g, '/')
 const APPS_P = srcPosix(APPS_DIR)
 const SHARED_P = srcPosix(SHARED_DIR)
+const SHELL_P = srcPosix(SHELL_DIR)
 
-/** 说明符指向哪个应用目录（相对或 @apps 别名都算） */
+/**
+ * 包名 → 目录。npm workspaces 之后，边界不再只写在注释里：
+ * 引 `@airship/<包>` 就是引那个包，摸它的内部文件要么被 exports 挡掉，要么被这里挡掉。
+ */
+const APP_NAMES = new Set(discoveredAppIds().map((id) => `@airship/${id}`))
+/** 允许被外部摸到内部路径的导出（SDK 的两个子入口） */
+// SDK 的三个公开子入口：测试替身、基线样式、给构建配置用的 CSP 注入插件
+const ALLOWED_SUBPATHS = ['@airship/sdk/testing', '@airship/sdk/styles.css', '@airship/sdk/vite']
+
+/** 说明符指向哪个应用包（npm 名或相对路径都算） */
 function appTarget(file: string, spec: string): string | null {
-  if (spec.startsWith('@apps/')) return spec.slice('@apps/'.length).split('/')[0] ?? null
+  if (spec.startsWith('@airship/')) {
+    const name = spec.slice('@airship/'.length).split('/')[0]!
+    return APP_NAMES.has(`@airship/${name}`) ? name : null
+  }
   const resolved = resolveSpec(file, spec)
   if (!resolved || !resolved.startsWith(APPS_P + '/')) return null
   return resolved.slice(APPS_P.length + 1).split('/')[0] ?? null
 }
 
+/** 说明符指向哪个区（shell / sdk / shared / apps / 其他） */
+function areaTarget(file: string, spec: string): string | null {
+  if (spec.startsWith('@airship/shell')) return 'shell'
+  if (spec.startsWith('@airship/sdk')) return 'sdk'
+  if (spec.startsWith('@airship/contract') || spec.startsWith('@airship/library') || spec.startsWith('@airship/textdecode'))
+    return 'shared'
+  const resolved = resolveSpec(file, spec)
+  if (!resolved) return null
+  if (resolved.startsWith(SHELL_P + '/')) return 'shell'
+  if (resolved.startsWith(srcPosix(join(SRC, 'sdk')) + '/')) return 'sdk'
+  if (resolved.startsWith(SHARED_P + '/')) return 'shared'
+  return null
+}
+
 describe('应用注册', () => {
-  it('每个应用目录都有 app.ts 与 index.tsx，且 id 与目录名一致', () => {
+  it('每个应用目录都有 app.ts、index.html、main.tsx 与一张图标，且 id 与目录名一致', () => {
     const dirs = readdirSync(APPS_DIR).filter(
       (n) => statSync(join(APPS_DIR, n)).isDirectory() && n !== 'specs' && n !== 'tests'
     )
     for (const dir of dirs) {
       expect(existsSync(join(APPS_DIR, dir, 'app.ts')), `${dir}/app.ts 必须存在`).toBe(true)
-      expect(existsSync(join(APPS_DIR, dir, 'index.tsx')), `${dir}/index.tsx 必须存在`).toBe(true)
+      // 包自持：入口文档与装组件的那份脚本各一份，缺一样这个包就开不出窗口
+      expect(existsSync(join(APPS_DIR, dir, 'index.html')), `${dir}/index.html 必须存在`).toBe(true)
+      expect(existsSync(join(APPS_DIR, dir, 'main.tsx')), `${dir}/main.tsx 必须存在`).toBe(true)
+      // CSP 由 src/sdk/csp.ts 在构建时注入，应用不许自己抄一条
+      const html = readFileSync(join(APPS_DIR, dir, 'index.html'), 'utf8')
+      expect(html, `${dir}/index.html 里不许自己写 CSP`).not.toMatch(/Content-Security-Policy/)
+      expect(html, `${dir}/index.html 的入口脚本必须是相对路径（dev 与包里指的不是同一层）`).toContain(
+        'src="./main.tsx"'
+      )
       // 图标是文件约定：apps/<id>/icon.svg|png|jpg|jpeg|webp，而且只能有一张
       const icons = readdirSync(join(APPS_DIR, dir)).filter((n) => /^icon\.(svg|png|jpe?g|webp)$/.test(n))
       expect(icons.length, `${dir}/ 必须有且只有一张 icon.* 文件`).toBe(1)
@@ -109,6 +159,89 @@ describe('应用注册', () => {
 
   it('至少发现到一个应用（glob 路径写错时不至于静默发现零个）', () => {
     expect(discoveredAppIds().length).toBeGreaterThan(0)
+  })
+})
+
+describe('应用只引 SDK 与契约层（§4 / I-6）', () => {
+  /**
+   * AP-013：包要能被装进另一份壳里跑，所以应用与 SDK 都不许直连壳的实现。
+   *
+   * SDK 与 `@shared` 是应用能看到的全部：SDK 给宿主与观感，`@shared` 给契约与共享包。
+   * 一旦应用直连 `src/shell/**`，"包自持"就是假的——那份包再也离不开这个仓库。
+   */
+  it('AP-013 应用不 import 壳的实现，SDK 也不 import 壳或应用', () => {
+    const violations: string[] = []
+    const scanned = [
+      ...sources(APPS_DIR),
+      ...sources(join(SRC, 'sdk')),
+      ...topLevelSources(SHELL_DIR).filter((f) => !/\.html$/.test(f))
+    ]
+    for (const file of scanned) {
+      const ownArea = srcPosix(file).slice(SRC.length + 1).split('/')[0]
+      for (const spec of importSpecifiers(file)) {
+        // 壳的渲染侧顶层文件（Launcher 等）引 SDK 是允许的；SDK 与 apps 反过来引壳不行
+        const hitsShell = areaTarget(file, spec) === 'shell'
+        const sdkIntoApps = ownArea === 'sdk' && appTarget(file, spec) !== null
+        const fromAppOrSdk = ownArea === 'apps' || ownArea === 'sdk'
+        if ((fromAppOrSdk && hitsShell) || sdkIntoApps) violations.push(`${srcPosix(file)} → ${spec}`)
+      }
+    }
+    expect(violations, `应用与 SDK 不许直连壳：\n${violations.join('\n')}`).toEqual([])
+  })
+
+  /**
+   * AP-016：每个包都用自己的 package.json 说话。
+   *
+   * 外部作者复制一个应用目录出去，靠的就是这几份文件——它们不在，"范本"就只是这个仓库里的一个目录。
+   */
+  it('AP-016 每个区都是真包：package.json 在，名字带 @airship 前缀', () => {
+    const expected = [
+      join(SRC, 'shell', 'package.json'),
+      join(SRC, 'sdk', 'package.json'),
+      join(SRC, 'shared', 'contract', 'package.json'),
+      join(SRC, 'shared', 'library', 'package.json'),
+      join(SRC, 'shared', 'textdecode', 'package.json'),
+      ...discoveredAppIds().map((id) => join(APPS_DIR, id, 'package.json'))
+    ]
+    for (const file of expected) {
+      expect(existsSync(file), `${file.replace(ROOT + '\\', '')} 必须存在`).toBe(true)
+      const pkg = JSON.parse(readFileSync(file, 'utf8')) as { name?: string; private?: boolean }
+      expect(pkg.name, `${file} 的 name 要带作用域前缀`).toMatch(/^@airship\//)
+      // 这个仓库还没往任何 registry 发东西：每一个包都得是 private，写错就会误发
+      expect(pkg.private, `${file} 得是 private`).toBe(true)
+    }
+    // 根只声明 workspaces，不带 scripts（命令的唯一真源是 justfile）
+    const root = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')) as {
+      scripts?: Record<string, string>
+      workspaces?: string[]
+      dependencies?: Record<string, string>
+    }
+    expect(root.scripts, '根 package.json 不许有 scripts').toBeUndefined()
+    expect(root.workspaces, '根要声明 workspaces').toContain('src/apps/*')
+  })
+
+  /**
+   * AP-014：CSP 只有一份，写在 `src/sdk/csp.ts`，构建时注入每个包的入口文档。
+   *
+   * 六个应用各抄一条权限字符串，就会有第六个版本悄悄少一个 `worker-src`；
+   * 注入器还顺手把"应用自己写了 CSP"当成错误抛出来，所以这条路不会被动破。
+   */
+  it('AP-014 CSP 的唯一真源在 SDK，应用入口 html 里没有那一条', () => {
+    const cspSource = readFileSync(join(SRC, 'sdk', 'csp.ts'), 'utf8')
+    expect(cspSource, '产线那条 CSP 必须存在').toMatch(/export const AIRSHIP_CSP/)
+    expect(cspSource, 'dev 那条要单独一份：react-refresh 的内联前言过不了 script-src 自检').toMatch(
+      /export const AIRSHIP_CSP_DEV/
+    )
+
+    const injector = readFileSync(join(SRC, 'sdk', 'cspPlugin.ts'), 'utf8')
+    expect(injector, '注入器要按命令选策略：build 用收紧的那条，dev 用带 localhost 的那条').toMatch(
+      /ctx\.bundle \? AIRSHIP_CSP : AIRSHIP_CSP_DEV/
+    )
+
+    for (const dir of discoveredAppIds()) {
+      const html = readFileSync(join(APPS_DIR, dir, 'index.html'), 'utf8')
+      expect(html, `src/apps/${dir}/index.html 里不许自己写 CSP`).not.toMatch(/Content-Security-Policy/)
+    }
   })
 })
 
@@ -129,51 +262,61 @@ describe('依赖方向（§4 / I-1）', () => {
   it('共享包不 import 应用，也不 import 壳（共享在依赖图最下层）', () => {
     const violations: string[] = []
     for (const file of sources(SHARED_DIR)) {
+      const ownPkg = srcPosix(file).slice(SHARED_P.length + 1).split('/')[0]
       for (const spec of importSpecifiers(file)) {
+        const intoApp = appTarget(file, spec) !== null
+        const intoShell = areaTarget(file, spec) === 'shell'
+        // 相对路径跨出自己的包目录就算绕过（'../contract' 也不行——那是另一个包，要用包名引）
         const resolved = resolveSpec(file, spec)
-        const escapes =
-          (resolved && !resolved.startsWith(SHARED_P + '/')) ||
-          spec.startsWith('@apps') ||
-          spec.startsWith('@shell')
-        if (escapes) violations.push(`${srcPosix(file)} → ${spec}`)
+        const ownPkgDir = `${SHARED_P}/${ownPkg}`
+        const relativeEscape = resolved !== null && !resolved.startsWith(ownPkgDir + '/') && !resolved.startsWith(SHARED_P + '/contract')
+        const namedIntoSharedDeep = /^@airship\/(contract|library|textdecode)\//.test(spec)
+        if (intoApp || intoShell || relativeEscape || namedIntoSharedDeep) violations.push(`${srcPosix(file)} → ${spec}`)
       }
     }
-    expect(violations, `共享包只能依赖契约层，不许反向依赖应用或壳：\n${violations.join('\n')}`).toEqual([])
+    expect(violations, `共享包只能依赖契约层，且要用包名引：\n${violations.join('\n')}`).toEqual([])
   })
 
-  it('壳不摸应用内部模块，只走 apps 的注册表', () => {
+  it('壳不 import 任何应用——它只在运行期扫包', () => {
     const violations: string[] = []
-    for (const file of [...topLevelSources(SHELL_DIR), ...sources(join(SHELL_DIR, 'main')), ...sources(join(SHELL_DIR, 'preload'))]) {
+    const scanned = [
+      ...topLevelSources(SHELL_DIR),
+      ...sources(join(SHELL_DIR, 'main')),
+      ...sources(join(SHELL_DIR, 'preload'))
+    ]
+    for (const file of scanned) {
       for (const spec of importSpecifiers(file)) {
-        // 允许 '@apps' / '../apps'（注册表本身），禁止指向某个应用目录内部
-        const target = appTarget(file, spec)
-        const deeper =
-          target !== null &&
-          (spec.startsWith('@apps/') ? spec.split('/').length > 2 : !/\/apps\/?$/.test(resolveSpec(file, spec) ?? ''))
-        if (deeper) violations.push(`${srcPosix(file)} → ${spec}`)
+        // 拆包前壳还要 import 应用清单（纯数据那一份）；现在连这条都没了：清单从磁盘读
+        if (appTarget(file, spec) !== null) violations.push(`${srcPosix(file)} → ${spec}`)
       }
     }
-    expect(violations, `壳只能 import 应用注册表：\n${violations.join('\n')}`).toEqual([])
+    expect(violations, `壳不该 import 任何应用（名单来自运行期扫包）：\n${violations.join('\n')}`).toEqual([])
   })
 })
 
-describe('共享包入口（§8.1 规则 1）', () => {
-  it('外部只 import 包目录，不摸包内文件', () => {
+describe('包入口（§8.1 规则 1）', () => {
+  it('外部只 import 包的入口，不摸包内文件', () => {
     const violations: string[] = []
-    const scanned = [...sources(APPS_DIR), ...topLevelSources(SHELL_DIR)]
+    const scanned = [...sources(APPS_DIR), ...topLevelSources(SHELL_DIR), ...sources(join(SRC, 'sdk')), ...sources(SHARED_DIR)]
     for (const file of scanned) {
       for (const spec of importSpecifiers(file)) {
-        // '@shared/library/x' 或 '../../shared/library/x' 这种更深一层就算绕过
-        const tail = spec.startsWith('@shared/')
-          ? spec.slice('@shared/'.length)
-          : (() => {
-              const resolved = resolveSpec(file, spec)
-              return resolved && resolved.startsWith(SHARED_P + '/') ? resolved.slice(SHARED_P.length + 1) : null
-            })()
-        if (tail && tail.split('/').length > 1) violations.push(`${srcPosix(file)} → ${spec}`)
+        if (ALLOWED_SUBPATHS.includes(spec)) continue
+        // '@airship/library/x' 这种更深一层就是绕过入口
+        if (/^@airship\/[a-z-]+\//.test(spec)) violations.push(`${srcPosix(file)} → ${spec}`)
       }
     }
-    expect(violations, `绕过共享包入口就是破坏契约可见性：\n${violations.join('\n')}`).toEqual([])
+    expect(violations, `绕过包入口就是破坏契约可见性：\n${violations.join('\n')}`).toEqual([])
+  })
+})
+
+describe('旧别名不该回来', () => {
+  it('仓库里不再有 @shared / @sdk / @apps / @shell / @tests 说明符', () => {
+    const stale = /['"]@(shared|sdk|apps|shell|tests)[\\/]/
+    const hits: string[] = []
+    for (const file of [...sources(APPS_DIR), ...sources(SHELL_DIR), ...sources(SHARED_DIR), ...sources(join(SRC, 'sdk')), ...files(join(REPO, 'code'))]) {
+      if (stale.test(readFileSync(file, 'utf8'))) hits.push(srcPosix(file))
+    }
+    expect(hits, `这些文件还在用别名，说明符该换成 @airship/*：\n${hits.join('\n')}`).toEqual([])
   })
 })
 

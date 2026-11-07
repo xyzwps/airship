@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { AppApi, ShellEvent } from '@shared/protocol'
+import type { AppApi, ShellEvent } from '@airship/contract'
 
 /**
  * 订阅壳推回来的事件（子进程分块与结束）。

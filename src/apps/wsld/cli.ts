@@ -1,5 +1,5 @@
 import { cleanWslcError, parseContainers, parseImages, type RawContainer, type RawImage } from './parse'
-import type { AppApi, ProcResult } from '@shared/protocol'
+import type { AppApi, ProcResult } from '@airship/contract'
 
 /**
  * wslc 那一侧的门。

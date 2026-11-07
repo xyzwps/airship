@@ -19,22 +19,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "@shared/*": [
-        "src/shared/*"
-      ],
-      "@apps/*": [
-        "src/apps/*"
-      ]
-    }
+    "allowImportingTsExtensions": true
   },
   "include": [
     "src/shell/main/**/*.ts",
     "src/shell/preload/**/*.ts",
     "src/shared/**/*.ts",
     "src/apps/*/app.ts",
-    "electron.vite.config.ts"
+    "src/shell/electron.vite.config.ts"
   ],
   "exclude": [
     "src/**/tests/**",

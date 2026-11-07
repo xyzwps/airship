@@ -8,15 +8,19 @@
 ```
 src/shell/specs/*.md          壳的册子（窗口、主题、契约桥、授权、存储、子进程与工具、托盘、日志）
 src/shell/tests/*.test.*      壳的用例；helpers/ 里是壳的测试替身与界面挂载器
-src/apps/specs/*.md           应用注册与清单的规矩
+src/apps/specs/*.md           应用注册、清单与 airship 包的规矩
 src/apps/<id>/specs/*.md      每个应用一本（或多本）
 src/apps/<id>/tests/*.test.*  每个应用的用例
+src/sdk/tests/*.test.*        SDK 宿主的用例（SH-011 / SH-012 / SH-013 / SH-019 钉的是壳给的样子，
+                              实现搬到了 SDK，用例跟着实现走；编号不动）
 src/shared/<包>/specs/*.md    共享包一本；tests/ 放它的用例
 docs/specs/index.md           这本索引——唯一跨区的文件，与架构文档同级
 src/<区>/<名>/tests/fixtures/   真样本跟着用它的用例走（wslc 的真实输出在 src/apps/wsld/tests/fixtures/）
 ```
 
 `just casecov` 递归找所有 `specs/*.md` 与 `tests/**` 里的用例，新加区域不用改检查器。
+唯一的例外是 `templates/app/`：那是给外部作者复制的范本，里面的册子与用例还没落到某个真实应用上，
+按目录名排除在差集之外（`just test` 也不跑它）；复制进 `src/apps/<id>/` 之后才归这套规矩管。
 
 ## 结构（固定四档）
 
@@ -92,7 +96,8 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 | PT | 子进程与工具白名单（只跑壳发现/用户指定的东西） | `proc-tools.md` | 碰 proc、加工具的人 | 自动化 |
 | TR | 托盘（单占用者、点击只投占用窗口、退出清干净） | `tray.md` | 碰托盘的人 | 自动化（门控：真机看图标） |
 | LG | 日志（按天分文件、行形状、写失败不致命） | `logging.md` | 改日志格式的人 | 自动化 |
-| AP | 应用模型与发现（清单是文件约定，缺件在注册期炸） | `app-model.md` | 加应用、改清单字段的人 | 自动化 |
+| AP | 应用模型与发现（清单是文件约定，缺件在产包期炸，应用与 SDK 不直连壳） | `app-model.md` | 加应用、改清单字段的人 | 自动化 |
+| PK | airship 包的磁盘形状与运行期发现（归档名 `<id>.airship`、包清单、引用边界、两个包根与拖放装包） | `package.md` | 改包格式、动产包器与扫包的人 | 自动化 |
 
 ### 共享包（`src/shared/<包>/`）
 

@@ -28,7 +28,7 @@ import {
   type ThemeSnapshot,
   type ToolName,
   TOOL_NAMES
-} from '@shared/protocol'
+} from '@airship/contract'
 import {
   appChannelOnly,
   badToolName,
@@ -46,9 +46,10 @@ import {
   unknownApp,
   unknownSender,
   writeDenied
-} from '@shared/errors'
+} from '@airship/contract'
 import {
-  APP_MAP,
+  metaOf,
+  installedPackages,
   canAccessShared,
   canUseTool,
   hasCapability,
@@ -56,6 +57,32 @@ import {
   sharedNamespacesOf,
   unavailableReason
 } from './services/appRegistry'
+import { inspectPackage, installPackage, type PackageProposal } from './services/packageInstall'
+
+/**
+ * 提案 → 界面用得上的那一份。
+ *
+ * 绝对路径不出去：渲染侧只需要知道"这是生命游戏 0.1.0，279 KB，要读写你的文件"，
+ * 归档在哪儿、叫什么文件名，是主进程的事。
+ */
+function proposalView(p: PackageProposal) {
+  return {
+    id: p.meta.id,
+    name: p.meta.name,
+    sdkVersion: p.meta.sdkVersion,
+    bytes: p.bytes,
+    capabilities: [...p.meta.capabilities],
+    replacing: p.replacing
+      ? {
+          name: p.replacing.meta.name,
+          sdkVersion: p.replacing.meta.sdkVersion,
+          capabilities: [...p.replacing.meta.capabilities]
+        }
+      : null,
+    addedCapabilities: [...p.addedCapabilities],
+    removedCapabilities: [...p.removedCapabilities]
+  }
+}
 import {
   appCacheDir,
   appDataDir,
@@ -90,7 +117,7 @@ import type {
   ProcRequest,
   SaveFileOptions,
   TrayState
-} from '@shared/protocol'
+} from '@airship/contract'
 
 /**
  * IPC 注册。渲染进程能碰到的东西都在这里，一处收口。
@@ -547,7 +574,7 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
     const owner = senderOwner(event)
     const win = ownWindow(event)
     if (!win) return
-    const base = owner === 'shell' ? '飞船' : APP_MAP.get(owner)?.name ?? String(owner)
+    const base = owner === 'shell' ? '飞船' : metaOf(owner)?.name ?? String(owner)
     const sub = typeof title === 'string' && title.trim() ? title.trim() : null
     win.setTitle(sub ? `${base} · ${sub}` : base)
   })
@@ -565,6 +592,26 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
   handle('launcher:openApps', (event) => {
     requireShell(event)
     return openAppIds()
+  })
+
+  handle('launcher:apps', (event) => {
+    requireShell(event)
+    // 格子里摆什么，全看磁盘上装了哪些包：这里就是那一份真源
+    return installedPackages().map((p) => ({ meta: p.meta, iconUrl: p.iconUrl }))
+  })
+
+  /* ---------- 装包（拖放）：只有启动器能装 ---------- */
+
+  handle('launcher:inspectPackage', (event, path: unknown) => {
+    requireShell(event)
+    return proposalView(inspectPackage(assertNonEmptyString(path, '包路径')))
+  })
+
+  handle('launcher:installPackage', (event, path: unknown, overwrite: unknown) => {
+    requireShell(event)
+    if (typeof overwrite !== 'boolean') throw new Error(`overwrite 必须是 true 或 false，收到 ${JSON.stringify(overwrite)}`)
+    // 装完只回回执，不广播、不开窗口：装与跑是两件事，格子里刷新由启动器自己重问 apps()
+    return installPackage(assertNonEmptyString(path, '包路径'), overwrite)
   })
 
   handle('launcher:setTheme', (event, mode: unknown, resolvedHint: unknown) => {

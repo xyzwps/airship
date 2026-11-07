@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { logDir } from './paths'
-import type { AppId } from '@shared/protocol'
+import type { AppId } from '@airship/contract'
 
 type Level = 'info' | 'warn' | 'error'
 

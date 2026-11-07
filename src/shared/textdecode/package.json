@@ -1,0 +1,10 @@
+{
+  "name": "@airship/textdecode",
+  "version": "0.3.0",
+  "private": true,
+  "description": "中文文本解码：BOM → UTF-8 严格 → GBK",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  }
+}

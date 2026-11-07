@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { build, checks, defaultOutPath, display, fpath, audioFilters, videoFilters, type Note } from '@apps/vcp/command'
-import { detailText, forTarget, fromState, JobQueue, statusText, uniquePath, type JobSpec } from '@apps/vcp/jobs'
-import { feedProgress } from '@apps/vcp/runner'
-import { createState, type AppState, type ProbeInfo, type StreamInfo } from '@apps/vcp/state'
+import { build, checks, defaultOutPath, display, fpath, audioFilters, videoFilters, type Note } from '../command'
+import { detailText, forTarget, fromState, JobQueue, statusText, uniquePath, type JobSpec } from '../jobs'
+import { feedProgress } from '../runner'
+import { createState, type AppState, type ProbeInfo, type StreamInfo } from '../state'
 
 /**
  * VC 册子（src/apps/vcp/specs/vcp.md）里"命令与队列"那几条：纯函数，不碰界面也不碰真 ffmpeg。

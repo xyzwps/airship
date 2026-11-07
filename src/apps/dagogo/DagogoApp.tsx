@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
-import { useTheme } from '../../shell/theme'
-import { useAppAutotest } from '../../shell/autotest'
-import { markPerf } from '../../shell/shot'
-import type { AppApi } from '@shared/protocol'
-import { renderTrayIcon } from '../../shell/trayIcon'
+import { useTheme } from '@airship/sdk'
+import { useAppAutotest } from '@airship/sdk'
+import { markPerf } from '@airship/sdk'
+import type { AppApi } from '@airship/contract'
+import { renderTrayIcon } from '@airship/sdk'
 import {
   backgroundUrl,
   deleteBackground,

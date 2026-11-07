@@ -22,24 +22,14 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "@shared/*": [
-        "src/shared/*"
-      ],
-      "@apps/*": [
-        "src/apps/*"
-      ],
-      "@shell/*": [
-        "src/shell/*"
-      ]
-    }
+    "noEmit": true
   },
   "include": [
     "src/shell/*.ts",
     "src/shell/*.tsx",
     "src/shell/*.d.ts",
+    "src/sdk/**/*.ts",
+    "src/sdk/**/*.tsx",
     "src/apps/**/*.ts",
     "src/apps/**/*.tsx",
     "src/shared/**/*.ts",

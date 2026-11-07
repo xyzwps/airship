@@ -2,10 +2,10 @@
 import { readFileSync, rmSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { FakeAirship } from './helpers/fakeAirship'
-import { mountUi, type Mount } from './helpers/mount'
+import { FakeAirship } from '@airship/sdk/testing'
+import { mountUi, type Mount } from '@airship/sdk/testing'
 import { Launcher } from '../Launcher'
-import { useTheme } from '../theme'
+import { useTheme } from '@airship/sdk'
 
 /**
  * TH-001 ~ TH-009：三档主题的选定与落地。

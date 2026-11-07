@@ -1,106 +1,189 @@
-import type { AppMeta } from '@shared/app'
-import { platformIssue } from '@shared/errors'
-import { manifestProblems } from '@shared/registryRules'
-import type { Capability, PlatformId, SharedNamespace, ToolName } from '@shared/protocol'
+import { app } from 'electron'
+import { log } from './logging'
+import { packageRoots } from './packageRoots'
+import { loadPackages, packageProblems as scanProblems, type InstalledPackage } from './packageRegistry'
+import type { AppMeta } from '@airship/contract'
 
 /**
- * 主进程侧的应用注册表。
+ * 主进程侧的应用注册表——**现在是运行期的**，读的是磁盘上的 airship 包。
  *
- * 和渲染侧的 apps/index.ts 抓的是同一批清单文件（apps/<id>/app.ts，纯数据），
- * 所以"有哪些应用、各自声明了什么"在两侧是**同一个真源**，不存在两份名单对不齐的问题。
+ * 原来它靠构建期 glob（`import.meta.glob` 抓 `apps/<id>/app.ts`）认应用，所以改一个应用要重出整个安装包；
+ * 现在它在启动时扫两个包根（开发根与自装根，见 `packageRoots.ts`）——安装包是纯壳，不带应用。
+ * 对外的函数名与旧版一一对得上，所以 `ipc.ts`、`grants`、`paths.ts`、`windows.ts` 一行没改——
+ * **能力边界不在这次改动里**：照旧是"谁调用（event.sender 反查）+ 那份清单声明了什么"。
  *
- * 主进程必须自己知道这张表：能力校验要在主进程做，
- * 如果由渲染侧把能力传过来，那等于没有校验。
- *
- * 清单里只有数据没有组件，所以主进程 import 它不会把渲染侧代码拖进来。
+ * 规矩只有一句：清单不合格就不进这张表，而不合格的原因必须喊出来
+ * ——读出来包没装进来是"格子里凭空少一个应用"，没人看得懂。
  */
 
-const modules = import.meta.glob<{ app: AppMeta }>('../../../apps/*/app.ts', {
-  eager: true
-})
+let byId = new Map<string, InstalledPackage>()
+let loaded = false
 
-function idOfPath(path: string): string {
-  const m = /\/([^/]+)\/app\.ts$/.exec(path)
-  return m?.[1] ?? ''
-}
+/** 主进程启动时扫一次；`just dev` 要先 `just build-apps` 把包产到 dist-apps */
+export function scanInstalledPackages(): InstalledPackage[] {
+  const roots = packageRoots({
+    isPackaged: app.isPackaged,
+    env: process.env,
+    userDataDir: app.getPath('userData')
+  })
+  const scan = loadPackages(roots)
+  byId = new Map(scan.packages.map((p) => [p.meta.id, p]))
+  loaded = true
 
-const collected = new Map<string, AppMeta>()
-const problems: string[] = []
-
-for (const [path, mod] of Object.entries(modules)) {
-  const dirId = idOfPath(path)
-  const issues = manifestProblems(path, dirId, mod.app, [...collected.keys()])
-  if (issues.length > 0) {
-    problems.push(...issues)
-    continue
+  for (const pkg of scan.packages) {
+    log.info('shell', '装进壳的包', {
+      id: pkg.meta.id,
+      origin: pkg.origin,
+      archive: pkg.archive,
+      sdkVersion: pkg.manifest.sdkVersion
+    })
   }
-  collected.set(mod.app!.id, mod.app!)
+  for (const problem of scan.problems) {
+    log.warn('shell', '这个包没装进来', { at: problem.at, reason: problem.reason })
+  }
+  if (scan.packages.length === 0) {
+    log.error('shell', '一个应用都没装进来', { 找过的包根: roots.map((r) => r.dir) })
+  }
+  return scan.packages
 }
 
-if (problems.length > 0) {
-  // 启动就炸，比运行到一半"能力查不到"好解释得多
-  throw new Error(`应用注册表构建失败：\n${problems.join('\n')}`)
+/** 没扫过就问不出任何应用：第一次用到就扫，用例也走这条路 */
+function ensure(): void {
+  if (!loaded) scanInstalledPackages()
 }
 
-export const APP_MAP: ReadonlyMap<string, AppMeta> = collected
+/**
+ * 自装根的路径——拖放装包唯一允许的落点。
+ *
+ * 也不选开发根：那是 just build-apps 的产物目录，人手往里拷东西只会下次就被覆盖。
+ * 没有第三个选择——安装包是纯壳，安装目录里不带应用。
+ */
+export function installedRootDir(): string {
+  const roots = packageRoots({
+    isPackaged: app.isPackaged,
+    env: process.env,
+    userDataDir: app.getPath('userData')
+  })
+  const hit = roots.find((r) => r.origin === 'installed')
+  if (!hit) throw new Error('这台机器上没有可用的自装根（LOCALAPPDATA 与 userData 都拿不到）')
+  return hit.dir
+}
+
+/** 按 id 取整个包（入口地址、图标地址、包目录、包清单原样） */
+export function packageFor(id: string): InstalledPackage | null {
+  ensure()
+  return byId.get(id) ?? null
+}
+
+/** 装进壳的包，按 id 序 */
+export function installedPackages(): InstalledPackage[] {
+  ensure()
+  return [...byId.values()]
+}
+
+/** 每个没装进来的包与它的原因，诊断页与日志都从这里念 */
+export function packageProblemLines(): string[] {
+  ensure()
+  return scanProblems().map((p) => `${p.at}：${p.reason}`)
+}
+
+/** id → 应用清单（窗口尺寸与标题按它定）；没装进来就是 null */
+export function metaOf(id: string): AppMeta | null {
+  ensure()
+  return byId.get(id)?.meta ?? null
+}
+
+/*
+ * 下面这批读法**都要先 ensure()**，一个都不许直接 re-export。
+ *
+ * 上一版这里写的是 `export { appIds, ... } from './packageRegistry'`，看着等价，其实是漏的：
+ * `paths.ts` 第一个问的就是 `appIds()`，那一趟要是没人扫过包根，它拿到空表、
+ * 于是每个应用的数据目录都不建，错要到几十行开外的 `grants` 里才炸出来。
+ * 每个口子自己保证扫过，才不存在"谁先到谁拿到空表"。
+ */
+
+import {
+  appIds as idsOf,
+  appsAvailableOn as appsOnPlatform,
+  appsInOrder as appsSorted,
+  availableOn as appAvailableOn,
+  canAccessShared as sharedAllowed,
+  canUseTool as toolAllowed,
+  capabilitiesOf as capsOf,
+  hasCapability as capHeld,
+  isKnownApp as appKnown,
+  packagesAvailableOn as packagesOnPlatform,
+  sharedNamespacesOf as namespacesOf,
+  toolsOf as toolsDeclared,
+  unavailableReason as platformBlockReason
+} from './packageRegistry'
+import type { Capability, PlatformId, SharedNamespace, ToolName } from '@airship/contract'
 
 export function appIds(): string[] {
-  return [...collected.keys()]
+  ensure()
+  return idsOf()
 }
 
-/** 按名字典序排好的元数据；顺序是壳的表现决定，不由应用自己声明 */
+/** 按名字典序排好的清单；顺序是壳的表现决定，不由应用自己声明 */
 export function appsInOrder(): AppMeta[] {
-  return [...collected.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh'))
+  ensure()
+  return appsSorted()
 }
 
 export function isKnownApp(value: unknown): value is string {
-  return typeof value === 'string' && collected.has(value)
+  ensure()
+  return appKnown(value)
 }
 
 export function capabilitiesOf(app: string): readonly Capability[] {
-  return collected.get(app)?.capabilities ?? []
+  ensure()
+  return capsOf(app)
 }
 
 export function hasCapability(app: string, capability: Capability): boolean {
-  return capabilitiesOf(app).includes(capability)
+  ensure()
+  return capHeld(app, capability)
 }
 
 /** 应用能不能碰某个共享命名空间：既要有 shared 能力，也要在名单里 */
 export function canAccessShared(app: string, ns: string): ns is SharedNamespace {
-  if (!hasCapability(app, 'shared')) return false
-  const meta = collected.get(app)
-  return (meta?.sharedNamespaces ?? []).includes(ns as SharedNamespace)
+  ensure()
+  return sharedAllowed(app, ns)
 }
 
-/** 本应用声明的共享命名空间 */
 export function sharedNamespacesOf(app: string): SharedNamespace[] {
-  return collected.get(app)?.sharedNamespaces ?? []
+  ensure()
+  return namespacesOf(app)
 }
 
-/** 本应用声明要用的外部工具 */
 export function toolsOf(app: string): ToolName[] {
-  return collected.get(app)?.tools ?? []
+  ensure()
+  return toolsDeclared(app)
 }
 
-/**
- * 应用能不能问壳要这个工具的路径：
- * 既要有 proc 能力（拿到路径是为了跑它），也要在清单 tools 里声明过（可审计）。
- */
 export function canUseTool(app: string, tool: ToolName): boolean {
-  return hasCapability(app, 'proc') && toolsOf(app).includes(tool)
+  ensure()
+  return toolAllowed(app, tool)
 }
 
-/** 这个应用在当前平台上用不了的话，原因是什么；能用则 null */
 export function unavailableReason(app: string, platform: PlatformId | 'unknown'): string | null {
-  const meta = collected.get(app)
-  return meta ? platformIssue(meta, platform) : null
+  ensure()
+  return platformBlockReason(app, platform)
 }
 
 export function availableOn(app: string, platform: PlatformId | 'unknown'): boolean {
-  return unavailableReason(app, platform) === null
+  ensure()
+  return appAvailableOn(app, platform)
 }
 
-/** 当前平台用得了的应用，按名字典序（启动器与截图工装都按这个顺序摆） */
+/** 当前平台用得了的清单（截图工装按这个顺序逐个开窗口） */
 export function appsAvailableOn(platform: PlatformId | 'unknown'): AppMeta[] {
-  return appsInOrder().filter((meta) => availableOn(meta.id, platform))
+  ensure()
+  return appsOnPlatform(platform)
+}
+
+/** 同上，但要包地址的那一份：启动器摆格子用的是它 */
+export function packagesAvailableOn(platform: PlatformId | 'unknown'): InstalledPackage[] {
+  ensure()
+  return packagesOnPlatform(platform)
 }

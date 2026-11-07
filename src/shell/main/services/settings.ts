@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync, existsSync } from '
 import { dirname } from 'node:path'
 import { appSettingsFile, shellSettingsFile } from './paths'
 import { log } from './logging'
-import type { AppId } from '@shared/protocol'
+import type { AppId } from '@airship/contract'
 
 /**
  * 设置存储：每个应用一个 JSON 文件，壳自己一个。

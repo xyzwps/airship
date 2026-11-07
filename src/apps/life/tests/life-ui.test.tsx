@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { act } from 'react'
-import { FakeAirship } from '@tests/helpers/fakeAirship'
-import { mountUi, type Mount } from '@tests/helpers/mount'
-import LifeApp from '@apps/life/LifeApp'
-import { GROUPS, PATTERNS } from '@apps/life/patterns'
+import { FakeAirship } from '@airship/sdk/testing'
+import { mountUi, type Mount } from '@airship/sdk/testing'
+import LifeApp from '../LifeApp'
+import { GROUPS, PATTERNS } from '../patterns'
 
 /**
  * LF 册子里"界面上看得见"的那一半（推演与图形库那一半在 rules.test.ts）。

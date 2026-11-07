@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
-import { FakeAirship } from '@tests/helpers/fakeAirship'
-import { mountUi, type Mount } from '@tests/helpers/mount'
-import PdfApp from '@apps/pdf/PdfApp'
-import { loadBooks } from '@shared/library'
+import { FakeAirship } from '@airship/sdk/testing'
+import { mountUi, type Mount } from '@airship/sdk/testing'
+import PdfApp from '../PdfApp'
+import { loadBooks } from '@airship/library'
 
 /**
  * PD 册子（docs/specs/pdf.md）。

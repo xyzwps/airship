@@ -2,8 +2,8 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { StringDecoder } from 'node:string_decoder'
 import { isAllowedExecutable } from './tools'
 import { log } from './logging'
-import { dupJob, exeDenied } from '@shared/errors'
-import type { AppId, ProcRequest, ProcResult, ShellEvent } from '@shared/protocol'
+import { dupJob, exeDenied } from '@airship/contract'
+import type { AppId, ProcRequest, ProcResult, ShellEvent } from '@airship/contract'
 
 /**
  * 子进程服务。

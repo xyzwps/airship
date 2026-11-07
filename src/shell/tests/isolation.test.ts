@@ -52,9 +52,11 @@ describe('渲染侧拿不到 ipcRenderer', () => {
   })
 
   it('BR-005b 应用窗口拿不到启动器的面（开不了别人的窗口）', () => {
-    // airshipShell 只在 IS_SHELL 分支里暴露
+    // airshipShell 只在 IS_SHELL 分支里暴露。
+    // 判据是"这一句出现在那个分支之内"，不是"在前 1200 个字符里"——
+    // 分支里每加一颗方法，那种定长窗口就会莫名其妙地红一次。
     const shellBlock = preloadSource.slice(preloadSource.indexOf('if (IS_SHELL)'))
-    expect(shellBlock.slice(0, 1200)).toMatch(/exposeInMainWorld\('airshipShell'/)
+    expect(shellBlock).toMatch(/exposeInMainWorld\('airshipShell'/)
     expect(preloadSource.indexOf('if (IS_SHELL)')).toBeLessThan(preloadSource.indexOf("exposeInMainWorld('airshipShell'"))
   })
 })

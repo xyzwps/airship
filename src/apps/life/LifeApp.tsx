@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type JSX, type MouseEvent, type ReactNode } from 'react'
-import { useTheme } from '../../shell/theme'
+import { useTheme } from '@airship/sdk'
 import {
   GRID_LINE_MIN_PX,
   GRID_SIZES,

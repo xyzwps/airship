@@ -11,8 +11,8 @@ import {
   twoContainers,
   unmountAll
 } from './support'
-import type { FakeAirship, StartCall, StreamCtl } from '@tests/helpers/fakeAirship'
-import type { Mount } from '@tests/helpers/mount'
+import type { FakeAirship, StartCall, StreamCtl } from '@airship/sdk/testing'
+import type { Mount } from '@airship/sdk/testing'
 
 /**
  * CA-001 ~ CA-024：容器的那四个动作。
