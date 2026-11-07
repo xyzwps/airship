@@ -16,5 +16,5 @@
   编号是稳定句柄：不复用、不重排；`just casecov` 会把册里编号与用例编号做双向差集，
   册里有号没用例 = 未实现，用例挂了号册里没有 = 私测，两边都算红。
   界面观感（宽度、圆角、真排版好不好看）不进册子，那是 `just shot` 截图走查的事。
-  前缀取两个没被用过的字母（AP BK BR CA CL DG GR IM LB LF LG PD PT SH ST TD TH TR VC WL PK 已占用）。
+  前缀取两个没被用过的字母（AL AP BK BR CA CL DG GR IM LB LF LG PD PT SH ST TD TH TR VC WL PK 已占用）。
 -->
