@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { strFromU8, unzipSync } from 'fflate'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { badAppId, notRegistered } from '@airship/contract'
-import { DEFAULT_ENTRY, MANIFEST_NAME, PACKAGE_SUFFIX } from '@airship/contract'
+import { DEFAULT_ENTRY, MANIFEST_NAME, PACKAGE_ROOT_LABEL, PACKAGE_SUFFIX } from '@airship/contract'
 import { archiveEntryNames, normalizeEntryName } from '../main/services/packageArchive'
 import { scanPackages } from '../main/services/packageRegistry'
 import { packageRoots } from '../main/services/packageRoots'
@@ -66,7 +66,8 @@ describe('壳在运行期扫包认应用', () => {
     const shadowed = scan.problems.filter((p) => p.reason.includes('同一个 id 已经有包了'))
     expect(shadowed.length, scan.problems.map((p) => p.reason).join('\n')).toBe(1)
     expect(shadowed[0]!.at).toBe(join(installed, `life${PACKAGE_SUFFIX}`))
-    expect(shadowed[0]!.reason).toContain('来自开发/测试根')
+    // 「来自哪个根」那句的措辞只有一处真源（PACKAGE_ROOT_LABEL），用例不在这里再抄一遍字
+    expect(shadowed[0]!.reason).toContain(`来自${PACKAGE_ROOT_LABEL.dev}的`)
   })
 
   it('PK-009 坏包不占名：不合格的那一份压不住能用的那一份', () => {

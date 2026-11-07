@@ -17,12 +17,20 @@
 .launcher__bar {
   display: flex;
   justify-content: flex-end;
+  gap: 2px;
   margin-bottom: 6px;
 }
 
-/* 主题键：纯图标，平时不带边框也不带底色（它不是"一颗按钮"，是界面上唯一那颗开关）；
-   悬停才给一块方形反馈，键盘聚焦留一圈描边——不然焦点看不见 */
-.theme-toggle {
+/* 设置那一屏的返回键在左上角：回得去这个动作跟着"从哪儿进来"的视线走 */
+.launcher__bar--start {
+  justify-content: flex-start;
+}
+
+/* 右上角那排键：纯图标，平时不带边框也不带底色（它们不是"按钮"，是界面上的开关）；
+   悬停才给一块方形反馈，键盘聚焦留一圈描边——不然焦点看不见。
+   主题键沿用 .theme-toggle（用例按它找），设置键与返回键用 .bar-btn，同一套画法。 */
+.theme-toggle,
+.bar-btn {
   width: 28px;
   height: 28px;
   display: grid;
@@ -35,19 +43,58 @@
   cursor: default;
 }
 
-.theme-toggle:hover {
+.theme-toggle:hover,
+.bar-btn:hover {
   background: var(--bg-hover);
   color: var(--fg);
 }
 
-.theme-toggle:focus-visible {
+.theme-toggle:focus-visible,
+.bar-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
-.theme-toggle svg {
+.theme-toggle svg,
+.bar-btn svg {
   width: 17px;
   height: 17px;
+}
+
+/* ---------- 设置那一屏 ---------- */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 720px;
+}
+
+.settings__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  margin-bottom: 2px;
+}
+
+/* 一行的标签在左、值在同一行的右边；路径长就自己换行，不裁——裁了就念不全 */
+.settings__row {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  align-items: baseline;
+  gap: 10px;
+  padding: 3px 0;
+}
+
+.settings__label {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+
+.settings__value {
+  font-size: 12.5px;
+  color: var(--fg);
+  overflow-wrap: anywhere;
 }
 
 .tiles {

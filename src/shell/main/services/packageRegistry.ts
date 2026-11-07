@@ -4,6 +4,7 @@ import { manifestProblems } from '@airship/contract'
 import {
   ICON_PATTERN,
   MANIFEST_NAME,
+  PACKAGE_ROOT_LABEL,
   PACKAGE_SUFFIX,
   entryOf,
   packageManifestProblems,
@@ -190,11 +191,10 @@ export function scanPackages(roots: readonly PackageRoot[]): ScanResult {
   return { packages, problems }
 }
 
+/** 一档根的人话名字，措辞在 `PACKAGE_ROOT_LABEL` 那一处 */
 function labelOf(origin: PackageOrigin): string {
-  return origin === 'dev' ? '开发/测试根' : '自装根'
+  return PACKAGE_ROOT_LABEL[origin]
 }
-
-export { labelOf as packageOriginLabel }
 
 /* ---------------- 活的那一份：主进程启动时扫一次 ---------------- */
 

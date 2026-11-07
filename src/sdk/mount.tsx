@@ -250,6 +250,7 @@ function shellStub(): ShellBridge {
     theme: no,
     settings: { get: no, set: no },
     rootPaths: no,
+    shellInfo: no,
     currentPlatform: no,
     toolPath: no,
     setToolPath: no,

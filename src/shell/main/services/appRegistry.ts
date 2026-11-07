@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { log } from './logging'
-import { packageRoots } from './packageRoots'
+import { packageRoots, type PackageRoot } from './packageRoots'
 import { loadPackages, packageProblems as scanProblems, type InstalledPackage } from './packageRegistry'
 import type { AppMeta } from '@airship/contract'
 
@@ -19,13 +19,23 @@ import type { AppMeta } from '@airship/contract'
 let byId = new Map<string, InstalledPackage>()
 let loaded = false
 
-/** 主进程启动时扫一次；`just dev` 要先 `just build-apps` 把包产到 dist-apps */
-export function scanInstalledPackages(): InstalledPackage[] {
-  const roots = packageRoots({
+/**
+ * 现在这两个包根，顺序就是优先级。
+ *
+ * 装包落点、日志里"找过的包根"、设置页那一行都从这里问——**别在别处再算一遍**：
+ * 一个 env 变量与 isPackaged 的组合，两处各写一份迟早会算出两个答案。
+ */
+export function currentPackageRoots(): PackageRoot[] {
+  return packageRoots({
     isPackaged: app.isPackaged,
     env: process.env,
     userDataDir: app.getPath('userData')
   })
+}
+
+/** 主进程启动时扫一次；`just dev` 要先 `just build-apps` 把包产到 dist-apps */
+export function scanInstalledPackages(): InstalledPackage[] {
+  const roots = currentPackageRoots()
   const scan = loadPackages(roots)
   byId = new Map(scan.packages.map((p) => [p.meta.id, p]))
   loaded = true
@@ -59,12 +69,7 @@ function ensure(): void {
  * 没有第三个选择——安装包是纯壳，安装目录里不带应用。
  */
 export function installedRootDir(): string {
-  const roots = packageRoots({
-    isPackaged: app.isPackaged,
-    env: process.env,
-    userDataDir: app.getPath('userData')
-  })
-  const hit = roots.find((r) => r.origin === 'installed')
+  const hit = currentPackageRoots().find((r) => r.origin === 'installed')
   if (!hit) throw new Error('这台机器上没有可用的自装根（LOCALAPPDATA 与 userData 都拿不到）')
   return hit.dir
 }

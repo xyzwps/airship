@@ -187,6 +187,8 @@ if (IS_SHELL) {
       set: <T>(key: string, value: T) => call<void>('launcher:settingsSet', key, value)
     },
     rootPaths: () => call('launcher:rootPaths'),
+    /** 设置页那一屏：壳版本 + 包根（自装根总有，开发根只在这台机器上有它时出现） */
+    shellInfo: () => call('launcher:shellInfo'),
     currentPlatform: () => call('launcher:currentPlatform'),
     toolPath: (name: ToolName) => call('launcher:toolPath', name),
     setToolPath: (name: ToolName, exe: string) => call('launcher:setToolPath', name, exe),

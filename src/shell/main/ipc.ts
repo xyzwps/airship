@@ -50,6 +50,7 @@ import {
 import {
   metaOf,
   installedPackages,
+  currentPackageRoots,
   canAccessShared,
   canUseTool,
   hasCapability,
@@ -661,6 +662,18 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
   handle('launcher:currentPlatform', (event) => {
     requireShell(event)
     return currentPlatform()
+  })
+
+  /**
+   * 设置页那一屏：版本 + 包根。
+   *
+   * 版本取 `app.getVersion()`——安装包的文件版本与 exe 都来自 `src/shell/package.json`，
+   * 所以这行念的就是"这台机器上正在跑的壳"，不是 SDK 那份，也不是某个应用的版本。
+   * 包根给的是目录本身（`installedRootDir()` 那一份算法的表），归档路径仍然留在主进程。
+   */
+  handle('launcher:shellInfo', (event) => {
+    requireShell(event)
+    return { shellVersion: app.getVersion(), roots: currentPackageRoots() }
   })
 
   handle('launcher:toolPath', (event, tool: unknown) => {

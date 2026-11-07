@@ -119,6 +119,24 @@ export function capabilitiesPhrase(list: readonly Capability[]): string {
   return list.map((c) => CAPABILITY_LABEL[c]).join('、')
 }
 
+/** 壳扫包的根是哪一类；顺序就是优先级（先扫到的那份占住同一个 id） */
+export type PackageRootOrigin = 'dev' | 'installed'
+
+/**
+ * 包根的人话名字。遮蔽原因那句、日志里的"找过的包根"、设置页那一行都从这里念——
+ * 措辞只这一处，界面上不许再抄一遍（与 CAPABILITY_LABEL 同一条规矩）。
+ */
+export const PACKAGE_ROOT_LABEL: Record<PackageRootOrigin, string> = {
+  dev: '开发包根',
+  installed: '应用安装目录'
+}
+
+/** 一个包根：目录本身，不是某个归档的路径 */
+export interface PackageRootView {
+  origin: PackageRootOrigin
+  dir: string
+}
+
 export interface AppPaths {
   /** 本应用私有数据目录，读写默认落在这里 */
   data: string
@@ -368,6 +386,17 @@ export interface InstallResultView {
 }
 
 /**
+ * 设置页那一屏要的两样：壳自己的版本，和这台机器上应用装在哪。
+ *
+ * 版本取 `src/shell/package.json`——安装包的文件版本与它同源，所以这行念的就是"这台机器上跑的壳"。
+ * `roots` 是壳扫包用的那张表原样：自装根总有一条，开发根只在未打包且设了 `AIRSHIP_APPS_ROOT` 时才有。
+ */
+export interface ShellInfoView {
+  shellVersion: string
+  roots: PackageRootView[]
+}
+
+/**
  * 启动器窗口专用的面（`window.airshipShell`）。
  *
  * 启动器是壳自己，不是应用，所以它要的东西和应用的完全不同：
@@ -408,6 +437,13 @@ export interface ShellBridge {
   }
   /** 壳自己的目录（诊断页显示数据落在哪） */
   rootPaths(): Promise<AppPaths>
+  /**
+   * 设置页那一屏：壳版本 + 包根表。
+   *
+   * 这里给的是**目录**，不是某个归档的路径——装包那条"归档绝对路径不出去"管的是拖进来的
+   * 那个文件（只有启动器收拖放），这一条回答的是"这台机器上应用装在哪"，问的人只有启动器。
+   */
+  shellInfo(): Promise<ShellInfoView>
   /** 这台机器的平台名，启动器按它过滤格子 */
   currentPlatform(): Promise<PlatformId | 'unknown'>
   /** 工具发现状态（诊断页显示"ffmpeg 就绪 / 不可用"） */

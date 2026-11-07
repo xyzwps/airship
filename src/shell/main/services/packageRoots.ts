@@ -1,4 +1,5 @@
 import { join, resolve } from 'node:path'
+import type { PackageRootOrigin } from '@airship/contract'
 
 /**
  * 包根——壳去哪儿找 airship 包。
@@ -21,7 +22,8 @@ import { join, resolve } from 'node:path'
  * 这个文件不 import electron：把判定条件当参数收进来，运行期发现这件事才测得了。
  */
 
-export type PackageOrigin = 'dev' | 'installed'
+/** 一档根是哪一档：契约里那份说法，不在这里另立一套 */
+export type PackageOrigin = PackageRootOrigin
 
 export interface PackageRoot {
   dir: string
