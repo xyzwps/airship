@@ -93,7 +93,7 @@ vi.mock('electron', async () => {
   }
 })
 
-const { openAppWindow } = await import('../main/windows')
+const { openAppWindow, createLauncher, bringLauncherToFront } = await import('../main/windows')
 const { settings } = await import('../main/services/settings')
 
 /** 上一条用例留下的窗口先关掉：台账是模块级的，不关就会走"聚焦已有"而不是新建 */
@@ -149,5 +149,29 @@ describe('窗口尺寸只认清单，位置与尺寸都不记', () => {
     openAppWindow('dagogo')
     expect(lastWindow().options.x).toBeUndefined()
     expect(lastWindow().options.y).toBeUndefined()
+  })
+})
+
+/**
+ * 单实例的唤起落点（architecture §3 的"二次启动唤起已有启动器"）。
+ * 这条不进册子——真机上"再点一次图标能不能看见启动器"只有 shot 之外验不了，
+ * 但"窗口已关时对死引用 show"这个回归能用假壳钉住：2026-11-07 使用者报的
+ * "关了启动器再打开应用后，shell 再也打不开"就是它。
+ */
+describe('二次启动唤起启动器', () => {
+  it('启动器窗口已关时，唤起把它重建', () => {
+    resetWindows()
+    createLauncher()
+    const first = lastWindow()
+    first.close()
+    FakeBrowserWindow.created.length = 0
+
+    bringLauncherToFront()
+    expect(FakeBrowserWindow.created, '启动器关了之后，唤起没有重建窗口——第二次启动会看着像打不开').toHaveLength(1)
+    expect(lastWindow().destroyed).toBe(false)
+
+    // 还开着时再唤一次：只唤，不重复建
+    bringLauncherToFront()
+    expect(FakeBrowserWindow.created).toHaveLength(1)
   })
 })

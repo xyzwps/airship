@@ -245,8 +245,19 @@ export function broadcast(event: ShellEvent): void {
   for (const w of liveWindows()) w.window.webContents.send('airship:event', event)
 }
 
+/**
+ * 二次启动的唤起落点。
+ *
+ * 启动器窗口可能已经被关掉了而进程还活着（应用窗口还开着，window-all-closed 不触发）——
+ * 这时必须重建启动器，只 show 一个死引用等于"shell 再也打不开"（2026-11-07 使用者报）。
+ */
 export function bringLauncherToFront(): void {
-  if (!launcher || launcher.isDestroyed()) return
+  if (!launcher || launcher.isDestroyed()) {
+    log.info('shell', '启动器被再次唤起：窗口已不在，重建')
+    createLauncher()
+    return
+  }
+  log.info('shell', '启动器被再次唤起')
   if (launcher.isMinimized()) launcher.restore()
   launcher.show()
   launcher.focus()
