@@ -95,6 +95,8 @@ export interface ShapeBase {
   /** [0,1] */
   opacity: number
   fillRule: 'nonzero' | 'evenodd'
+  /** false = 画布上不画、点不着，只用来描图时清场；照样进文档数据、进导出、进 PNG */
+  visible: boolean
 }
 
 export interface RectShape extends ShapeBase {
@@ -160,7 +162,6 @@ export type Shape =
 /* ---------------- 文档与桌布 ---------------- */
 
 export interface Doc {
-  name: string
   /** "none" 或 6 位 hex：画布视图背景，不进导出 */
   background: string
   /** [64,10000]，整数 */
@@ -353,12 +354,12 @@ export function normalizeCommands(raw: unknown): PathCommand[] {
 
 /**
  * 唯一文档净化器（对应单文件版 wi）。默认位置类字段以文档宽高为参照，
- * 所以宽高先修、形状后修。name 缺省念**当前语言**的"未命名画布"。
+ * 所以宽高先修、形状后修。画布没有名字：文档里不存在 name 这个字段，
+ * 旧存档里残留的 name 读到时直接忽略，不迁移。
  */
 export function normalizeDoc(raw: unknown, lang: Lang): Doc {
   const input = (raw ?? {}) as Record<string, unknown>
   const doc: Doc = {
-    name: typeof input.name === 'string' && input.name.trim() ? input.name : t(lang, 'doc.untitled'),
     background: input.background === 'none' || isHexColor(input.background) ? input.background : '#fffdf8',
     width: clamp(Math.round(num(input.width, 960)), 64, 10000),
     height: clamp(Math.round(num(input.height, 640)), 64, 10000),
@@ -375,7 +376,8 @@ export function normalizeDoc(raw: unknown, lang: Lang): Doc {
       stroke: isHexColor(item.stroke) || item.stroke === 'none' ? item.stroke : '#1b1d22',
       strokeWidth: Number.isFinite(Number(item.strokeWidth)) ? clamp(Number(item.strokeWidth), 0, 120) : 2,
       opacity: Number.isFinite(Number(item.opacity)) ? clamp(Number(item.opacity), 0, 1) : 1,
-      fillRule: type === 'path' && item.fillRule === 'evenodd' ? 'evenodd' : 'nonzero'
+      fillRule: type === 'path' && item.fillRule === 'evenodd' ? 'evenodd' : 'nonzero',
+      visible: item.visible !== false
     }
     switch (type) {
       case 'rect':
@@ -465,6 +467,7 @@ export function makeStarterDoc(lang: Lang): Doc {
       strokeWidth: 2,
       opacity: 1,
       fillRule: 'nonzero',
+      visible: true,
       cx: 612,
       cy: 322,
       rx: 171,
@@ -479,6 +482,7 @@ export function makeStarterDoc(lang: Lang): Doc {
       strokeWidth: 2,
       opacity: 1,
       fillRule: 'nonzero',
+      visible: true,
       x: 150,
       y: 180,
       w: 304,
@@ -494,6 +498,7 @@ export function makeStarterDoc(lang: Lang): Doc {
       strokeWidth: 6,
       opacity: 1,
       fillRule: 'nonzero',
+      visible: true,
       commands: [
         { id: makeId('c'), type: 'M', x: 242, y: 438 },
         { id: makeId('c'), type: 'C', x1: 335, y1: 216, x2: 504, y2: 519, x: 652, y: 318 },

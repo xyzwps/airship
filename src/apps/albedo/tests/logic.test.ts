@@ -9,7 +9,8 @@ import {
   pathCommandsBBox,
   stepZoom,
   zoomFromWheel,
-  zoomLabel
+  zoomLabel,
+  fitZoom
 } from '../geom.ts'
 import { parsePathCommands } from '../pathdata.ts'
 import { parseTransformAttr, viewBoxToFit, invertMatrix, multiply, transformArc } from '../matrix.ts'
@@ -24,9 +25,12 @@ import { runBoolean } from '../booleanOps.ts'
  */
 
 describe('模型净化', () => {
-  it('缺省文档是 960×640 纸底', () => {
+  it('缺省文档是 960×640 纸底，且画布没有名字', () => {
     const doc = normalizeDoc({}, 'zh')
-    expect([doc.width, doc.height, doc.background, doc.name]).toEqual([960, 640, '#fffdf8', '未命名画布'])
+    expect([doc.width, doc.height, doc.background]).toEqual([960, 640, '#fffdf8'])
+    expect('name' in doc).toBe(false)
+    // 旧存档里残留的 name 读到时忽略，不迁移
+    expect('name' in normalizeDoc({ name: '旧名字' }, 'zh')).toBe(false)
   })
 
   it('尺寸钳在 64..10000，坏形状整条丢弃', () => {
@@ -223,6 +227,15 @@ describe('缩放档位', () => {
     expect(up).toBeGreaterThan(1)
     expect(up).toBeLessThanOrEqual(2)
   })
+
+  it('适应屏幕取两边比值的小者，钳在档位区间；量不到可视区回落 1', () => {
+    // 可视区 1272×772 相对基准 980×653.33：高边先满 → 1.1816
+    expect(fitZoom(1272, 772, 980, 980 / 1.5)).toBeCloseTo(772 / (980 / 1.5), 6)
+    // 窗口窄到装不下基准宽：宽边先满，且不会超过 8
+    expect(fitZoom(490, 772, 980, 653)).toBeCloseTo(0.5, 6)
+    expect(fitZoom(8000, 8000, 980, 653)).toBe(8)
+    expect(fitZoom(0, 0, 980, 653)).toBe(1)
+  })
 })
 
 describe('字体名工具', () => {
@@ -266,17 +279,18 @@ describe('布尔运算（Paper.js）', () => {
 })
 
 describe('整幅重画的导出串', () => {
-  it('XML 头、title、两空格缩进与属性顺序', () => {
+  it('XML 头、没有 title、两空格缩进与属性顺序', () => {
     const doc = normalizeDoc(
       { width: 100, height: 80, name: '测试', shapes: [{ type: 'rect', x: 1, y: 2, w: 30, h: 20, rx: 4, fill: '#ff0000', stroke: 'none', strokeWidth: 0 }] },
       'zh'
     )
-    const text = exportFromModel(doc, '未命名画布', () => null)
+    const text = exportFromModel(doc, () => null)
     const lines = text.split('\n')
     expect(lines[0]).toBe('<?xml version="1.0" encoding="UTF-8"?>')
     expect(lines[1]).toBe('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="80" viewBox="0 0 100 80">')
-    expect(lines[2]).toBe('  <title>测试</title>')
-    expect(lines[3]).toContain('fill="#ff0000" stroke="none" stroke-linecap="round"')
+    expect(lines[2]).toContain('fill="#ff0000" stroke="none" stroke-linecap="round"')
+    expect(text).not.toContain('<title>')
+    expect(text).not.toContain('测试')
     expect(text.endsWith('</svg>\n')).toBe(true)
   })
 })

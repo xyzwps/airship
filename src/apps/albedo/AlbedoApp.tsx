@@ -7,7 +7,7 @@ import './albedo.css'
  * Albedo 的 React 外壳：只负责画静态骨架（Photoshop 式布局），
  * 真正的编辑器住在 `albedoWorkspace.ts`——舞台、手势、检查器与文档状态都在那里。
  *
- * 布局五块：顶部选项条（文档名/保存态/撤销重做/文件动作/语言）、左侧竖排图标工具条、
+ * 布局五块：顶部选项条（保存态/撤销重做/文件动作/语言）、左侧竖排图标工具条、
  * 中间画布区（辅助条 + 深灰画布面 + 底部状态条）、右侧停靠面板（上属性、下图层）。
  * 外壳固定深色——深灰金属就是这套工具的样子，不跟壳的主题键走（画布纸色不受影响）。
  *
@@ -30,22 +30,7 @@ export default function AlbedoApp({ api }: { api: AppApi }): JSX.Element {
   return (
     <div className="app" ref={rootRef}>
       <header className="topbar">
-        <div className="brand" aria-label="Albedo SVG Studio">
-          <span className="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg" focusable="false">
-              <rect x="16" y="32" width="84" height="62" rx="10" fill="#f26b4f" stroke="#0f1013" strokeWidth="6" />
-              <ellipse cx="100" cy="102" rx="42" ry="31" fill="#98a6e8" />
-            </svg>
-          </span>
-          <span className="brand-name">Albedo</span>
-        </div>
-
-        <span className="tb-sep" aria-hidden="true"></span>
-
-        <div className="doc-block">
-          <input id="docTitle" className="doc-title" defaultValue="未命名画布" data-i18n-aria="doc.nameAria" maxLength={60} />
-          <span id="saveState" className="save-state" data-i18n="save.saved">已保存</span>
-        </div>
+        <span id="saveState" className="save-state" data-i18n="save.saved">已保存</span>
 
         <span className="tb-sep" aria-hidden="true"></span>
 
@@ -59,6 +44,7 @@ export default function AlbedoApp({ api }: { api: AppApi }): JSX.Element {
           <button id="exportBtn" className="tb-btn primary" data-i18n-title="action.exportSvgTitle" title="导出 SVG 文件">
             <span data-i18n="action.exportSvg">导出 SVG</span>
           </button>
+          <button id="exportPngBtn" className="tb-btn" data-i18n-title="action.exportPngTitle" title="导出 PNG 位图（与画布同尺寸）" data-i18n="action.exportPng">导出 PNG</button>
         </div>
 
         <span className="tb-spacer"></span>
@@ -161,6 +147,9 @@ export default function AlbedoApp({ api }: { api: AppApi }): JSX.Element {
                 <button type="button" id="zoomOutBtn" className="zoom-btn" data-i18n-title="canvas.zoomOut" title="缩小画布（Ctrl + -）">&minus;</button>
                 <button type="button" id="zoomFitBtn" className="zoom-btn zoom-label-btn" data-i18n-title="canvas.zoomReset" title="恢复 100% 缩放（Ctrl + 0）"><span id="zoomLabel">100%</span></button>
                 <button type="button" id="zoomInBtn" className="zoom-btn" data-i18n-title="canvas.zoomIn" title="放大画布（Ctrl + =）">+</button>
+                <button type="button" id="zoomFitScreenBtn" className="zoom-btn zoom-icon-btn" data-i18n-title="canvas.zoomFitScreen" data-i18n-aria="canvas.zoomFitScreenAria" title="适应屏幕（Ctrl + 1）" aria-label="适应屏幕">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" /></svg>
+                </button>
               </div>
               <button type="button" id="canvasSizeBtn" className="meta-pill canvas-size-btn" data-i18n-title="canvas.changeSize" title="修改画布尺寸" aria-haspopup="dialog" aria-controls="canvasModal">
                 <span id="canvasSizeLabel">960 × 640</span>

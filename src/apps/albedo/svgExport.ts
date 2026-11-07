@@ -72,14 +72,13 @@ export function serializeShapeToText(shape: Shape, fontsOf: FontsOf): string {
   }
 }
 
-/** 整幅重画：XML 头 + svg 根 + title + 每个形状一行，文件以换行结尾 */
-export function exportFromModel(doc: Doc, untitledText: string, fontsOf: FontsOf): string {
+/** 整幅重画：XML 头 + svg 根 + 每个形状一行，文件以换行结尾；画布没有名字，所以不写 <title> */
+export function exportFromModel(doc: Doc, fontsOf: FontsOf): string {
   const lines: string[] = []
   lines.push('<?xml version="1.0" encoding="UTF-8"?>')
   lines.push(
     `<svg xmlns="${SVG_NS}" width="${doc.width}" height="${doc.height}" viewBox="0 0 ${doc.width} ${doc.height}">`
   )
-  lines.push(`  <title>${escapeXml(doc.name || untitledText)}</title>`)
   for (const shape of doc.shapes) {
     const line = serializeShapeToText(shape, fontsOf)
     if (line) lines.push(line)
@@ -195,8 +194,9 @@ function sortDeep(v: unknown): unknown {
 }
 
 /**
- * 形状指纹：归一化后剥掉 id/name/sourceKey 与命令 id，只剩几何+样式。
+ * 形状指纹：归一化后剥掉 id/name/sourceKey/visible 与命令 id，只剩几何+样式。
  * 导入时记为 baseline；导出时与当前形状再算一次比相等——相等就连节点都不动。
+ * visible 不进指纹：隐藏只是编辑时的清场，不该让一份原稿在导出时变了写法。
  */
 export function shapeSignature(shape: Shape): string {
   const normalized = normalizeDoc({ width: 64, height: 64, shapes: [shape] }, 'en').shapes[0] as
@@ -206,6 +206,7 @@ export function shapeSignature(shape: Shape): string {
   const clone = JSON.parse(JSON.stringify(normalized)) as Shape & { sourceKey?: string }
   delete (clone as { id?: string }).id
   delete (clone as { name?: string }).name
+  delete (clone as { visible?: boolean }).visible
   delete clone.sourceKey
   if (clone.type === 'path') {
     clone.commands = clone.commands.map((c) => {
@@ -307,19 +308,18 @@ export function fixDomOrder(
 export interface PatchedExportInput {
   source: SourceDocState
   doc: Doc
-  untitledText: string
   fontsOf: FontsOf
 }
 
 /**
  * 补丁式导出；没有来源文档时返回 **null**，调用方回落整幅重画。
  *
- * 步骤：覆写根尺寸 → 保 title → 已配对元素按模型顺序重排 → 逐形状：
+ * 步骤：覆写根尺寸 → 摘掉根上的 <title>（画布没有名字）→ 已配对元素按模型顺序重排 → 逐形状：
  * 无 entry/查无原节点 → 新元素追到根尾；指纹相等 → 原节点整个不动；改过 → 重建 +
  * 搬外观 + 逆变换保位置（变换链不支持时退化为"摘原节点、挂根尾"）→ 删除模型里已不存在的原节点 → 清配对键。
  */
 export function exportPatched(input: PatchedExportInput): string | null {
-  const { source, doc, untitledText, fontsOf } = input
+  const { source, doc, fontsOf } = input
   if (!source?.doc) return null
   const clone = source.doc.cloneNode(true) as Document
   const root = clone.documentElement
@@ -328,12 +328,9 @@ export function exportPatched(input: PatchedExportInput): string | null {
   root.setAttribute('height', String(doc.height))
   root.setAttribute('viewBox', `0 0 ${doc.width} ${doc.height}`)
 
-  let title = Array.from(root.children).find((c) => c.nodeName.toLowerCase() === 'title') ?? null
-  if (!title) {
-    title = clone.createElementNS(SVG_NS, 'title')
-    root.insertBefore(title, root.firstChild)
+  for (const child of Array.from(root.children)) {
+    if (child.nodeName.toLowerCase() === 'title') root.removeChild(child)
   }
-  title.textContent = doc.name || untitledText
 
   fixDomOrder(clone, root, doc.shapes, source.entries)
 

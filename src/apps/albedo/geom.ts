@@ -750,6 +750,19 @@ export function zoomLabel(v: unknown): string {
   return `${Math.round(clampZoom(v) * 100)}%`
 }
 
+/**
+ * 适应屏幕该给多少倍：可视区 availW×availH 相对"缩放 1 时画板占的屏幕尺寸" baseW×baseH 的比值取小，
+ * 再钳进档位区间。任一边不是正数（jsdom 里 clientWidth 全是 0）回落 1，别算出 Infinity。
+ */
+export function fitZoom(availW: unknown, availH: unknown, baseW: unknown, baseH: unknown): number {
+  const aw = Number(availW)
+  const ah = Number(availH)
+  const bw = Number(baseW)
+  const bh = Number(baseH)
+  if (!(aw > 0) || !(ah > 0) || !(bw > 0) || !(bh > 0)) return 1
+  return clampZoom(Math.min(aw / bw, ah / bh))
+}
+
 /* ---------------- opentype → 命令 ---------------- */
 
 /** opentype 字体 getPath 的 commands 转内部命令（带 id 由调用方补） */

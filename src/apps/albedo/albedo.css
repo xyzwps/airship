@@ -57,23 +57,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   border-bottom: 1px solid var(--line);
   z-index: 20;
 }
-.brand { display: flex; align-items: center; gap: 7px; padding-left: 2px; }
-.brand-mark svg { width: 20px; height: 20px; display: block; }
-.brand-name { font-weight: 650; letter-spacing: 0.02em; }
 .tb-sep { width: 1px; height: 20px; background: var(--line); flex: 0 0 1px; }
 .tb-spacer { flex: 1; }
 
-.doc-block { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.doc-title {
-  width: 190px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 3px 7px;
-  font-weight: 600;
-}
-.doc-title:hover { border-color: var(--line); }
-.doc-title:focus { border-color: var(--blue); background: var(--bg2); outline: none; }
 .save-state { font-size: 11px; color: var(--tx3); white-space: nowrap; }
 .save-state::before { content: "● "; color: var(--ok); }
 .save-state.saving { color: var(--tx2); }
@@ -255,6 +241,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .zoom-btn:hover:not(:disabled) { background: var(--bg3); color: var(--tx); }
 .zoom-btn:disabled { opacity: 0.4; cursor: default; }
 .zoom-label-btn { font-size: 11.5px; }
+.zoom-icon-btn { display: inline-flex; align-items: center; justify-content: center; }
+.zoom-icon-btn svg { display: block; }
 .meta-pill {
   height: 24px;
   display: inline-flex;
@@ -435,10 +423,12 @@ body.is-drop .stage-drop { display: flex; }
   color: var(--tx3);
 }
 .layer-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
-.layer-btn { width: 20px; height: 20px; border-radius: 4px; color: var(--tx3); font-size: 11px; }
-.layer-btn:hover:not(:disabled) { background: var(--bg1); color: var(--tx); }
-.layer-btn:disabled { opacity: 0.3; cursor: default; }
-.layer-btn.danger:hover:not(:disabled) { color: var(--acc-hi); }
+.layer-btn { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; color: var(--tx3); font-size: 11px; }
+.layer-btn:hover { background: var(--bg1); color: var(--tx); }
+.layer-btn.danger:hover { color: var(--acc-hi); }
+/* 隐藏的图层：行整体退到"看不清"那一档，眼睛键念的是"显示图层"——状态与措辞同一件事 */
+.layer-row.is-hidden .layer-name, .layer-row.is-hidden .layer-grip { color: var(--tx3); }
+.layer-row.is-hidden .layer-type { opacity: 0.55; }
 
 /* ---------- 检查器 ---------- */
 .inspector-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
@@ -479,13 +469,24 @@ body.is-drop .stage-drop { display: flex; }
 .ins-section-head .rule { flex: 1; height: 1px; background: var(--line); }
 .ins-section-head .tiny { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; color: var(--tx3); white-space: nowrap; }
 
-.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; }
-.field-grid.three { grid-template-columns: 1fr 1fr 1fr; }
-.field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.field.full { grid-column: 1 / -1; }
-.field.wide { grid-column: 1 / -1; }
+/* ---------- 字段：标签在左、控件在右同一行 ----------
+   单个 .field 自己就是一行两列（auto 让标签占它该占的，控件吃掉剩下的）。
+   放进 .field-grid 时 .field 不再是盒子（display: contents），标签和控件直接落进
+   那四列 auto 1fr auto 1fr——于是一行能放两组，且两组的控件上下对齐，标签宽度不写死。 */
+.field-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: center;
+}
+.field-grid .field { display: contents; }
+.field { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px; align-items: center; min-width: 0; }
+.field > label, .field > .field-label, .field-label { white-space: nowrap; }
+.field-grid .field.full > :first-child { grid-column: 1; }
+.field-grid .field.full > :nth-child(2) { grid-column: 2 / -1; }
+.field > .field-hint, .field-grid .field > .field-hint { grid-column: 1 / -1; }
 .field label, .field-label { font-size: 10.5px; letter-spacing: 0.04em; color: var(--tx3); text-transform: uppercase; }
-.input-shell { position: relative; display: flex; align-items: center; }
+.input-shell { position: relative; display: flex; align-items: center; min-width: 0; }
 .input-shell .prefix { position: absolute; left: 7px; font-size: 10px; color: var(--tx3); pointer-events: none; }
 .input-shell input[type="number"], .input-shell input[type="text"] {
   width: 100%;
@@ -493,10 +494,12 @@ body.is-drop .stage-drop { display: flex; }
   background: var(--bg0);
   border: 1px solid var(--line);
   border-radius: 4px;
-  padding: 0 7px 0 20px;
+  padding: 0 7px;
   color: var(--tx);
   font-size: 12px;
 }
+/* 只有框内真写了前缀的那几个（多边形顶点）才留那条内缩的左肩 */
+.input-shell:has(.prefix) input { padding-left: 20px; }
 .input-shell input:hover { border-color: var(--line2); }
 .input-shell input:focus { border-color: var(--blue); outline: none; }
 .field-hint, .panel-hint { margin: 7px 0 0; font-size: 11px; line-height: 1.55; color: var(--tx3); }
@@ -530,8 +533,9 @@ body.is-drop .stage-drop { display: flex; }
 .none-chip:hover { background: var(--bg3); color: var(--tx); }
 .none-chip.active { border-color: var(--acc); color: var(--acc-hi); background: rgba(227, 91, 63, 0.12); }
 
-.opacity-row { display: flex; align-items: center; gap: 8px; }
-.opacity-row input[type="range"] { flex: 1; accent-color: var(--acc); }
+.opacity-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.opacity-row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--acc); }
+.opacity-row .pct { flex: 0 0 auto; }
 .pct { width: 38px; text-align: right; font-family: var(--mono); font-size: 11px; color: var(--tx2); }
 
 .align-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
@@ -622,7 +626,8 @@ body.is-drop .stage-drop { display: flex; }
 .cmd-del { width: 20px; height: 20px; border-radius: 4px; color: var(--tx3); font-size: 11px; }
 .cmd-del:hover:not(:disabled) { background: var(--bg1); color: var(--acc-hi); }
 .cmd-del:disabled { opacity: 0.3; cursor: default; }
-.cmd-body { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; padding: 0 8px 8px; }
+/* 命令卡的字段行复用 .field-grid 那套四列（标签在左、控件在右，一行两组），这里只补卡内的留白 */
+.cmd-body { padding: 0 8px 8px; }
 .group-label { grid-column: 1 / -1; font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--tx3); margin-top: 2px; }
 .cmd-arc-flags { grid-column: 1 / -1; display: flex; gap: 12px; }
 .cmd-flag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--tx2); cursor: pointer; }

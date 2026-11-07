@@ -148,13 +148,6 @@ function hasTransformInStyle(node: Element): boolean {
   return /(?:^|;)\s*transform\s*:/i.test(style)
 }
 
-function readSvgTitle(node: Element): string | null {
-  const title = Array.from(node.children).find((c) => tagName(c) === 'title')
-  if (!title) return null
-  const text = (title.textContent || '').replace(/\s+/g, ' ').trim()
-  return text || null
-}
-
 /* ---------------- 根归一化与配对键 ---------------- */
 
 interface PreparedSvg {
@@ -166,7 +159,6 @@ interface PreparedSvg {
   elements: Map<string, SourceEntry>
   sourceDoc: Document
   sourceRoot: Element
-  title: string | null
 }
 
 export interface SourceEntry {
@@ -340,8 +332,7 @@ function prepareSvgSource(text: string): PreparedSvg {
     viewport: { width: normalized.width, height: normalized.height },
     elements,
     sourceDoc: cloneDoc,
-    sourceRoot: cloneRoot,
-    title: readSvgTitle(cloneRoot)
+    sourceRoot: cloneRoot
   }
   return prepared
 }
@@ -677,7 +668,6 @@ export interface ImportOutcome {
   sourceDoc: Document
   sourceRoot: Element
   sourceElements: Map<string, SourceEntry>
-  title: string | null
 }
 
 export function importSvg(text: string): ImportOutcome {
@@ -764,8 +754,7 @@ export function importSvg(text: string): ImportOutcome {
       warnings,
       sourceDoc: prepared.sourceDoc,
       sourceRoot: prepared.sourceRoot,
-      sourceElements: prepared.elements,
-      title: prepared.title || null
+      sourceElements: prepared.elements
     }
   } finally {
     paperScope.settings.scaleStrokes = prevScaleStrokes

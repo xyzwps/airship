@@ -46,6 +46,7 @@ import {
   stepZoom,
   zoomFromWheel,
   zoomLabel,
+  fitZoom,
   type Box,
   type TextFontLike
 } from './geom.ts'
@@ -65,6 +66,7 @@ import {
   shapeSignature,
   type SourceEntryRecord
 } from './svgExport.ts'
+import { svgToPngBytes } from './pngExport.ts'
 import {
   parseFontBuffer,
   fontPostscriptName,
@@ -327,11 +329,11 @@ export class AlbedoWorkspace {
       'underlayEmpty', 'underlayControls', 'underlayImportBtn', 'underlayThumb', 'underlayName', 'underlayMeta',
       'underlayVisibleBtn', 'underlayAdjustBtn', 'underlayReplaceBtn', 'underlayRemoveBtn', 'underlayHint',
       'underlayToggle', 'underlayPopover', 'underlayPopoverClose', 'underlayStateDot',
-      'importSvgBtn', 'insertSvgBtn', 'stageDrop', 'docTitle', 'saveState',
+      'importSvgBtn', 'insertSvgBtn', 'stageDrop', 'saveState',
       'coordStatus', 'shapeStatus', 'nodeStatus', 'canvasTip', 'emptyCanvas', 'artboardWrap', 'stageBody',
-      'zoomInBtn', 'zoomOutBtn', 'zoomFitBtn', 'zoomLabel', 'canvasSizeBtn', 'canvasSizeLabel',
+      'zoomInBtn', 'zoomOutBtn', 'zoomFitBtn', 'zoomFitScreenBtn', 'zoomLabel', 'canvasSizeBtn', 'canvasSizeLabel',
       'canvasModal', 'canvasWidthInput', 'canvasHeightInput', 'canvasRatioChip', 'canvasSizeError', 'canvasApplyBtn',
-      'undoBtn', 'redoBtn', 'newBtn', 'copyBtn', 'exportBtn', 'gridToggle', 'gridSize', 'snapToggle', 'langSelect', 'toast'
+      'undoBtn', 'redoBtn', 'newBtn', 'copyBtn', 'exportBtn', 'exportPngBtn', 'gridToggle', 'gridSize', 'snapToggle', 'langSelect', 'toast'
     ]
     for (const id of ids) {
       const el = this.host.querySelector(`#${id}`)
@@ -446,7 +448,6 @@ export class AlbedoWorkspace {
         st.selectedCmdId = this.lastNonZ(path)?.id ?? null
       }
     }
-    this.syncDocTitleInput()
     this.fullRefresh()
     this.scheduleSave()
   }
@@ -695,7 +696,6 @@ export class AlbedoWorkspace {
     }
     this.applyLanguage()
     const renamed = this.localizeDoc()
-    this.syncDocTitleInput()
     if (!this.el('canvasModal').hidden) this.el('canvasSizeError').textContent = ''
     this.fullRefresh()
     if (renamed) this.scheduleSave()
@@ -771,18 +771,10 @@ export class AlbedoWorkspace {
     return raw
   }
 
-  /** 文档名 / 每个形状名 / 桌布名逐条本地化；返回是否有改动（调用方据此标脏） */
+  /** 每个形状名 / 桌布名逐条本地化；返回是否有改动（调用方据此标脏） */
   localizeDoc(): boolean {
     const st = this.state
     let touched = false
-    const untitledCandidates = [String(translate('zh', 'doc.untitled')), String(translate('en', 'doc.untitled'))]
-    if (st.doc && untitledCandidates.includes(st.doc.name)) {
-      const want = String(translate(st.lang, 'doc.untitled'))
-      if (st.doc.name !== want) {
-        st.doc.name = want
-        touched = true
-      }
-    }
     if (st.doc) {
       for (const shape of st.doc.shapes) {
         const next = this.localizeDocName(shape.name)
@@ -803,12 +795,6 @@ export class AlbedoWorkspace {
       }
     }
     return touched
-  }
-
-  syncDocTitleInput(): void {
-    const st = this.state
-    const input = this.el('docTitle') as HTMLInputElement
-    input.value = st.doc?.name?.trim() ? st.doc.name : this.t('doc.untitled')
   }
 
   /* ================= 选择与形状取用 ================= */
@@ -1121,7 +1107,8 @@ export class AlbedoWorkspace {
     this.syncCanvasGeometry()
     this.el('canvasBg').setAttribute('fill', st.doc.background === 'none' ? 'transparent' : st.doc.background)
     const frag = document.createDocumentFragment()
-    for (const shape of st.doc.shapes) frag.appendChild(this.renderShapeEl(shape))
+    // 隐藏的形状不进画布 DOM：既不画，也点不着（要改它从图层行选）
+    for (const shape of st.doc.shapes) if (shape.visible) frag.appendChild(this.renderShapeEl(shape))
     this.el('shapeLayer').replaceChildren(frag)
     this.updateEmptyCanvasHint()
     this.renderOverlay()
@@ -1471,21 +1458,12 @@ export class AlbedoWorkspace {
     const st = this.state
     if (!st.doc) return
     const before = anchor ? this.clientToDoc(anchor.x, anchor.y) : null
-    const body = this.el('stageBody')
     const wrap = this.el('artboardWrap')
-    const pad = 64
-    const availW = Math.max(80, body.clientWidth - pad * 2)
-    const availH = Math.max(80, body.clientHeight - pad * 2)
-    const aspect = st.doc.width / Math.max(1, st.doc.height)
-    let w = Math.min(availW, 980)
-    let h = w / aspect
-    if (h > availH) {
-      h = availH
-      w = h * aspect
-    }
+    const base = this.baseArtboardSize()
+    if (!base) return
     const z = clampZoom(st.zoom)
-    w = Math.max(1, Math.floor(w * z))
-    h = Math.max(1, Math.floor(h * z))
+    const w = Math.max(1, Math.floor(base.w * z))
+    const h = Math.max(1, Math.floor(base.h * z))
     wrap.style.width = `${w}px`
     wrap.style.height = `${h}px`
     const scale = this.currentScreenScale()
@@ -1496,6 +1474,35 @@ export class AlbedoWorkspace {
     }
     if (anchor && before) this.keepAnchor(anchor, before)
     this.syncZoomLabel()
+  }
+
+  /**
+   * 缩放 1 时画板在屏幕上占多大，连同那块可视区一起给（两侧各留 64，下限 80）：
+   * 按画布比例装进可视区，宽再钳在 980。layoutStage 与"适应屏幕"共用这一把尺——
+   * 两处算法必须一致，否则"适应屏幕"点下去会比 100% 还小或铺不满。
+   */
+  private baseArtboardSize(): { w: number; h: number; availW: number; availH: number } | null {
+    const st = this.state
+    if (!st.doc) return null
+    const body = this.el('stageBody')
+    const pad = 64
+    const availW = Math.max(80, body.clientWidth - pad * 2)
+    const availH = Math.max(80, body.clientHeight - pad * 2)
+    const aspect = st.doc.width / Math.max(1, st.doc.height)
+    let w = Math.min(availW, 980)
+    let h = w / aspect
+    if (h > availH) {
+      h = availH
+      w = h * aspect
+    }
+    return { w, h, availW, availH }
+  }
+
+  /** 适应屏幕：把画板铺满可视区（留白照旧），倍率钳在档位区间内 */
+  fitToScreen(): void {
+    const base = this.baseArtboardSize()
+    if (!base) return
+    this.setZoom(fitZoom(base.availW, base.availH, base.w, base.h), this.viewportCenter())
   }
 
   private currentScreenScale(): number {
@@ -1793,38 +1800,35 @@ export class AlbedoWorkspace {
       this.el('layers').innerHTML = `<div class="layer-empty"><strong>${this.escapeHtml(this.t('layers.emptyTitle'))}</strong>${this.escapeHtml(this.t('layers.emptyHint'))}</div>`
       return
     }
-    const len = shapes.length
     const rows = shapes
       .slice()
       .reverse()
-      .map((shape, v) => {
-        const index = len - 1 - v
+      .map((shape) => {
         const selected = st.selectedIds.includes(shape.id)
         const code = SHAPE_TYPE_CODE[shape.type]
-        return `<div class="layer-row${selected ? ' selected' : ''}" draggable="true" data-layer-id="${shape.id}">
+        const visLabel = this.escapeHtml(this.t(shape.visible ? 'layers.hide' : 'layers.show'))
+        const eye = shape.visible
+          ? '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M1.7 8S3.9 3.7 8 3.7 14.3 8 14.3 8 12.1 12.3 8 12.3 1.7 8 1.7 8Z"/><circle cx="8" cy="8" r="2.1"/></svg>'
+          : '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M1.7 8S3.9 3.7 8 3.7 14.3 8 14.3 8 12.1 12.3 8 12.3 1.7 8 1.7 8Z"/><circle cx="8" cy="8" r="2.1"/><path d="M3.2 12.8 12.8 3.2"/></svg>'
+        return `<div class="layer-row${selected ? ' selected' : ''}${shape.visible ? '' : ' is-hidden'}" draggable="true" data-layer-id="${shape.id}">
           <span class="layer-grip" aria-hidden="true">⋮⋮</span>
           <span class="layer-type" aria-hidden="true">${code}</span>
           <span class="layer-name">${this.escapeHtml(shape.name)}</span>
-          <button class="layer-btn" data-layer-action="up" title="${this.escapeHtml(this.t('layers.up'))}" aria-label="${this.escapeHtml(this.t('layers.up'))}"${index === len - 1 ? ' disabled' : ''}>↑</button>
-          <button class="layer-btn" data-layer-action="down" title="${this.escapeHtml(this.t('layers.down'))}" aria-label="${this.escapeHtml(this.t('layers.down'))}"${index === 0 ? ' disabled' : ''}>↓</button>
+          <button class="layer-btn" data-layer-action="toggle" title="${visLabel}" aria-label="${visLabel}">${eye}</button>
           <button class="layer-btn danger" data-layer-action="delete" title="${this.escapeHtml(this.t('layers.delete'))}" aria-label="${this.escapeHtml(this.t('layers.delete'))}">✕</button>
         </div>`
       })
     this.el('layers').innerHTML = rows.join('')
   }
 
-  moveLayerBy(id: string, delta: number): void {
+  /** 隐藏/显示：只改画布上画不画，文档数据、导出与图形计数都不动它 */
+  toggleShapeVisible(id: string): void {
     const st = this.state
-    if (!st.doc) return
-    const shapes = st.doc.shapes
-    const from = shapes.findIndex((s) => s.id === id)
-    if (from < 0) return
-    const to = from + delta
-    if (to < 0 || to >= shapes.length) return
+    const shape = st.doc?.shapes.find((s) => s.id === id)
+    if (!shape) return
     this.commitEdit()
     const before = this.snapshot()
-    const [item] = shapes.splice(from, 1)
-    shapes.splice(to, 0, item!)
+    shape.visible = !shape.visible
     this.pushHistory(before)
     this.renderShapeLayer()
     this.renderLayerList()
@@ -2160,7 +2164,7 @@ export class AlbedoWorkspace {
     const name = defaultShapeName(st.lang, type, nth)
     const id = makeId('s')
     const stroke = '#1b1d22'
-    const base = { id, name, stroke, opacity: 1, fillRule: 'nonzero' as const }
+    const base = { id, name, stroke, opacity: 1, fillRule: 'nonzero' as const, visible: true }
     let shape: Shape
     switch (type) {
       case 'rect': {
@@ -2591,6 +2595,8 @@ export class AlbedoWorkspace {
       strokeWidth: paintFrom.strokeWidth,
       opacity: paintFrom.opacity,
       fillRule: outcome.fillRule,
+      /** 与填充同一个来源：隐藏的那一层参与布尔，结果也保持隐藏 */
+      visible: paintFrom.visible,
       commands: normalizeCommands(
         outcome.segments.map((seg) => ({ ...seg, id: makeId('c') }))
       )
@@ -2680,15 +2686,6 @@ export class AlbedoWorkspace {
     }
   }
 
-  commitDocName(): void {
-    const st = this.state
-    if (!st.doc) return
-    const input = this.el('docTitle') as HTMLInputElement
-    st.doc.name = input.value.trim() || this.t('doc.untitled')
-    void this.api.window.setTitle(st.doc.name).catch(() => undefined)
-    this.scheduleSave()
-  }
-
   /** "新建"：清形状、留桌布、留尺寸；可撤销 */
   newBlankDocument(): void {
     const st = this.state
@@ -2707,7 +2704,6 @@ export class AlbedoWorkspace {
     this.setSelectedIds([])
     st.pathEdit = true
     st.underlayAdjust = false
-    this.syncDocTitleInput()
     this.pushHistory(prev)
     this.fullRefresh()
     void this.saveNow()
@@ -3193,7 +3189,7 @@ export class AlbedoWorkspace {
     html += this.colorField(this.t('inspector.stroke'), 'stroke', shape.stroke, true)
     html +=
       `<div class="field-grid">${this.numberField(this.t('inspector.strokeWidth'), 'strokeWidth', shape.strokeWidth, 0.5)}` +
-      `<div class="field"><span class="field-label">${this.escapeHtml(this.t('inspector.opacity'))}</span>` +
+      `<div class="field full"><span class="field-label">${this.escapeHtml(this.t('inspector.opacity'))}</span>` +
       `<div class="opacity-row"><input type="range" min="0" max="1" step="0.01" data-prop="opacity" value="${fmt2(shape.opacity)}">` +
       `<span class="pct" data-opacity-label>${Math.round(shape.opacity * 100)}%</span></div></div></div></section>`
     this.el('inspector').innerHTML = html
@@ -3237,7 +3233,6 @@ export class AlbedoWorkspace {
     }
     if (shape.type === 'path') return ''
     let fields = ''
-    let gridClass = 'field-grid'
     if (shape.type === 'rect') {
       fields =
         this.numberField('X', 'x', shape.x) + this.numberField('Y', 'y', shape.y) +
@@ -3250,13 +3245,12 @@ export class AlbedoWorkspace {
     } else if (shape.type === 'circle') {
       fields =
         this.numberField('CX', 'cx', shape.cx) + this.numberField('CY', 'cy', shape.cy) + this.numberField('R', 'r', shape.r)
-      gridClass = 'field-grid three'
     } else if (shape.type === 'line') {
       fields =
         this.numberField('X1', 'x1', shape.x1) + this.numberField('Y1', 'y1', shape.y1) +
         this.numberField('X2', 'x2', shape.x2) + this.numberField('Y2', 'y2', shape.y2)
     }
-    return this.sectionHead('geometry', this.t('inspector.geometry'), 'GEOMETRY') + `<div class="${gridClass}">${fields}</div></section>`
+    return this.sectionHead('geometry', this.t('inspector.geometry'), 'GEOMETRY') + `<div class="field-grid">${fields}</div></section>`
   }
 
   private cmdNumberInput(cmdId: string, label: string, key: string, value: number, cls = ''): string {
@@ -3270,6 +3264,11 @@ export class AlbedoWorkspace {
     return `<label class="cmd-flag"><input type="checkbox" data-cmd-flag="${flag}" data-cmd-id="${cmdId}"${checked ? ' checked' : ''}><span>${this.escapeHtml(label)}</span></label>`
   }
 
+  /**
+   * 一张命令卡 = 若干行「标签 输入框 标签 输入框」。
+   * 分组标题（控制点 1 / 终点 那几行）随同一行的排版一起退场：C1X、C1Y 这些字段名自己就说了是谁，
+   * 再各占一行只是把卡片拉高。只有 Z 那张留着一句"闭合回到起点"，因为它没有输入框可念。
+   */
   private commandFields(cmd: PathCommand): string {
     switch (cmd.type) {
       case 'Z':
@@ -3279,35 +3278,27 @@ export class AlbedoWorkspace {
         return this.cmdNumberInput(cmd.id, 'X', 'x', cmd.x) + this.cmdNumberInput(cmd.id, 'Y', 'y', cmd.y)
       case 'Q':
         return (
-          `<div class="group-label">${this.escapeHtml(this.t('inspector.controlPoint'))}</div>` +
           this.cmdNumberInput(cmd.id, 'CX', 'x1', cmd.x1) +
           this.cmdNumberInput(cmd.id, 'CY', 'y1', cmd.y1) +
-          `<div class="group-label">${this.escapeHtml(this.t('inspector.anchor'))}</div>` +
           this.cmdNumberInput(cmd.id, 'X', 'x', cmd.x) +
           this.cmdNumberInput(cmd.id, 'Y', 'y', cmd.y)
         )
       case 'C':
         return (
-          `<div class="group-label">${this.escapeHtml(this.t('inspector.control1'))}</div>` +
           this.cmdNumberInput(cmd.id, 'C1X', 'x1', cmd.x1) +
           this.cmdNumberInput(cmd.id, 'C1Y', 'y1', cmd.y1) +
-          `<div class="group-label">${this.escapeHtml(this.t('inspector.control2'))}</div>` +
           this.cmdNumberInput(cmd.id, 'C2X', 'x2', cmd.x2) +
           this.cmdNumberInput(cmd.id, 'C2Y', 'y2', cmd.y2) +
-          `<div class="group-label">${this.escapeHtml(this.t('inspector.end'))}</div>` +
           this.cmdNumberInput(cmd.id, 'X', 'x', cmd.x) +
           this.cmdNumberInput(cmd.id, 'Y', 'y', cmd.y)
         )
       case 'A':
         return (
-          `<div class="group-label">${this.escapeHtml(this.t('inspector.ellipseRadii'))}</div>` +
           this.cmdNumberInput(cmd.id, 'RX', 'rx', cmd.rx) +
           this.cmdNumberInput(cmd.id, 'RY', 'ry', cmd.ry) +
-          this.cmdNumberInput(cmd.id, this.t('inspector.rotation'), 'rotation', cmd.rotation, 'wide') +
-          `<div class="group-label">${this.escapeHtml(this.t('inspector.arcDirection'))}</div>` +
+          this.cmdNumberInput(cmd.id, this.t('inspector.rotation'), 'rotation', cmd.rotation, 'full') +
           `<div class="cmd-arc-flags">${this.cmdFlagInput(cmd.id, 'largeArc', this.t('inspector.largeArc'), Boolean(cmd.largeArc))}` +
           `${this.cmdFlagInput(cmd.id, 'sweep', this.t('inspector.sweep'), Boolean(cmd.sweep))}</div>` +
-          `<div class="group-label">${this.escapeHtml(this.t('inspector.end'))}</div>` +
           this.cmdNumberInput(cmd.id, 'X', 'x', cmd.x) +
           this.cmdNumberInput(cmd.id, 'Y', 'y', cmd.y)
         )
@@ -3337,7 +3328,7 @@ export class AlbedoWorkspace {
         `<span class="cmd-title">${this.escapeHtml(this.cmdTitle(cmd.type))}</span><span class="cmd-coords">${this.escapeHtml(coords)}</span>` +
         `<span class="cmd-index">${String(index + 1).padStart(2, '0')}</span>` +
         `<button class="cmd-del" data-del-cmd="${cmd.id}" title="${this.escapeHtml(delTitle)}"${index === 0 ? ' disabled' : ''}>\u2715</button></div>` +
-        `<div class="cmd-body">${this.commandFields(cmd)}</div></article>`
+        `<div class="cmd-body field-grid">${this.commandFields(cmd)}</div></article>`
     })
     html +=
       `</div><div class="path-code"><code id="pathCode">${this.escapeHtml(commandsToPath(shape.commands))}</code>` +
@@ -3512,20 +3503,17 @@ export class AlbedoWorkspace {
       const patched = exportPatched({
         source: st.source,
         doc: st.doc,
-        untitledText: this.t('doc.untitled'),
         fontsOf: (ps) => this.state.fonts.get(ps) ?? null
       })
       if (patched) return patched
     }
-    return exportFromModel(st.doc, this.t('doc.untitled'), (ps) => this.state.fonts.get(ps) ?? null)
+    return exportFromModel(st.doc, (ps) => this.state.fonts.get(ps) ?? null)
   }
 
-  /** 文件名清洗：只换 Windows 不允许的 9 个字符，连续并一个 -；空回落 albedo-svg */
-  exportFileName(): string {
-    const name = (this.state.doc?.name || 'albedo-svg').trim().replace(/[\\/:*?"<>|]+/g, '-')
-    return (name || 'albedo-svg') + '.svg'
-  }
-
+  /**
+   * 导出 SVG：内容口径 = 模型那份串（文字先描轮廓、背景与桌布都不进）。
+   * 画布没有名字，另存为只给一个固定默认名，真名字由使用者在对话框里打。
+   */
   async saveSvg(): Promise<void> {
     const st = this.state
     if (!st.doc) return
@@ -3535,13 +3523,39 @@ export class AlbedoWorkspace {
     if (text === null) return
     const path = await this.api.dialog.saveFile({
       title: this.t('action.exportSvg'),
-      defaultPath: this.exportFileName(),
+      defaultPath: 'albedo.svg',
       filters: [{ name: 'SVG', extensions: ['svg'] }]
     })
     if (!path) return
     try {
       await this.api.fs.write(path, text)
       this.toast(this.t('toast.svgExported'))
+    } catch (err) {
+      this.toast(this.t('toast.exportFailed', { message: err instanceof Error ? err.message : String(err) }))
+    }
+  }
+
+  /**
+   * 导出 PNG：内容口径与导出 SVG 完全同一份串（文字先描轮廓、背景与桌布都不进），
+   * 只是最后交给 pngExport 光栅成与画布同尺寸的位图。位图本身画得对不对归截图走查。
+   */
+  async savePng(): Promise<void> {
+    const st = this.state
+    if (!st.doc) return
+    this.commitEdit()
+    if (!(await this.ensureFontsForText())) return
+    const text = this.buildSvgText()
+    if (text === null) return
+    const path = await this.api.dialog.saveFile({
+      title: this.t('action.exportPng'),
+      defaultPath: 'albedo.png',
+      filters: [{ name: 'PNG', extensions: ['png'] }]
+    })
+    if (!path) return
+    try {
+      const bytes = await svgToPngBytes(text, st.doc.width, st.doc.height)
+      await this.api.fs.write(path, bytes)
+      this.toast(this.t('toast.pngExported'))
     } catch (err) {
       this.toast(this.t('toast.exportFailed', { message: err instanceof Error ? err.message : String(err) }))
     }
@@ -3612,9 +3626,6 @@ export class AlbedoWorkspace {
     this.applyImportedCanvasSize(parsed.source, replacesAll)
     if (st.doc) {
       if (isStarter) st.doc.shapes = []
-      if (st.doc.name === this.t('doc.untitled')) {
-        st.doc.name = parsed.title ? parsed.title : isStarter ? baseName : st.doc.name
-      }
       st.doc.shapes.push(...shapes)
     }
     st.sourceByDoc.set(before, prevSource)
@@ -3965,12 +3976,7 @@ export class AlbedoWorkspace {
     this.el('newBtn').addEventListener('click', () => this.newBlankDocument(), opts)
     this.el('copyBtn').addEventListener('click', () => void this.copySvgText(), opts)
     this.el('exportBtn').addEventListener('click', () => void this.saveSvg(), opts)
-    ;(this.el('docTitle') as HTMLInputElement).addEventListener('input', () => this.commitDocName(), opts)
-    ;(this.el('docTitle') as HTMLInputElement).addEventListener('blur', () => {
-      const input = this.el('docTitle') as HTMLInputElement
-      if (!input.value.trim()) input.value = this.t('doc.untitled')
-      this.commitDocName()
-    }, opts)
+    this.el('exportPngBtn').addEventListener('click', () => void this.savePng(), opts)
     for (const btn of Array.from(this.host.querySelectorAll<HTMLElement>('.shape-btn'))) {
       btn.addEventListener('click', () => this.addShape(btn.dataset.add as ShapeType | undefined), opts)
     }
@@ -4019,6 +4025,7 @@ export class AlbedoWorkspace {
     this.el('zoomInBtn').addEventListener('click', () => this.setZoom(stepZoom(st.zoom, 1), this.viewportCenter()), opts)
     this.el('zoomOutBtn').addEventListener('click', () => this.setZoom(stepZoom(st.zoom, -1), this.viewportCenter()), opts)
     this.el('zoomFitBtn').addEventListener('click', () => this.setZoom(1), opts)
+    this.el('zoomFitScreenBtn').addEventListener('click', () => this.fitToScreen(), opts)
     this.el('stageBody').addEventListener(
       'wheel',
       (e) => {
@@ -4141,8 +4148,7 @@ export class AlbedoWorkspace {
         e.stopPropagation()
         const action = actionEl.dataset.layerAction
         if (action === 'delete') this.deleteShapeById(id)
-        if (action === 'up') this.moveLayerBy(id, 1)
-        if (action === 'down') this.moveLayerBy(id, -1)
+        if (action === 'toggle') this.toggleShapeVisible(id)
         return
       }
       const ev = e as MouseEvent
@@ -4530,6 +4536,11 @@ export class AlbedoWorkspace {
       this.setZoom(1)
       return
     }
+    if (meta && e.key === '1') {
+      e.preventDefault()
+      this.fitToScreen()
+      return
+    }
     if (!inField && meta && k === 'a') {
       e.preventDefault()
       this.setSelection((st.doc?.shapes ?? []).map((s) => s.id))
@@ -4615,14 +4626,12 @@ export class AlbedoWorkspace {
     st.pathEdit = true
     st.underlay = this.loadUnderlayFromStore()
     this.localizeDoc()
-    this.syncDocTitleInput()
     this.bindUi()
     this.syncToolbarToggles()
     this.installTestHooks()
     this.fullRefresh()
     this.syncUndoRedoButtons()
     this.renderPointerCoord({ x: 0, y: 0 })
-    void this.api.window.setTitle(st.doc.name).catch(() => undefined)
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.layoutStage())
     else this.layoutStage()
     if (!loaded) {
@@ -4716,7 +4725,6 @@ export class AlbedoWorkspace {
         await this.applyFontBuffer(bytesToArrayBuffer(bytes), name)
       },
       boolean: (kind: string) => this.applyBoolean(kind),
-      exportFileName: () => this.exportFileName(),
       align: (mode: string) => this.alignSelection(mode),
       distribute: (axis: string) => this.distributeSelection(axis as 'x' | 'y')
     }

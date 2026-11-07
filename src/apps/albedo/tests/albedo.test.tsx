@@ -1,10 +1,23 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { FakeAirship, mountUi, type Mount } from '@airship/sdk/testing'
 import AlbedoApp from '../AlbedoApp.tsx'
 import { app } from '../app.ts'
 import { STORE_KEY_DOC, STORE_KEY_LANG, STORE_KEY_SOURCE } from '../albedoWorkspace.ts'
+
+/**
+ * 位图化替身：jsdom 没有 2D canvas，"PNG 真画得对不对"归 just shot；
+ * 这里只记账——交出去的串、宽高与写盘的字节是不是同一回事。
+ */
+const pngCalls = vi.hoisted(() => [] as Array<{ svg: string; width: number; height: number }>)
+
+vi.mock('../pngExport.ts', () => ({
+  svgToPngBytes: async (svg: string, width: number, height: number) => {
+    pngCalls.push({ svg, width, height })
+    return new Uint8Array([0x89, 0x50, 0x4e, 0x47])
+  }
+}))
 
 /**
  * AL 册子的影子：每一条断言"界面上读得到哪句话、属性变成什么数"。
@@ -16,7 +29,7 @@ import { STORE_KEY_DOC, STORE_KEY_LANG, STORE_KEY_SOURCE } from '../albedoWorksp
 
 type Hooks = {
   load(doc: unknown): void
-  doc(): { name: string; width: number; height: number; shapes: Array<{ id: string; type: string; name: string }> } | null
+  doc(): { width: number; height: number; shapes: Array<{ id: string; type: string; name: string }> } | null
   selection(): string[]
   export(): Promise<string | null>
   importSvg(text: string, name?: string): boolean
@@ -32,7 +45,6 @@ type Hooks = {
   boolean(kind: string): void
   align(mode: string): void
   distribute(axis: string): void
-  exportFileName(): string
 }
 
 function hook(): Hooks {
@@ -86,6 +98,31 @@ function toastText(m: Mount): string {
   return el(m, 'toast').textContent ?? ''
 }
 
+/** 图层行按界面顺序（第一行 = 最上层）；每次重新查，渲染是整段 innerHTML 重写 */
+function layerRows(m: Mount): HTMLElement[] {
+  return Array.from(m.container.querySelectorAll<HTMLElement>('.layer-row'))
+}
+
+function rowNames(m: Mount): (string | null)[] {
+  return layerRows(m).map((r) => r.querySelector('.layer-name')?.textContent ?? null)
+}
+
+function toggleOf(m: Mount, visualIndex: number): HTMLButtonElement {
+  const btn = layerRows(m)[visualIndex]?.querySelector<HTMLButtonElement>('[data-layer-action="toggle"]')
+  if (!btn) throw new Error(`第 ${visualIndex + 1} 行没有眼睛键`)
+  return btn
+}
+
+/**
+ * jsdom 根本没有 DragEvent：手搓一个带 clientY 的冒泡事件。
+ * dataTransfer 留空正好——实现里那句 try/catch 会走"状态记在 layerDrag"那条缝。
+ */
+function dragEvt(type: string, clientY: number): Event {
+  const ev = new Event(type, { bubbles: true, cancelable: true })
+  Object.defineProperty(ev, 'clientY', { value: clientY })
+  return ev
+}
+
 /** 等真实定时器走完（保存防抖 320ms / 输入合并 650ms 都不走假定时器） */
 async function wait(ms: number): Promise<void> {
   await act(async () => {
@@ -106,7 +143,7 @@ function rectDoc(x: number, y: number, extraShapes = 0): object {
   for (let i = 0; i < extraShapes; i += 1) {
     shapes.push({ type: 'ellipse', id: `s_e${i}`, name: `椭圆 ${i + 1}`, cx: 200 + i * 60, cy: 200, rx: 40, ry: 30 })
   }
-  return { name: '未命名画布', width: 960, height: 640, shapes }
+  return { width: 960, height: 640, shapes }
 }
 
 beforeEach(() => {
@@ -119,6 +156,22 @@ describe('启动与示例文档', () => {
     expect(el(m, 'shapeStatus').textContent).toBe('3 个图形')
     expect(el(m, 'layerCount').textContent).toBe('03')
     expect(m.container.querySelector('.layer-row .layer-name')!.textContent).toBe('贝塞尔曲线 1')
+    m.unmount()
+  })
+
+  it('AL-056 画布没有名字：顶栏读不到名称框，标题栏中段也没被写过', async () => {
+    const fake = freshFake()
+    const m = await openAlbedo(fake)
+    hook().load(rectDoc(10, 10))
+    await m.settle()
+    expect(m.container.querySelector('#docTitle')).toBeNull()
+    expect(m.container.querySelector('.topbar')!.textContent).not.toContain('未命名画布')
+    expect(fake.windowTitles).toHaveLength(0)
+    await act(async () => {
+      m.container.querySelector('.shape-btn[data-add="rect"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await m.settle()
+    expect(fake.windowTitles).toHaveLength(0)
     m.unmount()
   })
 
@@ -278,19 +331,22 @@ describe('添加图形', () => {
 
   it('AL-010 快捷键只在焦点不在输入框时生效', async () => {
     const m = await openAlbedo(freshFake())
-    hook().load({ width: 960, height: 640, shapes: [] })
+    hook().load(rectDoc(10, 10))
     await m.settle()
-    ;(el(m, 'docTitle') as HTMLInputElement).focus()
+    await act(async () => hook().select('s_r1'))
+    await m.settle()
+    const xInput = el(m, 'inspector').querySelector('input[data-prop="x"]') as HTMLInputElement
+    xInput.focus()
     await act(async () => {
-      el(m, 'docTitle').dispatchEvent(new KeyboardEvent('keydown', { key: 'r', bubbles: true }))
+      xInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', bubbles: true }))
     })
-    expect(hook().doc()!.shapes).toHaveLength(0)
-    ;(el(m, 'docTitle') as HTMLInputElement).blur()
+    expect(hook().doc()!.shapes).toHaveLength(1)
+    xInput.blur()
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', bubbles: true }))
     })
     await m.settle()
-    expect(hook().doc()!.shapes).toHaveLength(1)
+    expect(hook().doc()!.shapes).toHaveLength(2)
     m.unmount()
   })
 })
@@ -474,19 +530,25 @@ describe('图层表', () => {
     m.unmount()
   })
 
-  it('AL-021 上下移按钮在边界处按不动，上移交换两行', async () => {
+  it('AL-053 拖一行落到另一行下面，两行对调且能撤销', async () => {
     const m = await openAlbedo(freshFake())
     hook().load(rectDoc(0, 0, 1))
     await m.settle()
-    const rows = Array.from(m.container.querySelectorAll<HTMLElement>('.layer-row'))
-    const downBtns = rows.map((r) => r.querySelector<HTMLButtonElement>('[data-layer-action="down"]')!)
-    expect(downBtns[downBtns.length - 1]!.disabled).toBe(true)
+    expect(rowNames(m)).toEqual(['椭圆 1', '矩形 1'])
     await act(async () => {
-      rows[rows.length - 1].querySelector('[data-layer-action="up"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      layerRows(m)[0]!.dispatchEvent(dragEvt('dragstart', 0))
+    })
+    await act(async () => {
+      layerRows(m)[1]!.dispatchEvent(dragEvt('drop', 0))
     })
     await m.settle()
-    const names = Array.from(m.container.querySelectorAll('.layer-name')).map((n) => n.textContent)
-    expect(names).toEqual(['矩形 1', '椭圆 1'])
+    expect(rowNames(m)).toEqual(['矩形 1', '椭圆 1'])
+    expect(el(m, 'shapeStatus').textContent).toBe('2 个图形')
+    await act(async () => {
+      el(m, 'undoBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await m.settle()
+    expect(rowNames(m)).toEqual(['椭圆 1', '矩形 1'])
     m.unmount()
   })
 
@@ -500,6 +562,51 @@ describe('图层表', () => {
     await m.settle()
     expect(toastText(m)).toBe('已删除椭圆 1')
     expect(el(m, 'layerCount').textContent).toBe('01')
+    m.unmount()
+  })
+
+  it('AL-054 隐藏后画布上不画，那颗键改念"显示图层"', async () => {
+    const m = await openAlbedo(freshFake())
+    hook().load(rectDoc(0, 0, 1))
+    await m.settle()
+    expect(m.container.querySelectorAll('#shapeLayer .shape')).toHaveLength(2)
+    await act(async () => {
+      toggleOf(m, 0).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await m.settle()
+    expect(m.container.querySelectorAll('#shapeLayer .shape')).toHaveLength(1)
+    expect(el(m, 'layerCount').textContent).toBe('02')
+    expect(el(m, 'shapeStatus').textContent).toBe('2 个图形')
+    expect(layerRows(m)[0]!.classList.contains('is-hidden')).toBe(true)
+    expect(toggleOf(m, 0).getAttribute('title')).toBe('显示图层')
+    await act(async () => {
+      toggleOf(m, 0).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await m.settle()
+    expect(m.container.querySelectorAll('#shapeLayer .shape')).toHaveLength(2)
+    expect(toggleOf(m, 0).getAttribute('title')).toBe('隐藏图层')
+    m.unmount()
+  })
+
+  it('AL-055 隐藏的图形照样进导出，导出串逐字不变', async () => {
+    const m = await openAlbedo(freshFake())
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">' +
+      '<rect x="10" y="10" width="50" height="40" fill="#abcdef" stroke="#112233" stroke-dasharray="4 2"/>' +
+      '</svg>'
+    await act(async () => {
+      hook().importSvg(svg, '原稿.svg')
+    })
+    await m.settle()
+    const before = await hook().export()
+    await act(async () => {
+      toggleOf(m, 0).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await m.settle()
+    const after = await hook().export()
+    expect(after).not.toBeNull()
+    expect(after).toBe(before)
+    expect(after).toContain('stroke-dasharray="4 2"')
     m.unmount()
   })
 })
@@ -611,23 +718,9 @@ describe('导出与复制', () => {
     expect(written, `卷里应有画稿.svg，实际：${[...fake.vol.keys()].join(', ')}`).toBeTruthy()
     const text = String(written![1])
     expect(text.startsWith('<?xml version="1.0" encoding="UTF-8"?>')).toBe(true)
-    expect(text).toContain('<title>')
     expect(text).toContain('<rect')
+    expect(text).not.toContain('<title>')
     expect(toastText(m)).toBe('SVG 已导出')
-    m.unmount()
-  })
-
-  it('AL-030 导出文件名清洗 Windows 不允许的字符', async () => {
-    const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities, picks: ['keep.svg'] })
-    const m = await openAlbedo(fake)
-    hook().load({ name: 'a/b\\c:d*e', width: 300, height: 300, shapes: [] })
-    await m.settle()
-    expect(hook().exportFileName()).toBe('a-b-c-d-e.svg')
-    await act(async () => {
-      el(m, 'exportBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-    await m.settle()
-    expect(String(fake.vol.get('keep.svg') ?? '')).toContain('<title>a/b\\c:d*e</title>')
     m.unmount()
   })
 
@@ -685,6 +778,47 @@ describe('导出与复制', () => {
     const text = await hook().export()
     expect(text).toContain('stroke-dasharray="4 2"')
     expect(text).toContain('#abcdef')
+    m.unmount()
+  })
+
+  it('AL-050 导出 PNG 走系统另存为并写出位图字节', async () => {
+    pngCalls.length = 0
+    const fake = new FakeAirship({
+      id: app.id,
+      capabilities: app.capabilities,
+      picks: ['C:/fake/Downloads/画稿.png']
+    })
+    const m = await openAlbedo(fake)
+    hook().load(rectDoc(10, 10))
+    await m.settle()
+    await act(async () => {
+      el(m, 'exportPngBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await m.settle()
+    await wait(50)
+    const written = [...fake.vol.entries()].find(([path]) => path.replace(/\\/g, '/').endsWith('画稿.png'))
+    expect(written, `卷里应有画稿.png，实际：${[...fake.vol.keys()].join(', ')}`).toBeTruthy()
+    expect(Array.from(written![1] as Uint8Array).slice(0, 4)).toEqual([0x89, 0x50, 0x4e, 0x47])
+    expect(toastText(m)).toBe('PNG 已导出')
+    const call = pngCalls[pngCalls.length - 1]!
+    expect([call.width, call.height]).toEqual([960, 640])
+    expect(call.svg).toContain('<rect')
+    m.unmount()
+  })
+
+  it('AL-051 没选字体的文字层同样拦住 PNG 导出', async () => {
+    pngCalls.length = 0
+    const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities, picks: ['never.png'] })
+    const m = await openAlbedo(fake)
+    hook().load({ width: 400, height: 300, shapes: [{ type: 'text', id: 't1', name: '文字 1', x: 10, y: 10, text: '你好', fontSize: 40 }] })
+    await m.settle()
+    await act(async () => {
+      el(m, 'exportPngBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await m.settle()
+    expect(toastText(m)).toBe('文字层「文字 1」还没有选择字体，导出前请先指定')
+    expect([...fake.vol.keys()].some((k) => k.endsWith('.png'))).toBe(false)
+    expect(pngCalls).toHaveLength(0)
     m.unmount()
   })
 })
@@ -919,6 +1053,24 @@ describe('双语与画布尺寸', () => {
     })
     expect(el(m, 'snapToggle').getAttribute('aria-pressed')).toBe('false')
     expect(el(m, 'snapToggle').classList.contains('is-active')).toBe(false)
+    m.unmount()
+  })
+})
+
+describe('视口缩放', () => {
+  it('AL-052 点「适应屏幕」后标签念按可视区算出的倍率', async () => {
+    const m = await openAlbedo(freshFake())
+    hook().load(rectDoc(10, 10))
+    await m.settle()
+    const body = el(m, 'stageBody')
+    Object.defineProperty(body, 'clientWidth', { configurable: true, value: 1400 })
+    Object.defineProperty(body, 'clientHeight', { configurable: true, value: 900 })
+    await act(async () => {
+      el(m, 'zoomFitScreenBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await m.settle()
+    expect(el(m, 'zoomLabel').textContent).toBe('118%')
+    expect(el(m, 'zoomFitScreenBtn').getAttribute('title')).toBe('适应屏幕（Ctrl + 1）')
     m.unmount()
   })
 })
