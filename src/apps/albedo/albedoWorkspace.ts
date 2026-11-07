@@ -323,7 +323,7 @@ export class AlbedoWorkspace {
   private collectElements(): void {
     const ids = [
       'stage', 'stageDefs', 'gridLayer', 'shapeLayer', 'underlayLayer', 'overlay', 'canvasBg',
-      'layers', 'layerCount', 'leftRail', 'leftPanelBody', 'inspectorRail', 'inspector',
+      'layers', 'layerCount', 'inspectorRail', 'inspector',
       'underlayEmpty', 'underlayControls', 'underlayImportBtn', 'underlayThumb', 'underlayName', 'underlayMeta',
       'underlayVisibleBtn', 'underlayAdjustBtn', 'underlayReplaceBtn', 'underlayRemoveBtn', 'underlayHint',
       'underlayToggle', 'underlayPopover', 'underlayPopoverClose', 'underlayStateDot',
@@ -1660,8 +1660,10 @@ export class AlbedoWorkspace {
   }
 
   railIconSvg(key: string): string {
+    // 分区 shortcuts 的图标沿用原版注册表里的 keyboard 那张（两个名字，一张图）
+    const iconKey = key === 'shortcuts' ? 'keyboard' : key
     return `<svg class="rail-icon" viewBox="0 0 128 128" width="128" height="128" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${
-      AlbedoWorkspace.RAIL_ICON_PATHS[key] ?? ''
+      AlbedoWorkspace.RAIL_ICON_PATHS[iconKey] ?? ''
     }</svg>`
   }
 
@@ -1690,7 +1692,7 @@ export class AlbedoWorkspace {
       const name = section.getAttribute('data-rail-section')!
       const repeat = counts.get(name) ?? 0
       counts.set(name, repeat + 1)
-      const domId = this.railPanelDomId(body === this.el('inspector') ? 'inspectorPanel' : 'leftPanel', name, repeat)
+      const domId = this.railPanelDomId('inspectorPanel', name, repeat)
       if (!section.id) section.id = domId
       const isActive = tabName === name && activeFound === null
       if (isActive) activeFound = name
@@ -1748,10 +1750,6 @@ export class AlbedoWorkspace {
     return rail.querySelector<HTMLElement>('[data-rail-go].active')?.dataset.railGo ?? null
   }
 
-  showLeftTab(section: string): void {
-    this.state.leftTab = this.applyRailTab(this.el('leftPanelBody'), this.el('leftRail'), section) ?? section
-  }
-
   showInspectorTab(section: string): void {
     this.state.rightTab = this.applyRailTab(this.el('inspector'), this.el('inspectorRail'), section) ?? section
   }
@@ -1780,7 +1778,6 @@ export class AlbedoWorkspace {
   }
 
   refreshRails(): void {
-    this.applyRailTab(this.el('leftPanelBody'), this.el('leftRail'), this.state.leftTab)
     this.applyRailTab(this.el('inspector'), this.el('inspectorRail'), this.state.rightTab)
   }
 
@@ -3980,7 +3977,6 @@ export class AlbedoWorkspace {
     this.el('importSvgBtn').addEventListener('click', () => void this.openSvgPicker(), opts)
     this.el('insertSvgBtn').addEventListener('click', () => void this.openSvgPicker(), opts)
 
-    this.bindRailNav(this.el('leftRail'), (section) => this.showLeftTab(section))
     this.bindRailNav(this.el('inspectorRail'), (section) => this.showInspectorTab(section))
 
     this.el('gridToggle').addEventListener('click', () => {
