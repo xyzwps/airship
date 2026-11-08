@@ -147,8 +147,8 @@ export interface ResizeSnapResult {
   guides: SnapGuide[]
 }
 
-/** 拉手缩放：只吸被拖的那两条边，最小 1 用户单位 */
-export function snapResize(bounds: Box, handles: string[], opts: SnapOptions): ResizeSnapResult {
+/** 拉手缩放：只吸被拖的那两条边（handles 是 'se' 这种方向键），最小 1 用户单位 */
+export function snapResize(bounds: Box, handles: string, opts: SnapOptions): ResizeSnapResult {
   if (!opts.enabled || !bounds || !handles) return { bounds, guides: [] }
   const threshold = Number(opts.threshold) || 0
   if (threshold <= 0) return { bounds, guides: [] }

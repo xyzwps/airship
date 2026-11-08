@@ -699,34 +699,38 @@ kbd {
 /* ---------- 舞台 SVG 覆盖层 ---------- */
 .shape { cursor: pointer; }
 .shape-hit { pointer-events: stroke; }
+/* 覆盖层整块 g#overlay 是 pointer-events:none（不然虚线框会挡住图形点击），
+   所以每一处"要能抓住"的命中区必须自己声明 all——漏一条就是那个手柄按不动。
+   画在命中区之上的形状（手柄方块、锚点、控制点、标签）声明 none，让事件落到命中区上。 */
+#overlay .handle-hit, #overlay .node-hit, #overlay .underlay-hit { pointer-events: all; }
 .selection-box { fill: none; stroke: var(--blue); stroke-width: 1.2; pointer-events: none; }
 .sel-handle-g .handle-hit { fill: transparent; }
-.sel-handle-g .handle-visual { fill: #fff; stroke: var(--blue); stroke-width: 1.4; }
+.sel-handle-g .handle-visual { fill: #fff; stroke: var(--blue); stroke-width: 1.4; pointer-events: none; }
 .selection-label { pointer-events: none; }
-.sel-size-bg { fill: var(--blue); rx: 4; }
-.sel-size-text { fill: #fff; font-size: 11px; font-family: var(--mono); dominant-baseline: middle; }
-.marquee { fill: rgba(79, 140, 255, 0.08); stroke: var(--blue); stroke-dasharray: 3 3; }
-.snap-guide { stroke: var(--acc); stroke-width: 1; opacity: 0.9; }
+.sel-size-bg { fill: var(--blue); rx: 4; pointer-events: none; }
+.sel-size-text { fill: #fff; font-size: 11px; font-family: var(--mono); dominant-baseline: middle; pointer-events: none; }
+.marquee { fill: rgba(79, 140, 255, 0.08); stroke: var(--blue); stroke-dasharray: 3 3; pointer-events: none; }
+.snap-guide { stroke: var(--acc); stroke-width: 1; opacity: 0.9; pointer-events: none; }
 .snap-guide.node { stroke: var(--blue); }
 .snap-guide.grid { opacity: 0.5; }
 
 .node { cursor: pointer; }
-.node-hit { fill: transparent; }
-.node-anchor { fill: #fff; stroke: var(--blue); stroke-width: 1.6; }
+.node-hit { fill: transparent; cursor: grab; }
+.node-anchor { fill: #fff; stroke: var(--blue); stroke-width: 1.6; pointer-events: none; }
 .node-anchor.is-active { fill: var(--blue); }
-.node-control { fill: var(--acc); stroke: #1b1c20; stroke-width: 1; }
+.node-control { fill: var(--acc); stroke: #1b1c20; stroke-width: 1; pointer-events: none; }
 .node-control.is-active { fill: var(--acc-hi); stroke: #fff; }
-.node-label { fill: var(--tx2); font-size: 9px; font-family: var(--mono); }
-.guide-line { stroke: var(--tx3); stroke-width: 1; stroke-dasharray: 4 4; }
+.node-label { fill: var(--tx2); font-size: 9px; font-family: var(--mono); pointer-events: none; }
+.guide-line { stroke: var(--tx3); stroke-width: 1; stroke-dasharray: 4 4; pointer-events: none; }
 .guide-line.active { stroke: var(--blue); }
-.active-segment { fill: none; stroke: var(--blue); stroke-width: 2.6; opacity: 0.55; }
+.active-segment { fill: none; stroke: var(--blue); stroke-width: 2.6; opacity: 0.55; pointer-events: none; }
 
 .underlay-hit { fill: transparent; cursor: move; }
-.underlay-frame { fill: none; stroke: var(--acc); stroke-width: 1.5; stroke-dasharray: 7 5; }
+.underlay-frame { fill: none; stroke: var(--acc); stroke-width: 1.5; stroke-dasharray: 7 5; pointer-events: none; }
 .underlay-handle-g .handle-hit { fill: transparent; }
-.underlay-handle { fill: #fff; stroke: var(--acc); stroke-width: 1.5; }
-.underlay-label rect.underlay-label-bg { fill: rgba(27, 28, 32, 0.9); rx: 4; }
-.underlay-label text.underlay-label { fill: var(--tx); font-size: 11px; }
+.underlay-handle { fill: #fff; stroke: var(--acc); stroke-width: 1.5; pointer-events: none; }
+.underlay-label rect.underlay-label-bg { fill: rgba(27, 28, 32, 0.9); rx: 4; pointer-events: none; }
+.underlay-label text.underlay-label { fill: var(--tx); font-size: 11px; pointer-events: none; }
 
 /* ---------- 模态 ---------- */
 .modal-root { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; }

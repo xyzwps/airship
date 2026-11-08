@@ -685,10 +685,10 @@ interface ArcEndLike {
   y: number
 }
 
-/** 8 向拉手拉伸：最小 3 用户单位；lockAspect 时按原宽高比修正另一边 */
+/** 8 向拉手拉伸：handles 是 'se' 这种方向键（含 w/e 动横边、含 n/s 动竖边）；最小 3 用户单位；lockAspect 时按原宽高比修正另一边 */
 export function resizeBounds(
   orig: Box,
-  handles: string[],
+  handles: string,
   dx: number,
   dy: number,
   lockAspect: boolean

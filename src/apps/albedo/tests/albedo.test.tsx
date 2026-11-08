@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { act } from 'react'
 import { FakeAirship, mountUi, type Mount } from '@airship/sdk/testing'
 import AlbedoApp from '../AlbedoApp.tsx'
@@ -22,7 +24,8 @@ vi.mock('../pngExport.ts', () => ({
 /**
  * AL 册子的影子：每一条断言"界面上读得到哪句话、属性变成什么数"。
  *
- * jsdom 没有 getScreenCTM——指针手势与"手柄大小恒定"这类判据归 `just shot`；
+ * jsdom 没有 getScreenCTM——指针手势靠 makeStageMeasurable 补一个 1:1 的单位变换走通，
+ * "手柄大小恒定"这类观感判据仍归 `just shot`；
  * 这里的选中走 __ALBEDO_TEST__ 的接缝，断言的全是文字、状态与几何数字。
  * 措辞一律从 hook().t 取——界面和断言念同一份 i18n 真源，改措辞不会两头飘。
  */
@@ -144,6 +147,93 @@ function rectDoc(x: number, y: number, extraShapes = 0): object {
     shapes.push({ type: 'ellipse', id: `s_e${i}`, name: `椭圆 ${i + 1}`, cx: 200 + i * 60, cy: 200, rx: 40, ry: 30 })
   }
   return { width: 960, height: 640, shapes }
+}
+
+/** 一份尺寸清楚的矩形文档：AL-057/058 拖的是它的右下角 (300, 200) */
+function boxDoc(): object {
+  return { width: 960, height: 640, shapes: [{ type: 'rect', id: 's_r1', name: '矩形 1', x: 100, y: 80, w: 200, h: 120 }] }
+}
+
+/** 一条 Q 段路径：控制点 (150, 50)，终点 (200, 100) */
+function quadDoc(): object {
+  return {
+    width: 960,
+    height: 640,
+    shapes: [
+      {
+        type: 'path',
+        id: 's_q1',
+        name: '路径 1',
+        commands: [
+          { type: 'M', x: 100, y: 100 },
+          { type: 'Q', x1: 150, y1: 50, x: 200, y: 100 }
+        ]
+      }
+    ]
+  }
+}
+
+/**
+ * jsdom 根本没有 SVG 坐标变换那两个方法（真浏览器上有）：这里按"舞台 1:1 摆在原点"补上，
+ * 让屏幕坐标等于文档坐标——指针手势这条链才能在用例里走通（替身只实现真面已有的方法）。
+ */
+function makeStageMeasurable(m: Mount): void {
+  const svg = el(m, 'stage') as unknown as Record<string, unknown>
+  const unit = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }
+  svg.getScreenCTM = () => ({ ...unit, inverse: () => ({ ...unit }) })
+  svg.createSVGPoint = () => {
+    const pt = { x: 0, y: 0 }
+    return Object.assign(pt, {
+      matrixTransform: (mat: typeof unit) => ({
+        x: mat.a * pt.x + mat.c * pt.y + mat.e,
+        y: mat.b * pt.x + mat.d * pt.y + mat.f
+      })
+    })
+  }
+}
+
+function pointerEvt(type: string, x: number, y: number): PointerEvent {
+  return new PointerEvent(type, { bubbles: true, cancelable: true, button: 0, clientX: x, clientY: y })
+}
+
+/** 按下 from（事件落在那个元素上）、拖到 to、松开——一次手势 */
+async function dragFrom(m: Mount, from: Element, x0: number, y0: number, x1: number, y1: number): Promise<void> {
+  await act(async () => {
+    from.dispatchEvent(pointerEvt('pointerdown', x0, y0))
+  })
+  await act(async () => {
+    window.dispatchEvent(pointerEvt('pointermove', x1, y1))
+  })
+  await act(async () => {
+    window.dispatchEvent(pointerEvt('pointerup', x1, y1))
+  })
+  await m.settle()
+}
+
+/**
+ * 命中声明只能读样式表原文：jsdom 的 CSS 解析器咽不下整份 albedo.css（塞进 document 也是
+ * cssRules=0，计算样式读不到真值），而浏览器就是按这份原文决定手柄吃不吃鼠标——
+ * 骨架里 overlay 整层不吃，每个可拖点必须自己声明吃（2026-11-08 漏声明把手柄全弄死了）。
+ * jsdom 档下 import.meta.url 不是 file: 的，按仓库根拼路径（proc.test.ts 同法）。
+ */
+const albedoCssText = readFileSync(join(process.cwd(), 'src', 'apps', 'albedo', 'albedo.css'), 'utf8')
+
+/** 返回样式表里所有"选择器提到这个类名"的规则体。 */
+function ruleBodiesMentioning(className: string): string[] {
+  const bodies: string[] = []
+  const ruleRe = /([^{}]+)\{([^{}]*)\}/g
+  let m: RegExpExecArray | null
+  while ((m = ruleRe.exec(albedoCssText)) !== null) {
+    const selector = m[1] ?? ''
+    if (selector.includes(`.${className}`)) bodies.push(m[2] ?? '')
+  }
+  if (bodies.length === 0) throw new Error(`样式表里没有任何提到 .${className} 的规则`)
+  return bodies
+}
+
+/** 这些类名里有没有一条规则把它声明成吃/不吃鼠标 */
+function declaresPointerEvents(className: string, value: 'all' | 'none'): boolean {
+  return ruleBodiesMentioning(className).some((body) => new RegExp(`pointer-events:\\s*${value}\\b`).test(body))
 }
 
 beforeEach(() => {
@@ -435,6 +525,89 @@ describe('路径命令栈', () => {
     await m.settle()
     expect(fake.clipboardText).toBe(svgEl(m, '#shapeLayer path:not(.shape-hit)')!.getAttribute('d'))
     expect(toastText(m)).toBe('path d 已复制')
+    m.unmount()
+  })
+})
+
+/** 检查器里某个输入框当前念的数字 */
+function inputValue(m: Mount, sel: string): string {
+  const inp = el(m, 'inspector').querySelector<HTMLInputElement>(sel)
+  if (!inp) throw new Error(`检查器里没有 ${sel}`)
+  return inp.value
+}
+
+describe('覆盖层手柄与节点拖动', () => {
+  it('AL-057 按住角上的手柄拖动改变图形大小', async () => {
+    const m = await openAlbedo(freshFake())
+    hook().load(boxDoc())
+    await m.settle()
+    makeStageMeasurable(m)
+    await act(async () => {
+      hook().setSnap(false)
+      hook().select('s_r1')
+    })
+    await m.settle()
+    await dragFrom(m, svgEl(m, '#overlay [data-handle="se"] .handle-hit')!, 300, 200, 350, 230)
+    expect(inputValue(m, 'input[data-prop="w"]')).toBe('250')
+    expect(inputValue(m, 'input[data-prop="h"]')).toBe('150')
+    expect(svgEl(m, '#shapeLayer rect')!.getAttribute('width')).toBe('250')
+    expect(svgEl(m, '#shapeLayer rect')!.getAttribute('height')).toBe('150')
+    m.unmount()
+  })
+
+  it('AL-058 一次手柄拖动只留一条历史', async () => {
+    const m = await openAlbedo(freshFake())
+    hook().load(boxDoc())
+    await m.settle()
+    makeStageMeasurable(m)
+    await act(async () => {
+      hook().setSnap(false)
+      hook().select('s_r1')
+    })
+    await m.settle()
+    await dragFrom(m, svgEl(m, '#overlay [data-handle="se"] .handle-hit')!, 300, 200, 350, 230)
+    expect(inputValue(m, 'input[data-prop="w"]')).toBe('250')
+    await act(async () => {
+      el(m, 'undoBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    await m.settle()
+    expect(inputValue(m, 'input[data-prop="w"]')).toBe('200')
+    expect(inputValue(m, 'input[data-prop="h"]')).toBe('120')
+    expect(toastText(m)).toBe('已撤销')
+    m.unmount()
+  })
+
+  it('AL-059 覆盖层上的可拖点各自吃鼠标', async () => {
+    const m = await openAlbedo(freshFake())
+    hook().load(boxDoc())
+    await m.settle()
+    // 前提：覆盖层整块不吃鼠标（不然虚线框会挡住图形点击），所以"吃不吃"由每条规则自己声明
+    expect(el(m, 'overlay').getAttribute('pointer-events')).toBe('none')
+    for (const cls of ['handle-hit', 'node-hit', 'underlay-hit']) {
+      expect(declaresPointerEvents(cls, 'all'), cls).toBe(true)
+    }
+    for (const cls of ['selection-box', 'selection-label', 'handle-visual', 'node-anchor', 'node-control', 'guide-line', 'underlay-frame']) {
+      expect(declaresPointerEvents(cls, 'none'), cls).toBe(true)
+    }
+    m.unmount()
+  })
+
+  it('AL-060 拖路径的控制点改变曲线', async () => {
+    const m = await openAlbedo(freshFake())
+    hook().load(quadDoc())
+    await m.settle()
+    makeStageMeasurable(m)
+    await act(async () => {
+      hook().setSnap(false)
+      hook().select('s_q1')
+    })
+    await m.settle()
+    await dragFrom(m, svgEl(m, '#overlay .node[data-node="control"] .node-hit')!, 150, 50, 190, 75)
+    expect(inputValue(m, 'input[data-cmd-key="x1"]')).toBe('190')
+    expect(inputValue(m, 'input[data-cmd-key="y1"]')).toBe('75')
+    expect(el(m, 'inspector').querySelector('#pathCode')!.textContent).toBe(
+      svgEl(m, '#shapeLayer path:not(.shape-hit)')!.getAttribute('d')
+    )
     m.unmount()
   })
 })

@@ -2909,9 +2909,10 @@ export class AlbedoWorkspace {
       st.snapGuides = guides
     } else if (gesture.kind === 'resize') {
       const g = gesture as ResizeGesture
-      let box = resizeBounds(g.originalBounds, [String(g.handle)], dx, dy, e.shiftKey || g.keepAspect)
+      const handle = String(g.handle)
+      let box = resizeBounds(g.originalBounds, handle, dx, dy, e.shiftKey || g.keepAspect)
       if (st.snapEnabled && !e.altKey) {
-        const snapped = snapResize(box, [String(g.handle)], this.snapOptions())
+        const snapped = snapResize(box, handle, this.snapOptions())
         box = snapped.bounds
         st.snapGuides = snapped.guides
       } else {
