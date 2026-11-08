@@ -69,7 +69,7 @@ export function PreviewPane({
     <aside className="s3__pane">
       <div className="s3__pane-head">
         <span className="s3__pane-title">{row.label}</span>
-        <button type="button" className="s3__ghost" onClick={onClose}>
+        <button type="button" className="btn btn--ghost" onClick={onClose}>
           收起
         </button>
       </div>

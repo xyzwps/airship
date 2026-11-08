@@ -63,12 +63,12 @@ export function ObjectsView({
           </span>
         ))}
         {trail.length > 0 ? (
-          <button type="button" className="s3__ghost s3__up" data-test="up" onClick={onUp}>
+          <button type="button" className="btn btn--ghost s3__up" data-test="up" onClick={onUp}>
             上一级
           </button>
         ) : null}
         {hasMore ? (
-          <button type="button" className="s3__ghost s3__more" data-test="more" onClick={onMore} disabled={busy}>
+          <button type="button" className="btn btn--ghost s3__more" data-test="more" onClick={onMore} disabled={busy}>
             还有更多
           </button>
         ) : null}
@@ -136,7 +136,7 @@ function RowIcon({ label, test, onClick, children }: { label: string; test: stri
   return (
     <button
       type="button"
-      className="s3__icon"
+      className="icon-btn s3__icon"
       data-test={test}
       title={label}
       aria-label={label}

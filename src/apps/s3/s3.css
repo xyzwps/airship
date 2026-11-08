@@ -1,190 +1,93 @@
-/* S3 —— 对象存储台。顶栏一条，左一列桶，右边当前那一层的对象表。
-   配色一律用宿主给的变量，不在这份文件里定色（主题三档只有启动器能改）。 */
+/* S3 —— 对象存储台的版心。
+   Fluent 那一档的尺寸：控件 30–32 高、圆角走宿主的 5/8、间距按 4-8-12-16 走、
+   选中用左侧一道强调条而不是整行涂色。颜色一律取宿主给的变量，这里不另调一套
+   （主题三档只有启动器能改）；按钮、输入框、图标键都复用 SDK 的 .btn / .input / .icon-btn。 */
 
 .s3 {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  font-size: 13px;
 }
 
-/* 顶部选项栏 */
+/* ---------- 顶栏（命令条） ---------- */
+
 .s3__bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 6px;
+  height: 44px;
+  flex-shrink: 0;
+  padding: 0 12px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-sidebar);
+  background: var(--bg-elev);
 }
 
 .s3__busy {
   margin-left: auto;
   color: var(--fg-dim);
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* 通用键 */
-.s3__ghost {
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--fg);
-  font-size: 13px;
-  cursor: pointer;
-}
+/* ---------- 源：一颗组合框键 + 一张浮层 ---------- */
 
-.s3__ghost:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
-
-.s3__ghost:disabled {
-  color: var(--fg-faint);
-  cursor: default;
-}
-
-.s3__go {
-  padding: 4px 14px;
-  border: 1px solid var(--primary);
-  border-radius: var(--radius-sm);
-  background: var(--primary);
-  color: var(--bg);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-/* 连接卡 */
-.s3__card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 360px);
-  gap: 8px 12px;
-  align-items: center;
-  margin: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--bg-elev);
-  box-shadow: var(--shadow);
-  justify-content: center;
-}
-
-.s3__field {
-  display: contents;
-}
-
-.s3__field label {
-  text-align: right;
-  color: var(--fg-dim);
-  font-size: 13px;
-}
-
-.s3__field input {
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--fg);
-  font-size: 13px;
-  font-family: var(--mono);
-}
-
-.s3__field input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
-}
-
-.s3__card-foot {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 2px;
-}
-
-.s3__note {
-  color: var(--fg-faint);
-  font-size: 12px;
-}
-
-/* 错误条 */
-.s3__error {
-  margin: 10px 12px 0;
-  padding: 7px 10px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
-  color: var(--danger);
-  font-size: 13px;
-}
-
-/* 卡片里的那一条错误跟着网格占满一行 */
-.s3__card-error {
-  grid-column: 1 / -1;
-  margin: 0;
-}
-
-/* 两栏 */
-.s3__body {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-}
-
-.s3__buckets {
-  width: 220px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--border);
-  background: var(--bg-sidebar);
-  overflow-y: auto;
-}
-
-.s3__pane-title {
-  padding: 8px 12px 4px;
-  color: var(--fg-faint);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-}
-
-/* 顶栏那颗源键与它的面板 */
 .s3__menu {
   position: relative;
+  flex-shrink: 0;
 }
 
 .s3__menu-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  max-width: 260px;
-  padding: 3px 8px 3px 10px;
+  gap: 8px;
+  height: 30px;
+  max-width: 240px;
+  padding: 0 8px 0 11px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--bg-elev);
+  background: var(--bg);
   color: var(--fg);
-  font-size: 13px;
-  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: default;
 }
 
 .s3__menu-btn:hover {
   background: var(--bg-hover);
 }
 
+.s3__menu-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.s3__menu-btn svg {
+  flex-shrink: 0;
+  color: var(--fg-dim);
+}
+
 .s3__menu-current {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 600;
 }
 
 .s3__menu-panel {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: 0;
-  z-index: 20;
+  z-index: 30;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 280px;
+  min-width: 300px;
+  max-height: 320px;
+  overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
@@ -194,16 +97,19 @@
 
 .s3__menu-row {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 5px 8px;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px;
+  height: 32px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg);
-  font-size: 13px;
+  font: inherit;
+  font-size: 12.5px;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
+  transition: background 90ms ease-out;
 }
 
 .s3__menu-row:hover {
@@ -216,7 +122,7 @@
 }
 
 .s3__menu-label {
-  max-width: 150px;
+  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -225,53 +131,189 @@
 .s3__menu-host {
   margin-left: auto;
   color: var(--fg-faint);
-  font-size: 11px;
   font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .s3__menu-add {
-  margin-top: 2px;
-  padding-top: 7px;
+  margin-top: 3px;
+  padding-top: 0;
   border-top: 1px solid var(--border);
+  border-radius: 0 0 4px 4px;
   color: var(--fg-dim);
   font-weight: 400;
+}
+
+/* ---------- 新建桶那一行 ---------- */
+
+.s3__newbucket {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+
+.s3__newbucket label {
+  color: var(--fg-dim);
+  font-size: 12.5px;
+}
+
+.s3__newbucket input {
+  width: 260px;
+  font-family: var(--mono);
+}
+
+/* ---------- 连接卡 ---------- */
+
+.s3__card {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 380px);
+  gap: 8px 12px;
+  align-items: center;
+  justify-content: center;
+  margin: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow);
+}
+
+.s3__field {
+  display: contents;
+}
+
+.s3__field label {
+  text-align: right;
+  color: var(--fg-dim);
+  font-size: 12.5px;
+}
+
+.s3__field .input {
+  width: 100%;
+  font-family: var(--mono);
+}
+
+.s3__card-foot {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.s3__note {
+  margin-right: auto;
+  color: var(--fg-faint);
+  font-size: 11.5px;
+}
+
+/* ---------- 错误条 ---------- */
+
+.s3__error {
+  margin: 10px 12px 0;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  font-size: 12.5px;
+}
+
+.s3__card-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* ---------- 三栏 ---------- */
+
+.s3__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.s3__pane-title {
+  padding: 10px 12px 5px;
+  color: var(--fg-faint);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+
+/* 左栏：一列桶，按壳的导航那一档走 */
+.s3__buckets {
+  width: 208px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--bg-sidebar);
+  overflow-y: auto;
 }
 
 .s3__bucket-list {
   list-style: none;
   margin: 0;
-  padding: 0 6px 8px;
+  padding: 0 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .s3__bucket {
+  position: relative;
   display: block;
   width: 100%;
-  padding: 5px 8px;
+  height: 30px;
+  padding: 0 10px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg);
-  font-size: 13px;
+  font: inherit;
+  font-size: 12.5px;
   text-align: left;
-  cursor: pointer;
+  cursor: default;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: background 90ms ease-out;
 }
 
 .s3__bucket:hover {
   background: var(--bg-hover);
 }
 
+.s3__bucket:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* 选中不是整条涂满：一块底色加左侧一道强调条，这才是"当前在这一个桶里" */
 .s3__bucket--on {
   background: var(--bg-active);
   font-weight: 600;
 }
 
-/* 右侧 */
+.s3__bucket--on::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* 中间：面包屑 + 对象表 */
 .s3__objects {
   flex: 1;
   min-width: 0;
@@ -284,8 +326,9 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 8px 12px;
-  font-size: 13px;
+  min-height: 34px;
+  padding: 4px 14px;
+  font-size: 12.5px;
 }
 
 .s3__crumb-wrap {
@@ -296,16 +339,17 @@
 
 .s3__crumb-sep {
   color: var(--fg-faint);
+  padding: 0 1px;
 }
 
 .s3__crumb {
-  padding: 1px 5px;
+  padding: 3px 7px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-dim);
-  font-size: 13px;
-  cursor: pointer;
+  font: inherit;
+  cursor: default;
 }
 
 .s3__crumb:hover {
@@ -319,31 +363,38 @@
   cursor: default;
 }
 
-.s3__up {
+.s3__crumb--here:hover {
+  background: transparent;
+}
+
+.s3__up,
+.s3__more {
   margin-left: 8px;
 }
 
 .s3__empty {
-  padding: 16px 12px;
+  margin: 0;
+  padding: 16px 14px;
   color: var(--fg-dim);
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
-/* 对象表 */
 .s3__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 .s3__table th {
   position: sticky;
   top: 0;
-  padding: 5px 12px;
+  z-index: 2;
+  height: 32px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
   color: var(--fg-faint);
-  font-weight: 500;
+  font-weight: 400;
   text-align: left;
 }
 
@@ -353,7 +404,8 @@
 }
 
 .s3__table td {
-  padding: 5px 12px;
+  height: 34px;
+  padding: 0 14px;
   border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
   color: var(--fg);
   overflow: hidden;
@@ -361,18 +413,25 @@
   white-space: nowrap;
 }
 
-.s3__table tr:hover td {
+.s3__table tbody tr {
+  cursor: default;
+  transition: background 90ms ease-out;
+}
+
+.s3__table tbody tr:hover td {
   background: var(--bg-hover);
 }
 
-.s3__folder {
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--fg);
-  font-size: 13px;
+.s3__row--on td {
+  background: var(--bg-active);
+}
+
+.s3__row--on .s3__name {
   font-weight: 600;
-  cursor: pointer;
+}
+
+.s3__folder {
+  font-weight: 600;
 }
 
 .s3__num,
@@ -382,90 +441,39 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 新建桶那一行 */
-.s3__newbucket {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elev);
-}
-
-.s3__newbucket label {
-  color: var(--fg-dim);
-  font-size: 13px;
-}
-
-.s3__newbucket input {
-  width: 260px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  color: var(--fg);
-  font-size: 13px;
-  font-family: var(--mono);
-}
-
-/* 对象表：行尾的动作与选中态 */
-.s3__table tbody tr {
-  cursor: pointer;
-}
-
-.s3__row--on td {
-  background: var(--bg-active);
-}
-
 .s3__acts-h {
-  width: 96px;
+  width: 100px;
 }
 
 .s3__acts {
   text-align: right;
   white-space: nowrap;
-  width: 96px;
+  width: 100px;
 }
 
 .s3__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 22px;
-  margin-left: 2px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--fg-dim);
-  cursor: pointer;
-}
-
-.s3__icon:hover {
-  border-color: var(--border);
-  background: var(--bg-hover);
-  color: var(--fg);
-}
-
-.s3__more {
-  margin-left: 8px;
+  /* 宿主的 .icon-btn 是 grid（块级），三个并排必须收成行内，否则行高被撑开 */
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  margin-left: 1px;
+  vertical-align: middle;
 }
 
 .s3__hint {
-  margin: auto 12px 10px;
+  margin: auto 14px 10px;
   color: var(--fg-faint);
-  font-size: 12px;
+  font-size: 11.5px;
 }
 
-/* 右侧详情与预览 */
+/* 右侧：选中对象的详情与预览 */
 .s3__pane {
-  width: 360px;
+  width: 336px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 10px;
+  padding: 12px 14px;
   border-left: 1px solid var(--border);
   background: var(--bg-elev);
   overflow-y: auto;
@@ -480,7 +488,7 @@
 
 .s3__pane-head .s3__pane-title {
   padding: 0;
-  font-size: 13px;
+  font-size: 13.5px;
   letter-spacing: 0;
   color: var(--fg);
   font-weight: 600;
@@ -491,9 +499,13 @@
 
 .s3__meta {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 3px 10px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
   margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
   font-size: 12px;
 }
 
@@ -507,6 +519,11 @@
   overflow-wrap: anywhere;
 }
 
+.s3__key {
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
 .s3__status {
   margin: 0;
   color: var(--fg-dim);
@@ -516,21 +533,39 @@
 .s3__preview-img {
   max-width: 100%;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
+  background: var(--bg);
 }
 
 .s3__preview-text {
   margin: 0;
-  padding: 8px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg);
   color: var(--fg);
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  max-height: 420px;
+  max-height: 440px;
   overflow-y: auto;
   user-select: text;
+}
+
+/* 细滚动条：Fluent 那侧的浮层与列表都不该被一根粗槽抢走视线 */
+.s3 ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.s3 ::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 28%, transparent) padding-box;
+}
+
+.s3 ::-webkit-scrollbar-track {
+  background: transparent;
 }

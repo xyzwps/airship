@@ -42,6 +42,7 @@ export function ConnectionCard({
       <div className="s3__field">
         <label htmlFor="s3-name">名字</label>
         <input
+          className="input"
           id="s3-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -52,6 +53,7 @@ export function ConnectionCard({
       <div className="s3__field">
         <label htmlFor="s3-endpoint">端点</label>
         <input
+          className="input"
           id="s3-endpoint"
           value={endpoint}
           onChange={(e) => setEndpoint(e.target.value)}
@@ -62,6 +64,7 @@ export function ConnectionCard({
       <div className="s3__field">
         <label htmlFor="s3-region">区域</label>
         <input
+          className="input"
           id="s3-region"
           value={region}
           onChange={(e) => setRegion(e.target.value)}
@@ -72,6 +75,7 @@ export function ConnectionCard({
       <div className="s3__field">
         <label htmlFor="s3-ak">Access Key</label>
         <input
+          className="input"
           id="s3-ak"
           value={accessKeyId}
           onChange={(e) => setAccessKeyId(e.target.value)}
@@ -81,6 +85,7 @@ export function ConnectionCard({
       <div className="s3__field">
         <label htmlFor="s3-sk">Secret Key</label>
         <input
+          className="input"
           id="s3-sk"
           type="password"
           value={secretAccessKey}
@@ -91,16 +96,16 @@ export function ConnectionCard({
       {error !== '' ? <p className="s3__error s3__card-error">{error}</p> : null}
       <div className="s3__card-foot">
         <span className="s3__note">五个格子都存进本机设置，Secret Key 是明文。</span>
-        <button type="button" className="s3__go" disabled={busy} onClick={submit}>
+        <button type="button" className="btn btn--primary" disabled={busy} onClick={submit}>
           {current ? '存下' : '连上'}
         </button>
         {onRemove ? (
-          <button type="button" className="s3__ghost" data-test="source-remove" onClick={onRemove}>
+          <button type="button" className="btn btn--ghost btn--danger" data-test="source-remove" onClick={onRemove}>
             删掉这个源
           </button>
         ) : null}
         {onCancel ? (
-          <button type="button" className="s3__ghost" onClick={onCancel}>
+          <button type="button" className="btn btn--ghost" onClick={onCancel}>
             取消
           </button>
         ) : null}

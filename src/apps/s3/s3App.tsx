@@ -363,7 +363,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
         />
         <button
           type="button"
-          className="s3__ghost"
+          className="btn btn--ghost"
           onClick={() => {
             setMenu(false)
             setEditTarget(current)
@@ -374,13 +374,13 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
         >
           连接设置
         </button>
-        <button type="button" className="s3__ghost" onClick={() => void refreshBuckets(client)} disabled={client === null || busy !== ''}>
+        <button type="button" className="btn btn--ghost" onClick={() => void refreshBuckets(client)} disabled={client === null || busy !== ''}>
           刷新
         </button>
-        <button type="button" className="s3__ghost" onClick={() => void upload()} disabled={client === null || bucket === null || busy !== ''}>
+        <button type="button" className="btn btn--ghost" onClick={() => void upload()} disabled={client === null || bucket === null || busy !== ''}>
           上传
         </button>
-        <button type="button" className="s3__ghost" onClick={() => setCreating(true)} disabled={client === null || creating}>
+        <button type="button" className="btn btn--ghost" onClick={() => setCreating(true)} disabled={client === null || creating}>
           新建桶
         </button>
         <span className="s3__busy">{busy !== '' ? busy : note}</span>
@@ -390,6 +390,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
         <div className="s3__newbucket">
           <label htmlFor="s3-newbucket">桶名</label>
           <input
+            className="input"
             id="s3-newbucket"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
@@ -397,10 +398,10 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
             placeholder="my-bucket"
             autoFocus
           />
-          <button type="button" className="s3__go" onClick={() => void submitNewBucket()}>
+          <button type="button" className="btn btn--primary" onClick={() => void submitNewBucket()}>
             建
           </button>
-          <button type="button" className="s3__ghost" onClick={() => setCreating(false)}>
+          <button type="button" className="btn btn--ghost" onClick={() => setCreating(false)}>
             取消
           </button>
         </div>
