@@ -4,7 +4,7 @@
   "private": true,
   "description": "飞船的壳：窗口、能力实现、运行期扫包与启动器",
   "main": "out/main/index.js",
-  "author": "xyzwp",
+  "author": "xyzwps",
   "devDependencies": {
     "electron": "45.2.3",
     "electron-builder": "^26.18.0",
