@@ -1,10 +1,22 @@
 # 飞船（airship）
 
-一个 Electron 壳，里面装着八个自用应用。一个应用一个窗口一个渲染进程；每个应用是一个 `airship` 包（zip 归档 `<id>.airship`），运行期由壳扫出来——壳的产物里没有应用代码。
+飞船是一套装在自己电脑上的小工具：一个 Electron 壳，外面挂着八个各管一件事的应用——看电子书、读 PDF、勾待办、跑生命游戏、编排 FFmpeg、看 WSL 容器、编辑 SVG、浏览 S3 对象存储。
 
-## 应用
+它想解决的是自用工具的那个老问题：每写一个小工具就得装一个 Electron、开一份仓库、配一遍构建，用两次就懒得再开。在飞船里，工具是**一个可以拖进窗口的文件**。
 
-| id | 名称 | 做什么 |
+## 三个基本想法
+
+**一个应用就是一个文件。** 应用打包成 `<id>.airship`（其实是一个 zip 换了扩展名），把它拖到启动器上就算装好。不重装壳，不重启，不编译。
+
+**壳不认识任何具体应用。** 壳启动时扫包根得到名单，安装包的产物里没有一行应用代码。所以加一个应用、更新一个应用、卸掉一个应用，都不需要重新出安装包——壳是纯的，应用是外挂的。
+
+**一个应用一个窗口一个渲染进程。** 应用只能通过 `window.airship` 这一面碰系统，而且能碰什么必须先写在自己的清单里声明；没声明的一律拒绝，并给出读得懂的原因。于是改一个应用不用管其余七个，一个应用崩了也不带崩别人。
+
+数据由壳统一托管在各应用自己的目录里，卸载时可以选择连数据一起删。
+
+## 里面装着什么
+
+| | 名称 | 做什么 |
 | --- | --- | --- |
 | `books` | 墨读 | EPUB / MOBI 电子书书架与阅读器 |
 | `pdf` | PDF | PDF 阅读，与墨读共用同一个书架 |
@@ -13,58 +25,51 @@
 | `vcp` | vcp | FFmpeg 编排台：选流、加处理链、看命令、跑队列 |
 | `wsld` | 容器台 | WSL 容器与镜像的图形外壳（仅 Windows） |
 | `albedo` | Albedo | SVG 编辑工作台：形状与路径、布尔运算、导出 SVG/PNG |
-| `s3` | S3 | 连 S3 兼容对象存储：浏览、上传下载、预览、删除 |
+| `s3` | S3 | 连 S3 兼容的对象存储：浏览、上传下载、预览、删除 |
 
-## 目录
+## 怎么用
 
+装好壳、打开来是启动器，一屏格子。
+
+1. 把 `<id>.airship` 拖到启动器上，对应的格子就出现了（装完只刷新格子，不会自动开窗口）。
+2. 点格子开窗口；窗口已经开着再点，只是把它唤到前面。
+3. 想收摊，顶栏的管理键让每格露出卸载记号——只卸应用，还是连数据一起删，在卡片上选。窗口还开着时不动磁盘。
+
+应用落在 `%LOCALAPPDATA%\airship\apps`。安装包本身只有壳，所以壳的更新和应用的更新是两件事，互不阻塞。
+
+没有代码签名，第一次运行会被 SmartScreen 拦一道，点"仍要运行"。
+
+## 想自己写一个应用
+
+从范本造出来，壳侧任何文件都不用改：
+
+```bash
+just new-app hello 你好        # 复制 templates/app → src/apps/hello
+# 改三处：app.ts（这个应用的清单）、样式、规格册
+just build-apps                # 产 dist-apps/hello.airship
 ```
-src/shell              主进程、preload、启动器；不认识任何具体应用
-src/sdk               宿主（标题栏 / 主题 / 留白 / 占位）、CSP、测试工装
-src/apps/<id>         八个应用，各自自持 index.html 与清单 app.ts
-src/shared/contract   契约、清单类型、注册与包形状的规矩
-src/shared/library    共享书库（墨读与 PDF 同一份数据）
-src/shared/textdecode 中文解码
-templates/app         新应用范本
-code/                 工具脚本（产包、造应用、出图标、自检）
-docs/                 架构说明、规格册索引、待办
-```
 
-每个区都是一个 npm 包，说明符一律写包名（`@airship/...`）；应用与 SDK 都不许 import `src/shell/**`。
+然后把它拖回启动器，`just shot` 看一眼窗口。
 
-## 环境
+应用面向壳的那一面是 SDK：标题栏、主题落地、窗口留白、占位图都由宿主管，作者只需要写自己的正文，以及在清单里声明用到的能力（`capabilities`）和外部工具（`tools`）。清单只写"这个应用自己的事实"，不写图标路径、排序这类表现形式。
 
-Windows，Node.js `^20.19.0 || >=22.12.0`（Vite 8 的要求；本机跑的是 25.x），[just](https://github.com/casey/just)，以及 Git Bash（justfile 里写死了它的路径）。Electron 与 electron-builder 的二进制走 npmmirror 镜像，已在 `.npmrc` 里配好。
+## 开发这个仓库
+
+要 Windows、Node.js `^20.19.0 || >=22.12.0`、[just](https://github.com/casey/just) 和 Git Bash：
 
 ```bash
 npm install
+just dev      # 起壳 + 各应用的包，改代码热更
+just build    # 打壳的安装包 + 产各应用的包（产物互不包含）
+just check    # 类型 + 单测 + 册子差集
 ```
 
-## 命令
+`just` 不带参数列出全部配方，[justfile](justfile) 是命令的唯一真源（`package.json` 里没有 scripts）。
 
-命令的唯一真源是 [justfile](justfile)，`just` 不带参数就列出全部配方。
+每个功能在动之前先有一份规格册：四档结构、每条场景带稳定编号、只写可观察的结果（界面读得到哪句话、落盘文件是什么形状），实现细节一律不写。用例标题以同一个编号开头，`just casecov` 做双向差集，所以"册子里承诺了但没做"和"偷偷测了但没承诺"都过不了检查。界面观感不进册子，靠 `just shot` 逐窗口截图走查。
 
-```bash
-just dev            # 开发（先产各应用的包）
-just build-apps     # 产各应用的 airship 包到 dist-apps/
-just build-shell    # 打壳的安装包（清场 → 编译 → NSIS → 自检）
-just build          # 两条都跑，产物互不包含
-just check          # 提交前一轮：类型 + 单测 + 册子差集
-just shot           # 逐窗口截图，顺带证明包真能装进壳跑起来
-just new-app hello 你好   # 从范本造一个新应用
-```
-
-## 装一个应用
-
-只有一条路：把 `<id>.airship` 拖到启动器上。落点是 `%LOCALAPPDATA%\airship\apps`，装完只刷新格子、不自动开窗口。安装包是纯壳，里面不带任何应用。
-
-## 规格册
-
-每个区自带 `specs/` 与 `tests/`：契约按四档结构写（Purpose → Requirement → Scenario → WHEN/THEN），每条场景带稳定编号，只写可观察结果。用例标题以编号开头，`just casecov` 做双向差集——册里有号没用例等于未实现，用例挂了号册里没有就是私测。
-
-界面观感不进册子，那是 `just shot` 截图走查的事。
-
-给代理的说明见 [AGENTS.md](AGENTS.md)，架构理由见 [docs/architecture.md](docs/architecture.md)。
+再往下读：给代理的说明在 [AGENTS.md](AGENTS.md)，架构理由与七条不变量在 [docs/architecture.md](docs/architecture.md)，用户可见契约的索引在 [docs/specs/index.md](docs/specs/index.md)。
 
 ## 许可
 
-MIT，见 [LICENSE](LICENSE)。目前没有代码签名，第一次运行会被 SmartScreen 拦一道。
+MIT，见 [LICENSE](LICENSE)。
