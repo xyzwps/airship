@@ -17,9 +17,9 @@ import { mountUi, type Mount } from '@airship/sdk/testing'
  */
 
 const APPS: InstalledApp[] = [
-  { meta: { id: 'life', name: '生命游戏', description: '康威生命游戏', capabilities: [] }, iconUrl: null },
-  { meta: { id: 'pdf', name: 'PDF', description: '看 PDF', capabilities: [] }, iconUrl: null },
-  { meta: { id: 'vcp', name: 'vcp', description: '转码', capabilities: [] }, iconUrl: null }
+  { meta: { id: 'life', name: '生命游戏', description: '康威生命游戏', capabilities: [] }, iconUrl: null, origin: 'installed' },
+  { meta: { id: 'pdf', name: 'PDF', description: '看 PDF', capabilities: [] }, iconUrl: null, origin: 'installed' },
+  { meta: { id: 'vcp', name: 'vcp', description: '转码', capabilities: [] }, iconUrl: null, origin: 'dev' }
 ]
 
 /** 版本与包根都由这里给：界面读到的就是这一份，一个数字都不自己拼 */

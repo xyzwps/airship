@@ -16,7 +16,8 @@ import type { InstalledApp, PlatformId } from '@airship/contract'
 
 const lifeApp: InstalledApp = {
   meta: { id: 'life', name: '生命游戏', description: '康威生命游戏', capabilities: [] },
-  iconUrl: 'airship://life/icon.svg'
+  iconUrl: 'airship://life/icon.svg',
+  origin: 'installed'
 }
 
 function proposal(over: Partial<PackageProposalView> = {}): PackageProposalView {

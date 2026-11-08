@@ -1,16 +1,25 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_ENTRY, MANIFEST_NAME, PACKAGE_SUFFIX, capabilitiesPhrase } from '@airship/contract'
+import {
+  DEFAULT_ENTRY,
+  MANIFEST_NAME,
+  PACKAGE_SUFFIX,
+  capabilitiesPhrase,
+  entryOf,
+  notRegistered,
+  windowBlocksUninstall
+} from '@airship/contract'
 import { packageFixtureRoot, writeArchive } from './helpers/packages'
 import { REAL_APPS, manifestOf } from './helpers/realApps'
 import type { AppMeta } from '@airship/contract'
 
 /**
- * PK-015 ~ PK-019：把包拖进壳里装。
+ * PK-015 ~ PK-025：把包拖进壳里装，以及把它卸掉。
  *
- * 这里测的是拖放背后主进程干的事：装到哪、什么情况下不装、覆盖为什么要确认。
- * 界面上的句子（"松手就装"、确认卡片、装完那一行）在 `launcher.test.tsx` 里钉。
+ * 这里测的是这两条链背后主进程干的事：装到哪、什么情况下不装、覆盖为什么要确认，
+ * 卸的时候删掉哪一份、什么时候一条字节都不许动。
+ * 界面上的句子（"松手就装"、确认卡片、装完与卸完那一行）在 `launcher*.test.tsx` 里钉。
  *
  * 自装根用假的 `LOCALAPPDATA` 挪进临时目录——
  * 装包这条判据必须对着真文件落盘验，只断言"函数被调过"等于没验。
@@ -34,8 +43,12 @@ vi.mock('electron', () => ({
   ipcMain: { handle: () => undefined, on: () => undefined }
 }))
 
-const { inspectPackage, installPackage } = await import('../main/services/packageInstall')
-const { appIds, installedPackages, scanInstalledPackages } = await import('../main/services/appRegistry')
+const { inspectPackage, installPackage, uninstallPackage } = await import('../main/services/packageInstall')
+const { appIds, installedPackages, packageFor, scanInstalledPackages } = await import('../main/services/appRegistry')
+const { appBaseDir } = await import('../main/services/paths')
+const { grants } = await import('../main/services/grants')
+const { resolvePackageEntry } = await import('../main/services/packageProtocol')
+const electronApp = (await import('electron')).app as unknown as { isPackaged: boolean }
 
 const life = () => REAL_APPS.find((m) => m.id === 'life')!
 const vcp = () => REAL_APPS.find((m) => m.id === 'vcp')!
@@ -65,6 +78,9 @@ beforeEach(() => {
   rmSync(sandbox, { recursive: true, force: true })
   for (const dir of [installedRoot, userData, source]) mkdirSync(dir, { recursive: true })
   process.env.LOCALAPPDATA = local
+  // 上一轮 PK-024 为了摆出"两档根同 id"改过这两样；泄漏进下一条就是凭空多个包根
+  electronApp.isPackaged = true
+  delete process.env.AIRSHIP_APPS_ROOT
   scanInstalledPackages()
 })
 
@@ -143,5 +159,119 @@ describe('把包拖进壳里装', () => {
     expect(proposal.meta.capabilities.length, 'vcp 声明过能力').toBeGreaterThan(0)
     expect(capabilitiesPhrase(proposal.meta.capabilities)).toContain('读你的文件')
     expect(capabilitiesPhrase(proposal.meta.capabilities)).toContain('跑外部程序')
+  })
+})
+
+describe('把装进壳的包卸掉', () => {
+  it('PK-021 卸掉生效那一份归档，重扫后查不到这个 id，其余包一个字没动', () => {
+    installPackage(makeArchive(source, life()), false)
+    installPackage(makeArchive(source, vcp()), false)
+    const landed = join(installedRoot, `life${PACKAGE_SUFFIX}`)
+    const vcpLanded = join(installedRoot, `vcp${PACKAGE_SUFFIX}`)
+    const vcpBefore = readFileSync(vcpLanded)
+
+    const outcome = uninstallPackage('life', { purgeData: false, windowIsOpen: false })
+
+    expect(outcome).toEqual({
+      id: 'life',
+      name: '生命游戏',
+      origin: 'installed',
+      dataRemoved: false,
+      dataWasAbsent: false,
+      tookOverByOtherRoot: false
+    })
+    expect(existsSync(landed), '那一份归档从磁盘上没了').toBe(false)
+    expect(packageFor('life'), '重扫过：按 id 查不到包').toBeNull()
+    expect(appIds()).not.toContain('life')
+    expect(appIds(), '别的包不受影响').toContain('vcp')
+    expect(readFileSync(vcpLanded)).toEqual(vcpBefore)
+  })
+
+  it('PK-022 窗口开着就不动磁盘，念得出为什么', () => {
+    installPackage(makeArchive(source, life()), false)
+    const landed = join(installedRoot, `life${PACKAGE_SUFFIX}`)
+    const before = readFileSync(landed)
+    mkdirSync(join(appBaseDir('life'), 'data'), { recursive: true })
+    writeFileSync(join(appBaseDir('life'), 'settings.json'), '{}', 'utf8')
+
+    expect(() => uninstallPackage('life', { purgeData: true, windowIsOpen: true })).toThrow(
+      windowBlocksUninstall('生命游戏')
+    )
+
+    expect(readFileSync(landed), '被拒就一条字节都不许动').toEqual(before)
+    expect(existsSync(join(appBaseDir('life'), 'settings.json')), '选了删数据也不许动').toBe(true)
+    expect(packageFor('life')).not.toBeNull()
+    expect(appIds()).toContain('life')
+  })
+
+  it('PK-023 连数据一起卸时那一族整没了，只卸载时原样留着', () => {
+    installPackage(makeArchive(source, life()), false)
+    installPackage(makeArchive(source, vcp()), false)
+    for (const id of ['life', 'vcp']) {
+      mkdirSync(join(appBaseDir(id), 'data'), { recursive: true })
+      writeFileSync(join(appBaseDir(id), 'settings.json'), '{}', 'utf8')
+    }
+
+    const keep = uninstallPackage('life', { purgeData: false, windowIsOpen: false })
+    expect(keep.dataRemoved, '只卸载不碰数据那一族').toBe(false)
+    expect(existsSync(join(appBaseDir('life'), 'settings.json'))).toBe(true)
+    expect(existsSync(join(appBaseDir('life'), 'data'))).toBe(true)
+
+    installPackage(makeArchive(source, life()), false)
+    expect(packageFor('life'), '重装回来还接着用那份数据').not.toBeNull()
+
+    const purge = uninstallPackage('vcp', { purgeData: true, windowIsOpen: false })
+    expect(purge.dataRemoved).toBe(true)
+    expect(existsSync(appBaseDir('vcp')), 'data、cache、settings.json 整族没了').toBe(false)
+    expect(existsSync(join(appBaseDir('life'), 'settings.json')), '别的应用那一族一个字没动').toBe(true)
+
+    // 没开过窗口的应用本来就没有那一族：不许把"没得删"念成"删了"
+    installPackage(makeArchive(source, vcp()), false)
+    const none = uninstallPackage('vcp', { purgeData: true, windowIsOpen: false })
+    expect(none.dataRemoved, '本来就不存在时不算删过').toBe(false)
+    expect(none.dataWasAbsent).toBe(true)
+  })
+
+  it('PK-024 两档根同 id：卸掉生效那一份，被遮住的那一份顶上', () => {
+    installPackage(makeArchive(source, life()), false)
+    const landed = join(installedRoot, `life${PACKAGE_SUFFIX}`)
+    const before = readFileSync(landed)
+    const devRoot = join(sandbox, 'dev-apps')
+    const devArchive = makeArchive(devRoot, life())
+
+    electronApp.isPackaged = false
+    process.env.AIRSHIP_APPS_ROOT = devRoot
+    try {
+      scanInstalledPackages()
+      expect(packageFor('life')!.archive, '生效的是先扫到的那一档根里那份').toBe(devArchive)
+
+      const outcome = uninstallPackage('life', { purgeData: false, windowIsOpen: false })
+
+      expect(existsSync(devArchive), '删的是生效那一份').toBe(false)
+      expect(readFileSync(landed), '被遮住那一份一个字节没变').toEqual(before)
+      expect(outcome.origin, '回执说的是删掉那一份来自哪一档根').toBe('dev')
+      expect(outcome.tookOverByOtherRoot, '自装根那份随之顶上').toBe(true)
+      expect(packageFor('life')!.archive).toBe(landed)
+      expect(appIds()).toContain('life')
+    } finally {
+      electronApp.isPackaged = true
+      delete process.env.AIRSHIP_APPS_ROOT
+      scanInstalledPackages()
+    }
+  })
+
+  it('PK-025 卸掉之后它的地址读不出来，攒下的路径授权也作废', () => {
+    installPackage(makeArchive(source, life()), false)
+    grants.grantRead('life', join(source, 'notes.txt'))
+    expect(grants.stats('life').read).toBe(1)
+
+    uninstallPackage('life', { purgeData: false, windowIsOpen: false })
+
+    const look = (id: string) => {
+      const pkg = packageFor(id)
+      return pkg ? { archive: pkg.archive, entry: entryOf(pkg.manifest) } : null
+    }
+    expect(resolvePackageEntry(`airship://life/${DEFAULT_ENTRY}`, look)).toEqual({ reason: notRegistered('life') })
+    expect(grants.stats('life').read, '重装回来的同 id 认不得上一次拖进来的那些路径').toBe(0)
   })
 })

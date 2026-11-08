@@ -58,7 +58,7 @@ import {
   sharedNamespacesOf,
   unavailableReason
 } from './services/appRegistry'
-import { inspectPackage, installPackage, type PackageProposal } from './services/packageInstall'
+import { inspectPackage, installPackage, uninstallPackage, type PackageProposal } from './services/packageInstall'
 
 /**
  * 提案 → 界面用得上的那一份。
@@ -598,10 +598,11 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
   handle('launcher:apps', (event) => {
     requireShell(event)
     // 格子里摆什么，全看磁盘上装了哪些包：这里就是那一份真源
-    return installedPackages().map((p) => ({ meta: p.meta, iconUrl: p.iconUrl }))
+    // origin 给的是"这一格的东西来自哪一档根"，是档位名字、不是归档路径
+    return installedPackages().map((p) => ({ meta: p.meta, iconUrl: p.iconUrl, origin: p.origin }))
   })
 
-  /* ---------- 装包（拖放）：只有启动器能装 ---------- */
+  /* ---------- 装包与卸载（拖放与格子上那颗键）：只有启动器能做 ---------- */
 
   handle('launcher:inspectPackage', (event, path: unknown) => {
     requireShell(event)
@@ -613,6 +614,14 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
     if (typeof overwrite !== 'boolean') throw new Error(`overwrite 必须是 true 或 false，收到 ${JSON.stringify(overwrite)}`)
     // 装完只回回执，不广播、不开窗口：装与跑是两件事，格子里刷新由启动器自己重问 apps()
     return installPackage(assertNonEmptyString(path, '包路径'), overwrite)
+  })
+
+  handle('launcher:uninstallPackage', (event, id: unknown, purgeData: unknown) => {
+    requireShell(event)
+    if (typeof purgeData !== 'boolean') throw new Error(`purgeData 必须是 true 或 false，收到 ${JSON.stringify(purgeData)}`)
+    const target = assertNonEmptyString(id, '应用 id')
+    // 开着窗口就不动磁盘：窗口台账只有这里问得到，服务层收的是算好的那一个布尔
+    return uninstallPackage(target, { purgeData, windowIsOpen: openAppIds().includes(target) })
   })
 
   handle('launcher:setTheme', (event, mode: unknown, resolvedHint: unknown) => {

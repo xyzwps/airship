@@ -85,5 +85,17 @@ export const grants = {
       read: bag(readGrants, app).size,
       write: bag(writeGrants, app).size
     }
+  },
+
+  /**
+   * 忘掉这个应用攒下的全部路径授权。
+   *
+   * 卸载时调：重装回来的那个同名应用不该接着读到上一次会话里拖进去的那些路径——
+   * 授权记的是 id，而 id 认不出"这还是不是同一只手写的包"。
+   * 表在进程内，本来重启就空；这一条让"卸掉"当场生效，不用等人重启一次。
+   */
+  forget(app: AppId): void {
+    readGrants.delete(app)
+    writeGrants.delete(app)
   }
 }

@@ -85,6 +85,22 @@ export const overwriteNeedsConfirm = (name: string, existing: string, incoming: 
 /** 源文件读不出来（拖进来后又被移走、没权限等） */
 export const packageUnreadable = (path: string, why: string): string =>
   `读不到这个包：${path}（${why}）`
+
+/* ---------------- 卸载的措辞 ---------------- */
+
+/**
+ * 这一格此刻开着窗口，不卸。
+ *
+ * 归档正被 `airship://` 供着：删掉之后同一个窗口的后续请求全变 404，是个谁也没见过的半死状态。
+ * 也不写成"已为你关闭窗口"——正在编辑的东西不该由卸载这一下没了。
+ */
+export const windowBlocksUninstall = (name: string): string =>
+  `${name} 的窗口还开着，先把它关掉再卸载（壳不替你关窗口）`
+
+/** 磁盘上删不掉（被占用、没权限）：原话要点出是哪个文件没删掉 */
+export const packageNotRemoved = (path: string, why: string): string =>
+  `没能卸载这个包：${path}（${why}）`
+
 /** 子进程白名单外的可执行文件 */
 export const exeDenied = (exe: string): string =>
   `不允许执行 ${exe}：可执行文件必须先由壳发现或用户在设置里指定（见 tools.ts 的白名单规则）`

@@ -245,6 +245,7 @@ function shellStub(): ShellBridge {
     openApp: no,
     inspectPackage: no,
     installPackage: no,
+    uninstallPackage: no,
     openApps: no,
     setTheme: no,
     theme: no,

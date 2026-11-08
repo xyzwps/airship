@@ -180,6 +180,8 @@ if (IS_SHELL) {
     inspectPackage: (file: File) => call('launcher:inspectPackage', webUtils.getPathForFile(file)),
     installPackage: (file: File, overwrite: boolean) =>
       call('launcher:installPackage', webUtils.getPathForFile(file), overwrite),
+    /** 卸载只交 id：归档在哪、叫什么名，是主进程的事（渲染侧连绝对路径都拿不到） */
+    uninstallPackage: (id: string, purgeData: boolean) => call('launcher:uninstallPackage', id, purgeData),
     setTheme: (mode, resolvedHint) => call('launcher:setTheme', mode, resolvedHint),
     theme: () => call('theme:get'),
     settings: {

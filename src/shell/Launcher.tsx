@@ -2,8 +2,8 @@ import { useEffect, useState, type JSX } from 'react'
 import { Titlebar } from '@airship/sdk'
 import { useTheme, THEME_LABEL, nextThemeMode, Glyph, type ThemeMode } from '@airship/sdk'
 import { useReportShotReady } from '@airship/sdk'
-import { capabilitiesPhrase, platformIssue, PACKAGE_ROOT_LABEL, type Capability, type InstallResultView, type PackageProposalView, type ShellInfoView } from '@airship/contract'
-import type { InstalledApp, PlatformId } from '@airship/contract'
+import { capabilitiesPhrase, platformIssue, PACKAGE_ROOT_LABEL, type Capability, type InstallResultView, type InstalledApp, type PackageProposalView, type ShellInfoView, type UninstallResultView } from '@airship/contract'
+import type { PlatformId } from '@airship/contract'
 
 /**
  * 启动器。
@@ -22,6 +22,12 @@ import type { InstalledApp, PlatformId } from '@airship/contract'
  * 拖进来一个 `<id>.airship` 归档就装它（PK-015~019）：
  * 只有这一扇窗接受拖放，应用窗口不接受——否则任何一个页面拖一下就有装包权。
  * 装之前把清单里的能力念给人看；同 id 要覆盖必须先确认；装完不自动开窗口。
+ *
+ * 卸载走顶栏那颗管理键（PK-021~026 / SH-025~029）：按下它，每格右上角露一个叉、
+ * 整格变成"点它是要卸它"而不是"点它是要开它"——一格里同一时刻只有一个动作，
+ * 所以格子内不摆第二颗可点的键，叉只是画在上面的记号。再按一下退回普通格子，
+ * 进设置那一屏也退回（回来的该是原来那些格，见 SH-029）。
+ * 点格子弹的是确认卡片：删代码还是连数据一起删，由人当场选；没点确认磁盘一个字节不动。
  */
 export function Launcher(): JSX.Element {
   const { mode, setMode } = useTheme()
@@ -32,6 +38,10 @@ export function Launcher(): JSX.Element {
   const [notice, setNotice] = useState<string | null>(null)
   /** 待确认的覆盖：一次拖多个时排队，同一时刻只挂一张卡片 */
   const [pending, setPending] = useState<{ file: File; proposal: PackageProposalView }[]>([])
+  /** 管理态：格子里露出卸载记号，点格子变成"要卸它" */
+  const [managing, setManaging] = useState(false)
+  /** 待确认的卸载：一次只挂一张卡片（卸载是逐个动作，不排队） */
+  const [removing, setRemoving] = useState<InstalledApp | null>(null)
   /** 两屏：格子与设置。设置那一屏的数据在进那一屏时才问主进程要（版本与包根不会自己变） */
   const [view, setView] = useState<'grid' | 'settings'>('grid')
   const [info, setInfo] = useState<ShellInfoView | null>(null)
@@ -143,6 +153,46 @@ export function Launcher(): JSX.Element {
     }
   }
 
+  /** 卸载那一行：名字 + 卸的是哪一档根 + 数据的下落；另一档根顶上时必须念出来 */
+  const uninstallSentence = (result: UninstallResultView): string => {
+    const data = result.dataRemoved ? '数据也删了' : result.dataWasAbsent ? '本来就没有它的数据' : '数据留着'
+    const bits = [`已卸载：${result.name} · 来自${PACKAGE_ROOT_LABEL[result.origin]} · ${data}`]
+    if (result.tookOverByOtherRoot) bits.push('另一档根里还有一份，现在生效的是它')
+    return bits.join('；')
+  }
+
+  const askRemove = (app: InstalledApp): void => {
+    setError(null)
+    setNotice(null)
+    setRemoving(app)
+  }
+
+  /** 卡片上那两颗键的差别只有一件事：数据这一族删不删。归档那一份都要删。 */
+  const confirmRemove = async (purgeData: boolean): Promise<void> => {
+    const target = removing
+    if (!target) return
+    setRemoving(null)
+    try {
+      const result = await window.airshipShell.uninstallPackage(target.meta.id, purgeData)
+      await reload()
+      setNotice(uninstallSentence(result))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const toggleManaging = (): void => {
+    setManaging((on) => !on)
+    setRemoving(null)
+  }
+
+  const openSettings = (): void => {
+    // 管理态不带进设置那一屏：从那一屏回来该是原来那些格（SH-024）
+    setManaging(false)
+    setRemoving(null)
+    setView('settings')
+  }
+
   const next = nextThemeMode(mode)
 
   return (
@@ -178,6 +228,18 @@ export function Launcher(): JSX.Element {
             </button>
           ) : (
             <>
+              {/* 一颗键两态：图形不换，换的是"按下去"那块底色与悬停说明念的那句话 */}
+              <button
+                type="button"
+                className={`bar-btn${managing ? ' bar-btn--on' : ''}`}
+                data-test="卸载管理"
+                aria-pressed={managing}
+                onClick={toggleManaging}
+                aria-label={managing ? '退出卸载管理：格子回到点开就开窗口' : '卸载管理：点一下，每格露出卸载记号'}
+                title={managing ? '退出卸载管理：格子回到点开就开窗口' : '卸载管理：点一下，每格露出卸载记号'}
+              >
+                <Glyph name="remove" />
+              </button>
               {/* 纯图标键：悬停说明与无障碍名称是强制项，念得出"现在哪档、点一下换成哪档" */}
               <button
                 type="button"
@@ -192,7 +254,7 @@ export function Launcher(): JSX.Element {
                 type="button"
                 className="bar-btn"
                 data-test="设置"
-                onClick={() => setView('settings')}
+                onClick={openSettings}
                 aria-label="设置"
                 title="打开设置页：版本与应用装在哪个目录"
               >
@@ -233,6 +295,29 @@ export function Launcher(): JSX.Element {
           </div>
         )}
 
+        {removing && (
+          <div className="card confirm" role="alertdialog" aria-label="卸载确认">
+            <p>
+              卸载 <strong>{removing.meta.name}</strong>？
+              删掉的是{PACKAGE_ROOT_LABEL[removing.origin]}里那一份 <code>{removing.meta.id}.airship</code> 归档。
+            </p>
+            <p className="hint">
+              它的数据（自己存的那些东西）另算：只卸载就原样留着，重装还能接着用；连数据一起删就回不来了。
+            </p>
+            <div className="row">
+              <button type="button" className="btn btn--primary" data-test="只卸载" onClick={() => void confirmRemove(false)}>
+                只卸载
+              </button>
+              <button type="button" className="btn btn--danger" data-test="卸载并删数据" onClick={() => void confirmRemove(true)}>
+                卸载并删数据
+              </button>
+              <button type="button" className="btn" data-test="取消卸载" onClick={() => setRemoving(null)}>
+                取消
+              </button>
+            </div>
+          </div>
+        )}
+
         {view === 'settings' ? (
           <SettingsScreen info={info} error={infoError} />
         ) : (
@@ -245,12 +330,27 @@ export function Launcher(): JSX.Element {
             )}
 
             <div className="tiles">
-              {entries.map(({ meta, iconUrl }) => (
-                <button key={meta.id} type="button" className="tile" onClick={() => open(meta.id)}>
+              {entries.map((app) => (
+                <button
+                  key={app.meta.id}
+                  type="button"
+                  className={`tile${managing ? ' tile--manage' : ''}`}
+                  data-test={managing ? `卸载 ${app.meta.id}` : undefined}
+                  onClick={() => (managing ? askRemove(app) : open(app.meta.id))}
+                  aria-label={managing ? `卸载 ${app.meta.name}` : undefined}
+                  title={managing ? `卸载 ${app.meta.name}` : undefined}
+                >
                   <span className="tile__icon">
-                    {iconUrl ? <img src={iconUrl} alt="" className="tile__glyph" /> : null}
+                    {app.iconUrl ? <img src={app.iconUrl} alt="" className="tile__glyph" /> : null}
                   </span>
-                  <span className="tile__name">{meta.name}</span>
+                  <span className="tile__name">{app.meta.name}</span>
+                  {/* 管理态里的叉只是画在格子角上的记号：一格里同一时刻只有一个动作，
+                      所以这里不再嵌第二颗可点的键（能点的整格就是那颗键） */}
+                  {managing && (
+                    <span className="tile__mark" aria-hidden="true">
+                      <CrossGlyph />
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -286,6 +386,24 @@ function SettingsScreen({ info, error }: { info: ShellInfoView | null; error: st
         </div>
       ))}
     </div>
+  )
+}
+
+/**
+ * 格角上的叉：两条对角线，不套圆框——顶栏那颗管理键是垃圾桶，两形不撞。
+ * 用 currentColor，跟着壳的文字色走。
+ */
+function CrossGlyph(): JSX.Element {
+  return (
+    <svg width={11} height={11} viewBox="0 0 16 16" aria-hidden={true}>
+      <path
+        d="M3.6 3.6l8.8 8.8M12.4 3.6 3.6 12.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+    </svg>
   )
 }
 

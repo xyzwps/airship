@@ -50,9 +50,20 @@ export function paths() {
   return cached
 }
 
+/**
+ * 这个应用在 userData 下的那一族的根：`<userData>/apps/<id>`，里面是 data、cache、settings.json。
+ *
+ * 与下面 `dirsFor` 的区别是**它不建目录**：卸载要问的是"这一族在不在"，
+ * 不是"给我用一下"——用 appDataDir 去问会顺手把 data 与 cache 造出来，
+ * 于是"没开过窗口的应用"被卸成"删过数据的应用"，界面上那句就念错了。
+ */
+export function appBaseDir(id: AppId): string {
+  return join(paths().root, 'apps', id)
+}
+
 /** 这个应用的三个目录；不存在就地建。所以"什么时候装的包"不影响它能不能用 */
 function dirsFor(id: AppId): AppDirs {
-  const base = join(paths().root, 'apps', id)
+  const base = appBaseDir(id)
   const data = join(base, 'data')
   const cache = join(base, 'cache')
   mkdirSync(data, { recursive: true })

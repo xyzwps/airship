@@ -351,11 +351,17 @@ export type AppApi = AirshipBridge & { id: AppId }
  *
  * `iconUrl` 由壳算：壳在包根扫到唯一那张 `icon.*`，拼成 `airship://<id>/icon.<ext>`。
  * 应用与包清单都不写图标路径——AP-007 那条"清单里没有图标字段"在包这一档同样成立。
+ *
+ * `origin` 是这一格的东西**来自哪一档根**：卸载要说清删掉的是哪一份（自装根里的那个，
+ * 还是 `just build-apps` 产在 dist-apps 里的那个）。给的是档位名字，不是归档的路径——
+ * 与装包那条"归档绝对路径不出去"同一个理由。
  */
 export interface InstalledApp {
   meta: AppMeta
   /** 壳在包根扫到唯一那张 `icon.*` 后拼出来的地址；扫不到就是 null，格子里留空 */
   iconUrl: string | null
+  /** 生效的那一份来自哪一档根（同 id 被遮住时，注册表里根本没有被遮住的那一份） */
+  origin: PackageRootOrigin
 }
 
 /**
@@ -383,6 +389,25 @@ export interface InstallResultView {
   name: string
   /** 换掉了自装根里原有的版本 */
   replaced: boolean
+}
+
+/**
+ * 卸成功的回执。
+ *
+ * `tookOverByOtherRoot` 是 PK-008 的反面：同一 id 在两档根里各有一份时，生效那一份被删掉后
+ * 另一份就顶上——格子里**还有**它，界面必须念得出这件事，不然人以为自己卸掉了。
+ */
+export interface UninstallResultView {
+  id: string
+  name: string
+  /** 删的是哪一档根里的东西（措辞取 PACKAGE_ROOT_LABEL） */
+  origin: PackageRootOrigin
+  /** 数据目录（`userData/apps/<id>/`：data、cache、settings.json）这一回跟着删了 */
+  dataRemoved: boolean
+  /** 选了删数据，但那一族在磁盘上本来就不存在：界面不许念成"数据留着"，也不许念成"删了" */
+  dataWasAbsent: boolean
+  /** 卸完之后另一档根里同 id 的那一份顶上了，格子里还有它 */
+  tookOverByOtherRoot: boolean
 }
 
 /**
@@ -423,6 +448,15 @@ export interface ShellBridge {
    * 装完只刷新格子，不开窗口：装与跑是两件事。
    */
   installPackage(file: File, overwrite: boolean): Promise<InstallResultView>
+  /**
+   * 卸载：删掉注册表里生效的那一份归档。只收 id——归档的路径由主进程从注册表问出来，
+   * 渲染侧既拿不到也不需要（它连绝对路径都拿不到）。
+   *
+   * `purgeData` 为真时连 `userData/apps/<id>/` 一起删；为假时数据原样留着，重装还能接着用。
+   * 这一格此刻开着窗口就**不动磁盘**，抛"先关窗口"那句——壳不替人关掉正在编辑的东西。
+   * 卸完重扫包根（格子里马上没有它），不广播、不做任何别的动作。
+   */
+  uninstallPackage(id: string, purgeData: boolean): Promise<UninstallResultView>
   /**
    * 改主题并广播给所有窗口。
    * mode 是 'system' 时，实际亮暗由启动器用 matchMedia 算好传进来——

@@ -347,8 +347,8 @@ export interface AppMeta {
 - `services/appRegistry.ts`：对外函数名与拆包前那份 glob 注册表一一对得上（`appIds` / `capabilitiesOf` /
   `canAccessShared` / `appsAvailableOn`…），所以 `ipc.ts`、`grants`、`paths.ts`、`windows.ts` 没跟着改。
   **能力边界不在这次改动里。**
-- 渲染侧不再扫任何东西：启动器问 `airshipShell.apps()` 拿名单（`InstalledApp` = 清单 + 图标地址），
-  应用窗口连名单都不需要——它的清单在自己包里。
+- 渲染侧不再扫任何东西：启动器问 `airshipShell.apps()` 拿名单（`InstalledApp` = 清单 + 图标地址 +
+  来自哪一档根），应用窗口连名单都不需要——它的清单在自己包里。
 
 壳从清单派生：应用列表、能力校验、数据目录、窗口尺寸与标题；显示顺序由壳按名字典序定。
 清单 id 与目录名不一致、id 重复、缺图标或多张图标、缺入口文档、`schemaVersion` 对不上——
@@ -360,6 +360,16 @@ export interface AppMeta {
 
 装包只有一条入口：把归档拖到启动器上（PK-015~020）。主进程侧是
 `services/packageInstall.ts` —— 复用 validateArchive 同一份判据、写暂存名再改名、失败把旧包挪回来；落点固定是自装根。同 id 已在自装根里时必须确认才换（覆盖是唯一不可逆的动作：下次打开跑的是新代码，而 `%APPDATA%/airship/apps/<id>/` 那份数据会被新代码接着读）。装完不自动开窗口——装与跑是两件事。
+
+卸载是同一条链的反向，入口也只有启动器那一扇（顶栏那颗管理键，PK-021~025 / SH-025~029）。四件实现上的理由：
+**只收 id**——归档的绝对路径留在主进程，与装包"路径不出去"同一条；**删的是注册表里生效那一份**——两档根同 id
+时（§7.3 的遮蔽）被遮住的那一份卸不到，卸掉生效那份它随之顶上，所以回执里带 `tookOverByOtherRoot`，界面上必须念；
+**窗口开着就不动磁盘**——归档正被 `airship://` 供着，删掉那个窗口就活在后续请求全 404 的半死状态，而壳替人关窗口
+会抹掉正在编辑的东西，所以拒掉、让人自己关（`ipc.ts` 问窗口台账算出那一个布尔，服务层不 import 窗口那一族）；
+**数据这一族由人当场选**——装包那张卡片承诺过"数据目录不会动"，卸载是唯一动它的地方。删归档走三轮重试
+（Windows 上正被读的短暂占用），缓存 `forgetArchive` + 重扫，顺手 `grants.forget(id)`：授权记的是 id，
+而 id 认不出"重装回来的还是不是同一只手写的包"。`paths.ts` 因此多导出一个不建目录的 `appBaseDir(id)`——
+用 `appDataDir` 去问"有没有数据"会顺手把 data 与 cache 造出来，界面上那句就念错了。
 
 拆掉的旧机制：渲染侧 `apps/index.ts` 那份 glob（清单 + 图标 + 组件三遍 glob）与主进程那份 glob 清单。
 两侧曾经各扫一遍、靠用例 `AP-008` 钉"集合一致"——现在只剩一份真源，`AP-008` 改成钉

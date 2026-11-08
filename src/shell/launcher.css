@@ -55,6 +55,12 @@
   outline-offset: 1px;
 }
 
+/* 管理键按下那一态：底色留着、字色提亮——画的是"现在真在这态里"，不是装饰性的强调色 */
+.bar-btn--on {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
 .theme-toggle svg,
 .bar-btn svg {
   width: 17px;
@@ -105,6 +111,7 @@
 }
 
 .tile {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -123,6 +130,25 @@
 .tile:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
+}
+
+/* 管理态里整格就是"卸载"那颗键：叉画在右上角，平时淡、悬停才亮成危险色。
+   叉本身 aria-hidden——能点的是整格，读屏念的是格子上那句"卸载 <名字>"。 */
+.tile__mark {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--fg-faint);
+}
+
+.tile--manage:hover .tile__mark,
+.tile--manage:focus-visible .tile__mark {
+  color: var(--danger, #b3564e);
 }
 
 /* 图标就是图标：原始文件直接画，不套底板。

@@ -245,4 +245,21 @@ describe('启动器面', () => {
     expect(reason(await call('launcher:openApp', LAUNCHER, 'ghost'))).toBe('没有注册这个应用：ghost')
     expect(reason(await call('launcher:openExternal', LAUNCHER, 'file:///C:/x'))).toContain('只允许打开 http/https 链接')
   })
+
+  it('PK-026 卸载只认 id：这条通道只有启动器能用，没装过的 id 念没有注册', async () => {
+    // 应用窗口那侧调不到（它连"往这台机器上删东西"的权力都没有）
+    expect(reason(await call('launcher:uninstallPackage', VCP, 'vcp', false))).toBe('这个接口只有启动器能用')
+    // 注册表里没有的 id：磁盘上什么都不必删
+    expect(reason(await call('launcher:uninstallPackage', LAUNCHER, 'ghost', false))).toBe('没有注册这个应用：ghost')
+    // 参数不合法念出收到的值
+    expect(reason(await call('launcher:uninstallPackage', LAUNCHER, 'vcp', 'yes'))).toContain('purgeData 必须是 true 或 false')
+  })
+
+  it('PK-022 那条拒在通道上同样成立：台账说开着就不动磁盘', async () => {
+    expect((await call('launcher:openApp', LAUNCHER, 'vcp')).ok).toBe(true)
+    expect(reason(await call('launcher:uninstallPackage', LAUNCHER, 'vcp', true))).toContain(
+      '的窗口还开着，先把它关掉再卸载'
+    )
+    expect((await call('launcher:apps', LAUNCHER)).ok, '格子里还有它').toBe(true)
+  })
 })
