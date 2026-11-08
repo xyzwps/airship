@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 /**
- * SH-015 / SH-016 / SH-018：窗口尺寸与摆放。
+ * SH-015 / SH-016 / SH-018：窗口尺寸与摆放；BR-011：建窗口那一刻的安全参数。
  *
  * 这里跑的是**真的 openAppWindow**，只把 BrowserWindow 换成记账的假壳——
  * 判据是"传进去的构造参数"：宽高来自清单、没有坐标、关掉再开也不留下任何窗口记录。
@@ -13,6 +13,7 @@ interface FakeOptions {
   x?: number
   y?: number
   show?: boolean
+  webPreferences?: { webSecurity?: boolean }
 }
 
 let nextContentsId = 1
@@ -173,5 +174,27 @@ describe('二次启动唤起启动器', () => {
     // 还开着时再唤一次：只唤，不重复建
     bringLauncherToFront()
     expect(FakeBrowserWindow.created).toHaveLength(1)
+  })
+})
+
+/**
+ * BR-011：`net` 能力换到的那一档跨源豁免（判据见 `src/shell/specs/bridge.md`）。
+ *
+ * 这里钉的是建窗口那一刻传进去的安全参数：窗口构造之后就没机会再改了，
+ * "声明了 net 的应用在自己窗口里读得到不回跨源许可的 http 服务响应"的前提就在这一位上。
+ * 清单是真的（setup.ts 把仓库的 `app.ts` 落成临时包根）：s3 声明了 net，dagogo 没有。
+ */
+describe('声明了 net 的应用窗口豁免同源策略', () => {
+  it('BR-011 只有声明 net 的应用窗口豁免同源策略，其余窗口照旧', () => {
+    resetWindows()
+    openAppWindow('s3')
+    expect(lastWindow().options.webPreferences?.webSecurity, 's3 声明了 net，它的窗口该豁免同源策略').toBe(false)
+
+    openAppWindow('dagogo')
+    expect(lastWindow().options.webPreferences?.webSecurity, 'dagogo 没声明 net，同源策略必须照旧').toBe(true)
+
+    // 启动器是壳自己的窗口，永远不豁免
+    createLauncher()
+    expect(lastWindow().options.webPreferences?.webSecurity, '启动器窗口不该被豁免同源策略').toBe(true)
   })
 })

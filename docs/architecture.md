@@ -219,9 +219,16 @@ preload 用 `contextBridge.exposeInMainWorld('airship', bridge)` 挂一个对象
 
 ## 6. 能力与授权
 
-### 6.1 能力位（10 项）
+### 6.1 能力位（11 项）
 
-`fs.read` `fs.write` `dialog` `settings` `shared` `proc` `tray` `notify` `clipboard` `log`
+`fs.read` `fs.write` `dialog` `settings` `shared` `proc` `tray` `notify` `clipboard` `log` `net`
+
+`net` 是其中唯一**不经过桥**的一项：应用在自己的窗口里用 `fetch` 直连外部服务（S3 兼容的对象存储），
+壳按清单做两件事——产包时注入放宽了 `connect-src` 的那一条 CSP，建窗口时给那个窗口豁免同源策略。
+不做成"壳代发请求"的接口，是因为对象存储的响应里普遍没有跨源许可（要按桶配 CORS 规则，
+实测本机 RustFS 的预检回 200 却不带任何 `Access-Control-Allow-*`），代发就得伪造别人的响应头；
+交回渲染侧才保得住 SDK 的流式上传与分块下载。判据见 `src/shell/specs/bridge.md` BR-011
+与 `src/apps/specs/app-model.md` AP-017。
 
 ### 6.2 路径授权
 
@@ -390,7 +397,7 @@ export interface AppMeta {
 截图工装等的"就绪"信号来自 SDK 宿主（`useReportShotReady`，画完下一帧才报）——
 等"脚本加载完"会截出一张占位，看着像跑起来了其实什么都没验。
 
-### 7.5 现有六个应用
+### 7.5 现有八个应用
 
 | id | 名称 | 能力 | 共享命名空间 | 工具 | 平台 |
 |---|---|---|---|---|---|
@@ -399,6 +406,8 @@ export interface AppMeta {
 | `pdf` | PDF | fs.read fs.write dialog settings shared notify clipboard log | library | — | 全平台 |
 | `dagogo` | 打勾勾 | fs.read fs.write dialog settings tray notify log | — | — | 全平台 |
 | `life` | 生命游戏 | **一件都不声明** | — | — | 全平台 |
+| `albedo` | Albedo | settings dialog fs.read fs.write clipboard | — | — | 全平台 |
+| `s3` | S3 | **net** settings dialog fs.read fs.write clipboard | — | — | 全平台 |
 | `wsld` | 容器台 | fs.read fs.write dialog settings proc notify clipboard log | — | wslc | **仅 windows** |
 
 墨读与 PDF 是两个入口、一份书库：书架、导入、封面、进度是同一套数据，各存一份会出现"同一本书在两个入口各一本"。
@@ -528,7 +537,7 @@ export interface AppMeta {
 | 体积实测 | 拆包**不减安装包体积**：`app.asar` 从 3.4 MB 降到壳自己的约 0.7 MB，六个归档合计约 1.2 MB（zip 压过，实测 life 240 KB → 79 KB）；安装包 122.2 MB → 122.6 MB。换来的是"改一个应用只重出一个包"与"应用能独立分发"，不是体积 |
 | 图标 | 母版 `src/shell/assets/icon-master.png`（用户提供的图形），`python code/make-icons.py` 重出 `src/shell/assets/icon.png`（256，窗口图标）与 `src/shell/assets/tray.png`（16，托盘默认），`python code/make-ico.py` 重出 `src/shell/assets/icon.ico`（16–256 七档，安装包与 exe 的图标）；标题栏那颗品牌图形在 `src/sdk/Titlebar.tsx`，应用自己的图标由 `main.tsx` 的 `icon` 参数交给宿主 |
 | 数据目录名 | 主进程开头 `app.setName('airship')` 钉死：Electron 的 userData 默认取 package.json 的 name，而壳的 name 是 `@airship/shell`——不钉住，`%APPDATA%/airship` 里的书架与设置看着像"凭空消失"了 |
-| 安全 | `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`、`webSecurity: true`；CSP 由 `src/sdk/csp.ts` 一份、构建时注入每个包的入口 html（AP-014），允许 `blob:`（foliate 用 blob iframe 与 blob 样式表）与样式 `unsafe-inline`，脚本只 `'self'`；`airship://` 处理器只读、只到自己那一个包目录（PK-014） |
+| 安全 | `contextIsolation: true`、`nodeIntegration: false`、`sandbox: true`；`webSecurity` 默认 `true`，**只有清单声明了 `net` 的那个应用窗口**关掉它（同源策略与混合内容一起豁免，见 BR-011）；CSP 由 `src/sdk/csp.ts` 一份、构建时注入每个包的入口 html（AP-014），按清单选档：默认那条 `connect-src` 收紧，声明了 `net` 的那一档放到 `http:` 与 `https:`（AP-017），两档的 `script-src` 都只 `'self'`；允许 `blob:`（foliate 用 blob iframe 与 blob 样式表）与样式 `unsafe-inline`；`airship://` 处理器只读、只到自己那一个包目录（PK-014） |
 | 外部链接 | 只放行 `http/https`，交给系统浏览器；`file://` 与自定义协议不开新窗 |
 
 命令：`just new-app` 造应用 · `just build-apps` 产包 · `just compile` 编译壳 · `just build-shell` 出安装包 · `just build` 两条一起跑 · `just dev` 开发（先 build-apps） · `just verify-installer` 出包自检 · `just test` 单测 · `just casecov` 册子与用例的双向差集 · `just typecheck` 两个 tsconfig · `just shot` 逐窗口截图（先 compile + build-apps） · `just e2e` 真编码用例 · `just wsld-real` 真 `wslc` 只读命令。

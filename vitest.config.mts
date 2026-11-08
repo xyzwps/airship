@@ -25,6 +25,10 @@ export default defineConfig({
          * 结果是 `import * as testing from '@airship/sdk/testing'` 拿到一个空模块——
          * 不报错，只是什么都没有，比报错难查得多。
          * 交给 vite 处理之后，源码包与仓库内文件走同一条变换管线。
+         *
+         * `@aws-sdk/*` 不在这一列里，而且不该在：它被外部化之后挑的是 Node 那一档传输，
+         * 换 `globalThis.fetch` 换不到它（请求会真发到机器上的端点去）。
+         * S3 那个应用的用例因此起一个真的内存 HTTP 服务当端点，见 `src/apps/s3/tests/helpers/fakeS3.ts`。
          */
         inline: [/^@airship\//]
       }

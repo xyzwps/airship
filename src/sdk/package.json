@@ -1,6 +1,6 @@
 {
   "name": "@airship/sdk",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "airship 应用面向的那一面：宿主、观感、CSP、工装钩子与测试替身",
   "type": "module",

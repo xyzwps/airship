@@ -44,6 +44,10 @@ src/shared/textdecode  @airship/textdecode   中文解码
 `devDependencies`——它们被构建进包，运行时不需要机器上装着（AP-016 钉这条）。
 说明符一律写包名（`@airship/...`），**手写别名已全部拆掉**：边界现在由 node 的解析器守，不靠注释。
 
+**版本号只有两条规矩**：根 `package.json` 与 `src/shell/package.json` **保持一致**——它们是同一个发布物，
+就该念同一个数（`code/build-apps.mjs` 取根那份当包清单里的 `sdkVersion`，两处不一致等于清单在说谎）；
+各应用自己的 `package.json` 版本**独立演化**，不跟壳跳，一个应用发自己的版不该惊动别的区和壳。
+
 应用与 SDK 都不许 import `src/shell/**`（AP-013 守着）；壳也不 import 任何应用——名单来自运行期扫包。
 `src/sdk` 是将来要独立发布的那一份，改它的导出等于改公开面（TD-013）。
 壳给应用窗口的 DOM 只有 SDK 那一份——`src/shell` 里不再有 `AppHost`，也没有 `app.html`。

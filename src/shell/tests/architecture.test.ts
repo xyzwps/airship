@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, posix } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { airshipCspPlugin } from '@airship/sdk/vite'
 
 /**
  * 架构不变量的可执行版本（docs/architecture.md §2、§4、§8）。
@@ -225,6 +226,8 @@ describe('应用只引 SDK 与契约层（§4 / I-6）', () => {
    *
    * 六个应用各抄一条权限字符串，就会有第六个版本悄悄少一个 `worker-src`；
    * 注入器还顺手把"应用自己写了 CSP"当成错误抛出来，所以这条路不会被动破。
+   * 选哪一条的逻辑也归 csp.ts（`pickCsp`，判据见 AP-017）：注入器只递交"产包还是开发"
+   * 与"清单有没有 net"这两个依据，自己手里不留任何一条字符串。
    */
   it('AP-014 CSP 的唯一真源在 SDK，应用入口 html 里没有那一条', () => {
     const cspSource = readFileSync(join(SRC, 'sdk', 'csp.ts'), 'utf8')
@@ -232,15 +235,68 @@ describe('应用只引 SDK 与契约层（§4 / I-6）', () => {
     expect(cspSource, 'dev 那条要单独一份：react-refresh 的内联前言过不了 script-src 自检').toMatch(
       /export const AIRSHIP_CSP_DEV/
     )
+    expect(cspSource, '选哪一条 CSP 的逻辑住在 csp.ts 里，产包与开发、带不带 net 都在这一处判').toMatch(
+      /export function pickCsp\(input: \{ bundle: boolean; net: boolean \}\)/
+    )
 
     const injector = readFileSync(join(SRC, 'sdk', 'cspPlugin.ts'), 'utf8')
-    expect(injector, '注入器要按命令选策略：build 用收紧的那条，dev 用带 localhost 的那条').toMatch(
-      /ctx\.bundle \? AIRSHIP_CSP : AIRSHIP_CSP_DEV/
+    expect(injector, '注入器要从 csp.ts 引选择逻辑，不许自己另选一条').toMatch(
+      /import\s*\{\s*pickCsp\s*\}\s*from\s*'\.\/csp\.ts'/
     )
+    expect(injector, '注入器只递交两个依据：构建还是开发、清单声明了没有 net').toMatch(
+      /pickCsp\(\{[^}]*bundle:[^}]*net:[^}]*\}\)/
+    )
+    expect(injector, 'CSP 字符串一处都不许出现在注入器里——唯一真源在 csp.ts').not.toMatch(/AIRSHIP_CSP/)
 
     for (const dir of discoveredAppIds()) {
       const html = readFileSync(join(APPS_DIR, dir, 'index.html'), 'utf8')
       expect(html, `src/apps/${dir}/index.html 里不许自己写 CSP`).not.toMatch(/Content-Security-Policy/)
+    }
+  })
+
+  /**
+   * AP-017：注入哪一条 CSP 按清单选档——真调注入器，不读它的源码。
+   *
+   * 判据的原文是"两档只差 connect-src 的外连，脚本与 frame 一概不放宽"，
+   * 最容易坏的地方恰恰是有人改字符串时顺手把 script-src 也松了，所以这里对结果说话。
+   * filename 指到 src/apps/<id>/index.html 的真路径：注入器从它旁边的 app.ts 读能力位。
+   */
+  it('AP-017 注入的 CSP 按清单选档：只有声明了 net 的应用放宽 connect-src', () => {
+    const doc =
+      '<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><title>工装</title></head><body><div id="root"></div></body></html>'
+
+    const cspOf = (id: string): string => {
+      // bundle 传非空对象：产包那一份是对外发布的形状，dev 档归截图与实测管
+      const injected = airshipCspPlugin().transformIndexHtml(doc, {
+        filename: join(APPS_DIR, id, 'index.html'),
+        bundle: {}
+      })
+      const hit = /<meta http-equiv="Content-Security-Policy" content="([^"]+)" \/>/.exec(injected)
+      expect(hit, `${id} 的入口文档没被注入 CSP`).not.toBeNull()
+      return hit[1]!
+    }
+
+    const directive = (csp: string, name: string): string[] => {
+      const line = csp.split(';').map((s) => s.trim()).find((s) => s.startsWith(`${name} `))
+      expect(line, `CSP 里没有 ${name} 这一项`).not.toBeUndefined()
+      return line!.split(/\s+/).slice(1)
+    }
+
+    const withNet = cspOf('s3')
+    const withoutNet = cspOf('life')
+
+    // 声明了 net 的：外连放到 http 与 https 两个协议；没声明的还是收紧那条
+    expect(directive(withNet, 'connect-src')).toEqual(expect.arrayContaining(['http:', 'https:']))
+    expect(directive(withoutNet, 'connect-src')).not.toContain('http:')
+    expect(directive(withoutNet, 'connect-src')).not.toContain('https:')
+
+    // 两档都没放宽的：脚本只认包里的那一份，frame 也不引外站
+    for (const [id, csp] of [
+      ['s3', withNet],
+      ['life', withoutNet]
+    ] as const) {
+      expect(directive(csp, 'script-src'), `${id} 的 script-src 被放宽了`).toEqual(["'self'"])
+      expect(directive(csp, 'frame-src'), `${id} 的 frame-src 被放宽了`).toEqual(["'self'", 'blob:'])
     }
   })
 })

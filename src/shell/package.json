@@ -1,6 +1,6 @@
 {
   "name": "@airship/shell",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "飞船的壳：窗口、能力实现、运行期扫包与启动器",
   "main": "out/main/index.js",

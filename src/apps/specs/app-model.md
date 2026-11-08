@@ -95,3 +95,8 @@
 - **AND** 应用的 `package.json` 里 SDK 与 react 记在 `devDependencies`——运行时机器上不需要装着它们
 - **AND** 根那份只声明工作区，没有 `scripts`（命令的唯一真源仍是 justfile）
 - **AND** 仓库里再没有 `@shared/…`、`@sdk/…`、`@apps/…` 这类手写别名说明符
+
+#### Scenario: AP-017 注入的 CSP 按清单分档：声明了 `net` 的才放宽外连
+- **WHEN** 比对注入给清单里声明了 `net` 的应用与没声明的应用的那条 CSP
+- **THEN** 前者的 `connect-src` 带着 `http:` 与 `https:`，后者仍是收紧的那条
+- **AND** 两档的 `script-src` 与 `frame-src` 都没放宽——能连外网不等于能加载外站脚本

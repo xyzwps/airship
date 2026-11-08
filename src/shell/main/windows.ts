@@ -1,6 +1,6 @@
 import { BrowserWindow, app } from 'electron'
 import { join } from 'node:path'
-import { packageFor, unavailableReason } from './services/appRegistry'
+import { packageFor, unavailableReason, hasCapability } from './services/appRegistry'
 import { platformIdOf } from '@airship/contract'
 import { notRegistered, platformUnsupported } from '@airship/contract'
 import { targetsFor, type WindowRef } from './services/routing'
@@ -42,12 +42,24 @@ function preloadPath(): string {
 }
 
 function baseWebPreferences(owner: Owner): Electron.WebPreferences {
+  /**
+   * 声明了 `net` 的应用窗口豁免同源策略，别的窗口照旧。
+   *
+   * 为什么豁免这一档而不是让壳代发请求：对象存储的响应里没有跨源许可
+   * （S3 与阿里云 OSS 都要按桶配 CORS 规则，实测 RustFS 的预检回 200 却一个 `Access-Control-Allow-*`
+   * 都不带），代发就得伪造别人的响应头。豁免给的是"这个窗口能读跨源响应"，
+   * 与那条能力位说的原本是同一件事，且保住了 SDK 的流式上传与分块下载。
+   * 顺带这一档也让 `airship://`（安全上下文）能连 `http://` 的本地端点——
+   * 混合内容的拦截跟着同源策略一起放开，这条是实测出来的，见 BR-011。
+   * 放宽的只有这一个窗口的这一条：`sandbox`、`contextIsolation`、`nodeIntegration` 一概不动。
+   */
+  const webSecurity = owner === 'shell' ? true : !hasCapability(owner, 'net')
   return {
     preload: preloadPath(),
     sandbox: true,
     contextIsolation: true,
     nodeIntegration: false,
-    webSecurity: true,
+    webSecurity,
     spellcheck: false,
     additionalArguments: owner === 'shell' ? ['--airship-role=shell'] : [`--airship-app=${owner}`]
   }

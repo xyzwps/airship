@@ -116,6 +116,7 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 | DG | 打勾勾：每日清单与托盘徽标 | `dagogo.md` | 自动化 |
 | LF | 生命游戏：100 / 200 / 300 三档网格与缩放、世代推演、经典图形与自画 | `life.md` | 自动化 |
 | AL | Albedo：SVG 编辑工作台（形状与路径命令栈、布尔、对齐吸附、桌布、双语、导入导出） | `albedo.md` | 自动化 + 截图走查 |
+| OS | S3：连接与它的记忆、桶与一层的对象、上传下载、预览、删除、建桶与临时链接 | `s3.md` | 自动化 + 截图走查（真端点） |
 | CL | wsld：容器列表与详情 | `wsld-containers.md` | 自动化（替身）+ 门控（`AIRSHIP_WSLD_INTEGRATION=1`） |
 | CA | wsld：容器生命周期操作 | `wsld-container-actions.md` | 同左 |
 | WL | wsld：容器日志（尾部行数、时间戳、实时） | `wsld-logs.md` | 同左 |
