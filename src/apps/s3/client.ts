@@ -9,7 +9,7 @@ import {
   S3Client
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import type { Connection } from './connection.ts'
+import type { Source } from './connection.ts'
 
 /**
  * 与对象存储端点说话的那一层。
@@ -25,7 +25,7 @@ import type { Connection } from './connection.ts'
  *     并按响应里的校验和做校验——S3 兼容端点大多不认这套，请求会在服务端被拒成一句看不懂的 XML。
  *     `WHEN_REQUIRED` 才是"只在协议要求时才带"，也就是不带。
  */
-export function createClient(conn: Connection): S3Client {
+export function createClient(conn: Source): S3Client {
   return new S3Client({
     region: conn.region,
     endpoint: conn.endpoint,

@@ -5,7 +5,16 @@ import { useAppAutotest, useTheme } from '@airship/sdk'
 import { ConnectionCard } from './ConnectionCard.tsx'
 import { ObjectsView } from './ObjectsView.tsx'
 import { PreviewPane } from './PreviewPane.tsx'
-import { loadConnection, parseConnection, saveConnection, type Connection, type ConnectionInput } from './connection.ts'
+import { SourceMenu } from './SourceMenu.tsx'
+import {
+  loadCurrent,
+  loadSources,
+  parseSource,
+  saveCurrent,
+  saveSources,
+  type Source,
+  type SourceInput
+} from './connection.ts'
 import {
   createClient,
   createBucket,
@@ -26,7 +35,10 @@ import './s3.css'
  * S3 —— 对象存储台。
  *
  * 三栏：左边一列桶，中间当前这一层的对象，右边选中那个对象的详情与预览。
- * 顶部一条选项栏：连的是哪个端点、连接设置、刷新、上传、新建桶。
+ * 顶部一条选项栏：当前是哪个源、连接设置、刷新、上传、新建桶。
+ *
+ * 一台机器上可以存好几个源（一家自建 RustFS、一家云 OSS……）：源排在顶栏那一排，
+ * 源在前、「添加源」在最后，点一枚就换端点；「连接设置」改与删的都是当前这一个。
  *
  * 措辞是契约的一部分（见 `specs/s3.md`）：哪一句跟着哪个状态写死在这里，
  * 用例逐句比对，所以改一句话等于改一次契约。
@@ -35,7 +47,8 @@ import './s3.css'
  */
 export default function S3App({ api }: { api: AppApi }): JSX.Element {
   const { resolved } = useTheme()
-  const [conn, setConn] = useState<Connection | null>(null)
+  const [sources, setSources] = useState<Source[]>([])
+  const [current, setCurrent] = useState<Source | null>(null)
   const [buckets, setBuckets] = useState<BucketRow[]>([])
   const [bucket, setBucket] = useState<string | null>(null)
   const [prefix, setPrefix] = useState('')
@@ -45,13 +58,17 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
+  /** 连接卡：开着没有、以及它这次是编辑哪一个源（null = 新增） */
   const [editing, setEditing] = useState(false)
+  const [editTarget, setEditTarget] = useState<Source | null>(null)
+  /** 顶栏那颗源键的面板 */
+  const [menu, setMenu] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
 
-  const client = useMemo(() => (conn ? createClient(conn) : null), [conn])
+  const client = useMemo(() => (current ? createClient(current) : null), [current])
 
-  /** 列桶：换端点、刷新、新建完都走这一条 */
+  /** 列桶：换端点、换源、刷新、新建完都走这一条 */
   const refreshBuckets = useCallback(async (next: S3Client | null): Promise<BucketRow[]> => {
     if (!next) return []
     setBusy('正在列桶…')
@@ -91,18 +108,21 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     [client]
   )
 
-  // 启动：设置里存过就直接连上去，没存过就把连接卡摊开
+  // 启动：设置里有源就直接连上次用的那一个，一个都没有就把连接卡摊开
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const stored = await loadConnection(api)
+      const stored = await loadSources(api)
+      const wanted = await loadCurrent(api)
       if (cancelled) return
-      if (!stored) {
+      if (stored.length === 0) {
         setEditing(true)
         return
       }
-      setConn(stored)
-      await refreshBuckets(createClient(stored))
+      setSources(stored)
+      const chosen = stored.find((s) => s.name === wanted) ?? stored[0]!
+      setCurrent(chosen)
+      await refreshBuckets(createClient(chosen))
     })()
     return () => {
       cancelled = true
@@ -113,14 +133,20 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
    * 截图模式的凭据：给一个本地路径，把它传到当前这一层，列表里看得见结果。
    *
    * `useAppAutotest` 只在挂载时注册一次 handler，闭包里的状态会停在首帧——
-   * 首帧还没有桶、也没有 client，所以这里每次都从 `live` 里取当下那一份。
+   * 首帧还没有源、也没有 client，所以这里每次都从 `live` 里取当下那一份。
    */
   const live = useRef({ client, bucket, buckets, openObjects })
   live.current = { client, bucket, buckets, openObjects }
   useAppAutotest(
     's3',
     async (path) => {
-      const now = live.current
+      // 主进程一等到"组件挂了监听"就推事件，那一刻第一次列桶往往还在路上；
+      // 抢跑的结果是一句红字"这个端点上还没有桶"。等它把桶列出来，别猜时机。
+      let now = live.current
+      for (let i = 0; i < 100 && (!now.client || now.buckets.length === 0); i += 1) {
+        await new Promise((r) => setTimeout(r, 50))
+        now = live.current
+      }
       const target = now.bucket ?? now.buckets[0]?.name ?? ''
       if (!now.client || target === '') throw new Error('这个端点上还没有桶')
       setBucket(target)
@@ -135,12 +161,38 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     (message) => setError(message)
   )
 
-  async function connect(input: ConnectionInput): Promise<void> {
-    const parsed = parseConnection(input)
+  /** 连接卡按下"连上"或"存下"：新增就是加一个源并切过去，编辑就是换掉当前那一份 */
+  async function submitCard(input: SourceInput): Promise<void> {
+    const taken = sources.filter((s) => s.name !== editTarget?.name).map((s) => s.name)
+    const parsed = parseSource(input, taken)
     if (!parsed.ok) {
       setError(parsed.reason)
       return
     }
+    const next = parsed.source
+    const list = sources.some((s) => s.name === editTarget?.name)
+      ? sources.map((s) => (s.name === editTarget?.name ? next : s))
+      : [...sources, next]
+
+    setSources(list)
+    setError('')
+    setNote('')
+    setEditing(false)
+    setEditTarget(null)
+    setBucket(null)
+    setPrefix('')
+    setRows([])
+    setSelected(null)
+    setCurrent(next)
+    await saveSources(api, list)
+    await saveCurrent(api, next.name)
+    await refreshBuckets(createClient(next))
+  }
+
+  /** 换到那一排里的另一个源：桶、路径、预览整个跟着端点走 */
+  async function pickSource(name: string): Promise<void> {
+    const next = sources.find((s) => s.name === name)
+    if (!next) return
     setEditing(false)
     setError('')
     setNote('')
@@ -148,9 +200,40 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     setPrefix('')
     setRows([])
     setSelected(null)
-    setConn(parsed.conn)
-    await saveConnection(api, parsed.conn)
-    await refreshBuckets(createClient(parsed.conn))
+    setCurrent(next)
+    await saveCurrent(api, next.name)
+    await refreshBuckets(createClient(next))
+  }
+
+  /** 删掉一个源（从连接卡里按）：这台机器上存的那把钥匙也跟着没了，所以先问一句 */
+  async function removeSource(name: string): Promise<void> {
+    if (!window.confirm(`删掉源「${name}」？这台机器上存的那把钥匙也跟着没了。`)) return
+    const rest = sources.filter((s) => s.name !== name)
+    setSources(rest)
+    setError('')
+    setNote(`已删掉源 ${name}`)
+    await saveSources(api, rest)
+    if (current?.name !== name) {
+      // 删的不是当前这一个：卡收起来，顶栏那排少一枚
+      setEditing(false)
+      return
+    }
+    const next = rest[0] ?? null
+    setCurrent(next)
+    setBucket(null)
+    setPrefix('')
+    setRows([])
+    setSelected(null)
+    setEditTarget(null)
+    if (next) {
+      await saveCurrent(api, next.name)
+      setEditing(false)
+      await refreshBuckets(createClient(next))
+      return
+    }
+    // 一个都不剩：这张卡转成"新增源"的样子，接着填下一个
+    await saveCurrent(api, '')
+    setEditing(true)
   }
 
   function enterBucket(name: string): void {
@@ -262,8 +345,33 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
   return (
     <div className={`s3 s3--${resolved}`}>
       <header className="s3__bar">
-        <span className="s3__endpoint">{conn ? hostOf(conn.endpoint) : '还没连上任何端点'}</span>
-        <button type="button" className="s3__ghost" onClick={() => setEditing(true)}>
+        <SourceMenu
+          sources={sources}
+          currentName={current?.name ?? ''}
+          open={menu}
+          onToggle={() => setMenu((v) => !v)}
+          onPick={(name) => {
+            setMenu(false)
+            void pickSource(name)
+          }}
+          onAdd={() => {
+            setMenu(false)
+            setEditTarget(null)
+            setEditing(true)
+            setError('')
+          }}
+        />
+        <button
+          type="button"
+          className="s3__ghost"
+          onClick={() => {
+            setMenu(false)
+            setEditTarget(current)
+            setEditing(true)
+            setError('')
+          }}
+          disabled={current === null}
+        >
           连接设置
         </button>
         <button type="button" className="s3__ghost" onClick={() => void refreshBuckets(client)} disabled={client === null || busy !== ''}>
@@ -300,11 +408,13 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
 
       {editing ? (
         <ConnectionCard
-          current={conn}
+          key={editTarget?.name ?? 'new'}
+          current={editTarget}
           error={error}
           busy={busy !== ''}
-          onCancel={conn ? () => setEditing(false) : undefined}
-          onSubmit={(i) => void connect(i)}
+          onCancel={editTarget || current ? () => setEditing(false) : undefined}
+          onRemove={editTarget ? () => void removeSource(editTarget.name) : undefined}
+          onSubmit={(i) => void submitCard(i)}
         />
       ) : null}
 
@@ -355,14 +465,6 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
       </div>
     </div>
   )
-}
-
-function hostOf(endpoint: string): string {
-  try {
-    return new URL(endpoint).host
-  } catch {
-    return endpoint
-  }
 }
 
 /** 本地路径的最后一段：Windows 用反斜杠，POSIX 用正斜杠，两种都要认 */

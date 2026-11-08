@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FakeAirship, mountUi, type Mount } from '@airship/sdk/testing'
 import S3App from '../s3App.tsx'
 import { app } from '../app.ts'
-import { CONNECTION_KEY } from '../connection.ts'
+import { CURRENT_KEY, SOURCES_KEY, type Source } from '../connection.ts'
 import { FakeS3, type Content, type SeedObject } from './helpers/fakeS3.ts'
 
 /**
@@ -26,6 +26,8 @@ interface OpenOptions {
   picks?: Array<string[] | string | null>
   /** 设置里已经存过连接（用这台假端点的地址）；不给就是"第一次打开" */
   stored?: boolean
+  /** 那个源在列表里的名字 */
+  name?: string
   confirm?: boolean
 }
 
@@ -33,9 +35,11 @@ interface Opened {
   m: Mount
   fake: FakeAirship
   s3: FakeS3
-  /** 假端点的地址，界面上顶栏念的就是它的主机与端口 */
+  /** 假端点的地址，界面上顶栏念的就是它 */
   endpoint: string
   host: string
+  /** 设置里那一个源（名字与密钥由 open 造出来） */
+  source: Source
 }
 
 const stoppers: Array<() => Promise<void>> = []
@@ -45,24 +49,28 @@ async function open(options: OpenOptions = {}): Promise<Opened> {
   const s3 = new FakeS3(options.seed ?? { demo: {}, archive: {} })
   const endpoint = await s3.start()
   stoppers.push(() => s3.stop())
+  const host = new URL(endpoint).host
 
   const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities, files: options.files, picks: options.picks })
+  const source: Source = {
+    name: options.name ?? '本机',
+    endpoint,
+    region: 'us-east-1',
+    accessKeyId: 'rustfsadmin',
+    secretAccessKey: 'rustfsadmin'
+  }
   if (options.stored !== false) {
-    fake.settingsStore[CONNECTION_KEY] = {
-      endpoint,
-      region: 'us-east-1',
-      accessKeyId: 'rustfsadmin',
-      secretAccessKey: 'rustfsadmin'
-    }
+    fake.settingsStore[SOURCES_KEY] = [source]
+    fake.settingsStore[CURRENT_KEY] = source.name
   }
 
   const m = await mountUi(<S3App api={fake.api} />, { fake, confirm: options.confirm })
   mounts.push(m)
   await quiet(m)
-  return { m, fake, s3, endpoint, host: new URL(endpoint).host }
+  return { m, fake, s3, endpoint, host, source }
 }
 
-/** 第一次打开：设置里什么都没有，连接卡摊着 */
+/** 第一次打开：设置里一个源都没有，连接卡摊着 */
 async function openFresh(options: Omit<OpenOptions, 'stored'> = {}): Promise<Opened> {
   return open({ ...options, stored: false })
 }
@@ -76,16 +84,18 @@ afterEach(async () => {
 /**
  * 等到应用把话说完。
  *
- * 一次列表请求要走完 发请求 → 收响应 → XML 解析 那条链，`settle` 的纯微任务盖不住它，
- * 所以每一轮都让出真实时间。用例等的是"界面念完了"，不是固定睡眠。
+ * 界面上任何"正在…"那句还在，就说明还有请求在路上；那句没了就走。
+ * 定轮数等法要么慢得把用例拖到超时（超时后这条异步链还在跑，会搅乱下一条用例），
+ * 要么短了盖不住一次真实的 发请求 → 收响应 → 解析 那条链。
  */
 async function quiet(m: Mount): Promise<void> {
-  for (let i = 0; i < 8; i += 1) {
+  for (let i = 0; i < 400; i += 1) {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 10))
     })
-    await m.settle(2)
+    if (!m.text().includes('正在')) break
   }
+  await m.settle(2)
 }
 
 /** 等到界面上出现那句话（大文件分段上传比一次列表慢得多，轮数等不出来） */
@@ -135,18 +145,19 @@ function textOf(s3: FakeS3, bucket: string, key: string): string {
   return stored === undefined ? '' : new TextDecoder().decode(stored.bytes)
 }
 
-describe('连接：四样东西与它的记忆', () => {
-  it('OS-001 第一次打开摊出那四个格子', async () => {
+describe('连接：五个格子与它的记忆', () => {
+  it('OS-001 第一次打开摊出那五个格子', async () => {
     const { m } = await openFresh()
     expect(m.text()).toContain('还没连上任何端点')
-    for (const id of ['s3-endpoint', 's3-region', 's3-ak', 's3-sk']) {
+    for (const id of ['s3-name', 's3-endpoint', 's3-region', 's3-ak', 's3-sk']) {
       expect(m.container.querySelector(`#${id}`), `缺输入框 #${id}`).not.toBeNull()
     }
-    expect(m.text()).toContain('四个格子都存进本机设置，Secret Key 是明文。')
+    expect(m.text()).toContain('五个格子都存进本机设置，Secret Key 是明文。')
   })
 
   it('OS-002 端点不成形状就在原地念原因，一条请求都不发', async () => {
     const { m, s3 } = await openFresh()
+    await fill(m, 's3-name', '家里的')
     await fill(m, 's3-endpoint', 'localhost:9000')
     await fill(m, 's3-ak', 'rustfsadmin')
     await fill(m, 's3-sk', 'rustfsadmin')
@@ -158,6 +169,7 @@ describe('连接：四样东西与它的记忆', () => {
 
   it('OS-003 少哪一样就念那一样的名字', async () => {
     const { m, s3, endpoint } = await openFresh()
+    await fill(m, 's3-name', '家里的')
     await fill(m, 's3-endpoint', endpoint)
     await fill(m, 's3-sk', 'rustfsadmin')
     await tapText(m, '连上')
@@ -166,33 +178,39 @@ describe('连接：四样东西与它的记忆', () => {
     expect(s3.requests.length).toBe(0)
   })
 
-  it('OS-004 连上之后顶栏念的是那个端点的主机与端口', async () => {
+  it('OS-004 连上之后顶栏那颗源键念得出这个源的名字', async () => {
     const { m, s3, endpoint, host } = await openFresh()
+    await fill(m, 's3-name', '家里的')
     await fill(m, 's3-endpoint', endpoint)
     await fill(m, 's3-ak', 'rustfsadmin')
     await fill(m, 's3-sk', 'rustfsadmin')
     await tapText(m, '连上')
 
+    expect(m.field('sources-toggle')?.textContent).toContain('家里的')
+    // 主机与端口在那一列里念得出（点开源键才看得见）
+    await tap(m, '[data-test="sources-toggle"]')
     expect(m.text()).toContain(host)
+
     expect(m.has('demo')).toBe(true)
     expect(m.has('archive')).toBe(true)
     expect(s3.requests.some((r) => r.method === 'GET' && r.path === '/')).toBe(true)
   })
 
-  it('OS-005 四样都记住，重开就直连', async () => {
+  it('OS-005 五样都记住，重开就直连', async () => {
     const first = await openFresh()
+    await fill(first.m, 's3-name', '家里的')
     await fill(first.m, 's3-endpoint', first.endpoint)
     await fill(first.m, 's3-ak', 'rustfsadmin')
     await fill(first.m, 's3-sk', 'rustfsadmin')
     await tapText(first.m, '连上')
-    expect(first.fake.settingsStore[CONNECTION_KEY]).toMatchObject({
-      endpoint: first.endpoint,
-      secretAccessKey: 'rustfsadmin'
-    })
+    expect(first.fake.settingsStore[SOURCES_KEY]).toMatchObject([
+      { name: '家里的', endpoint: first.endpoint, secretAccessKey: 'rustfsadmin' }
+    ])
+    expect(first.fake.settingsStore[CURRENT_KEY]).toBe('家里的')
     first.m.unmount()
 
-    // 同一份设置再开一次：不该再摊出那四个格子
-    const again = await open()
+    // 同一份设置再开一次：不该再摊出那五个格子
+    const again = await open({ name: '家里的' })
     expect(again.m.has('连上')).toBe(false)
     expect(again.m.has('demo')).toBe(true)
   })
@@ -214,7 +232,8 @@ describe('端点的话翻译成人能读的下一句', () => {
     await dead.stop()
 
     const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities })
-    fake.settingsStore[CONNECTION_KEY] = { endpoint, region: 'us-east-1', accessKeyId: 'k', secretAccessKey: 's' }
+    fake.settingsStore[SOURCES_KEY] = [{ name: '关掉的', endpoint, region: 'us-east-1', accessKeyId: 'k', secretAccessKey: 's' }]
+    fake.settingsStore[CURRENT_KEY] = '关掉的'
     const m = await mountUi(<S3App api={fake.api} />, { fake })
     mounts.push(m)
     await quiet(m)
@@ -472,20 +491,136 @@ describe('破坏性动作先问一句，建桶与链接各说一句人话', () =
     expect(m.text()).toContain('临时链接已复制，一小时内有效')
   })
 
-  it('OS-025 连上另一个端点之后，旧端点的桶读不到', async () => {
+  it('OS-025 编辑当前源换了端点，旧端点的桶读不到', async () => {
     const first = await open({ seed: { 'only-one': {}, archive: {} } })
     expect(first.m.has('only-one')).toBe(true)
 
-    // 换一家：另一台假端点，界面上把地址改成它的端口
+    // 换一家：另一台假端点，顶栏那颗「连接设置」改的就是当前这个源
     const second = new FakeS3({ 'only-two': {} })
     const other = await second.start()
     stoppers.push(() => second.stop())
 
     await tapText(first.m, '连接设置')
     await fill(first.m, 's3-endpoint', other)
-    await tapText(first.m, '连上')
+    await tapText(first.m, '存下')
 
     expect(first.m.has('only-two')).toBe(true)
     expect(first.m.has('only-one')).toBe(false)
+  })
+})
+
+describe('一台机器上的多个源', () => {
+  /** 先开一个源，再走源键面板里那行「添加源」加第二个（两台假端点各占一个端口） */
+  async function openTwo(options: { confirm?: boolean } = {}): Promise<Opened & { second: FakeS3; endpoint2: string; host2: string }> {
+    const opened = await open({ seed: { 'only-one': {} }, confirm: options.confirm })
+    const second = new FakeS3({ 'only-two': {} })
+    const endpoint2 = await second.start()
+    stoppers.push(() => second.stop())
+
+    await tap(opened.m, '[data-test="sources-toggle"]')
+    await tap(opened.m, '[data-test="sources-add"]')
+    await fill(opened.m, 's3-name', '另一家')
+    await fill(opened.m, 's3-endpoint', endpoint2)
+    await fill(opened.m, 's3-ak', 'rustfsadmin')
+    await fill(opened.m, 's3-sk', 'rustfsadmin')
+    await tapText(opened.m, '连上')
+
+    return { ...opened, second, endpoint2, host2: new URL(endpoint2).host }
+  }
+
+  /** 源键面板里那一列的名字，按出现顺序 */
+  function rowNames(m: Mount): string[] {
+    return [...m.container.querySelectorAll('[data-test^="pick:"]')].map((e) => e.getAttribute('data-test')!.slice(5))
+  }
+
+  it('OS-026 添加源之后那一列念得出两个名字与各自主机，「添加源」在最后', async () => {
+    const { m, host, host2 } = await openTwo()
+    await tap(m, '[data-test="sources-toggle"]')
+
+    expect(rowNames(m)).toEqual(['本机', '另一家'])
+    expect(m.field('pick:本机')?.textContent).toContain(host)
+    expect(m.field('pick:另一家')?.textContent).toContain(host2)
+    // 「添加源」排在两枚源之后，是这一列的最后一行
+    const rows = [...m.container.querySelectorAll('.s3__menu-row')]
+    expect(rows[rows.length - 1]?.getAttribute('data-test')).toBe('sources-add')
+  })
+
+  it('OS-027 点另一枚源，桶列表整个换成那一份', async () => {
+    const { m } = await openTwo()
+    expect(m.has('only-two')).toBe(true)
+
+    await tap(m, '[data-test="sources-toggle"]')
+    await tap(m, '[data-test="pick:本机"]')
+
+    expect(m.has('only-one')).toBe(true)
+    expect(m.has('only-two')).toBe(false)
+  })
+
+  it('OS-028 那一列里只有当前那一个带"当前"那一档底色', async () => {
+    const { m } = await openTwo()
+    await tap(m, '[data-test="sources-toggle"]')
+    expect(m.field('pick:另一家')?.className).toContain('s3__menu-row--on')
+    expect(m.field('pick:本机')?.className).not.toContain('s3__menu-row--on')
+
+    await tap(m, '[data-test="pick:本机"]')
+    await tap(m, '[data-test="sources-toggle"]')
+    expect(m.field('pick:本机')?.className).toContain('s3__menu-row--on')
+    expect(m.field('pick:另一家')?.className).not.toContain('s3__menu-row--on')
+  })
+
+  it('OS-029 重开回到上次用的那一个源', async () => {
+    const { m, fake } = await openTwo()
+    await tap(m, '[data-test="sources-toggle"]')
+    await tap(m, '[data-test="pick:本机"]')
+    m.unmount()
+
+    // 同一份设置再开一次：源键上念的是上次点的那个，两个源都还在
+    const again = await mountUi(<S3App api={fake.api} />, { fake })
+    mounts.push(again)
+    await quiet(again)
+    expect(again.field('sources-toggle')?.textContent).toContain('本机')
+    expect(again.has('only-one')).toBe(true)
+    await tap(again, '[data-test="sources-toggle"]')
+    expect(rowNames(again)).toEqual(['本机', '另一家'])
+  })
+
+  it('OS-030 名字重了当场说，那一列不多出一行', async () => {
+    const { m } = await openTwo()
+    await tap(m, '[data-test="sources-toggle"]')
+    await tap(m, '[data-test="sources-add"]')
+    await fill(m, 's3-name', '本机')
+    await fill(m, 's3-ak', 'rustfsadmin')
+    await fill(m, 's3-sk', 'rustfsadmin')
+    await tapText(m, '连上')
+
+    expect(m.text()).toContain('已经有叫「本机」的源了，换个名字')
+    await tap(m, '[data-test="sources-toggle"]')
+    expect(rowNames(m)).toEqual(['本机', '另一家'])
+  })
+
+  it('OS-031 从连接卡里删掉当前源，剩下那一个顶上并列出它的桶', async () => {
+    const { m, fake } = await openTwo({ confirm: true })
+    await tapText(m, '连接设置')
+    await tap(m, '[data-test="source-remove"]')
+
+    expect(m.field('sources-toggle')?.textContent).toContain('本机')
+    expect(m.has('only-one')).toBe(true)
+    expect(m.has('only-two')).toBe(false)
+    expect(fake.settingsStore[SOURCES_KEY]).toHaveLength(1)
+    expect(fake.settingsStore[CURRENT_KEY]).toBe('本机')
+  })
+
+  it('OS-032 只剩一个时删掉，回到没连上的样子并把卡留着填下一个', async () => {
+    const { m, fake } = await open({ seed: { 'only-one': {} }, confirm: true })
+    await tapText(m, '连接设置')
+    await tap(m, '[data-test="source-remove"]')
+
+    expect(m.field('sources-toggle')?.textContent).toContain('还没连上任何端点')
+    expect(m.has('连上')).toBe(true)
+    expect(fake.settingsStore[SOURCES_KEY]).toEqual([])
+
+    await tap(m, '[data-test="sources-toggle"]')
+    expect(rowNames(m)).toEqual([])
+    expect(m.has('添加源')).toBe(true)
   })
 })

@@ -18,12 +18,6 @@
   background: var(--bg-sidebar);
 }
 
-.s3__endpoint {
-  font-weight: 600;
-  color: var(--fg);
-  margin-right: 4px;
-}
-
 .s3__busy {
   margin-left: auto;
   color: var(--fg-dim);
@@ -151,6 +145,99 @@
   color: var(--fg-faint);
   font-size: 11px;
   letter-spacing: 0.06em;
+}
+
+/* 顶栏那颗源键与它的面板 */
+.s3__menu {
+  position: relative;
+}
+
+.s3__menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 3px 8px 3px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.s3__menu-btn:hover {
+  background: var(--bg-hover);
+}
+
+.s3__menu-current {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.s3__menu-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 280px;
+  padding: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow);
+}
+
+.s3__menu-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.s3__menu-row:hover {
+  background: var(--bg-hover);
+}
+
+.s3__menu-row--on {
+  background: var(--bg-active);
+  font-weight: 600;
+}
+
+.s3__menu-label {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.s3__menu-host {
+  margin-left: auto;
+  color: var(--fg-faint);
+  font-size: 11px;
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.s3__menu-add {
+  margin-top: 2px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-dim);
+  font-weight: 400;
 }
 
 .s3__bucket-list {
