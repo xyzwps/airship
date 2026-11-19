@@ -11,8 +11,9 @@
 跑起来靠已装好的 runtime。
 
 ```bash
-just build            # 产各应用的包 + 打 runtime 安装包
-just app-installer life   # 再逐个产应用安装器（要八个就跑八次）
+just build                # 一条命令三样都出：runtime 安装包 → 各应用的包 → 各应用的安装器
+just app-installer life   # 只重出那一个应用的安装器
+just installers           # 只重出全部应用的安装器（先产全部的包）
 ```
 
 产物：
@@ -30,10 +31,11 @@ just app-installer life   # 再逐个产应用安装器（要八个就跑八次�
 
 | 命令 | 做什么 |
 |---|---|
-| `just build` | 两条都跑：先 `build-apps` 产包，再 `build-runtime` 出 runtime 安装包 |
+| `just build` | 三样都跑：`build-runtime` 出 runtime 安装包 → `build-apps` 产包 → `installers` 逐个裹安装器 |
 | `just build-apps` | 只逐应用构建并打成 `dist-apps/<id>.airship` 归档 |
 | `just build-runtime` | 只打 runtime 安装包：清场 → 编译 → NSIS → 自检（`.sha256` 由自检写） |
 | `just app-installer <id>` | 产那一个应用的安装器：先产它那份包，再裹成每用户 `setup.exe` |
+| `just installers` | 产全部应用的安装器：先 `build-apps`，再对名单里每个应用各裹一枚（名单与产包同源 `code/app-dirs.mjs`） |
 | `just compile` | 只编译 runtime 的两个目标 → `src/runtime/out/{main,preload}`（没有 renderer） |
 | `just verify-installer` | 出包后自检（六件事，见下） |
 | `just icon` | 由母版 `assets/icon-master.png` 重出 `assets/icon.ico` |
@@ -42,14 +44,17 @@ just app-installer life   # 再逐个产应用安装器（要八个就跑八次�
 > **顺序**：应用安装器用的 `makensis` 是 electron-builder 缓存里那份（不引新依赖），
 > 所以**先跑一次 `just build-runtime`**（electron-builder 会下载 NSIS 到缓存），再产应用安装器。
 > 缓存里没有 makensis 时生成器会响亮报错并指回这条。
+> `just build` 里 `installers` 就排在 `build-runtime` 之后，一条命令自己把这条顺序满足了。
 
 > 清场（`code/clean-installer.mjs`）为什么算必要步骤：runtime 安装包的名字只由
 > `src/runtime/package.json` 的 version 决定，不 bump 版本号就永远是同一个文件名；一次没写成安装包的运行
 > （`dist` 半路失败，或只跑了解包）会让上一次那颗原地留着冒充刚出的那版。`verify-installer` 按名字匹配、
 > 只验 PE 头与 NSIS 签名，对旧包照样全绿，还会把 `.sha256` 一起改成旧包的。规矩：**release/ 里的安装包
-> 永远等于最后一次构建，宁可没有，不可有旧的**。清场只删 `airship-runtime-Setup-*` 那一族
-> （exe / .blockmap / .sha256）；`win-unpacked` 不在删除范围内（每次由 electron-builder 整体重写）。
-> 应用安装器同名旧包也由生成器自己先删（同一条规矩）。
+> 永远等于最后一次构建，宁可没有，不可有旧的**。清场有两档：默认删 `airship-runtime-Setup-*` 那一族
+> （exe / .blockmap / .sha256，由 `just build-runtime` 走）；`apps` 那一档删 `release/apps/*-Setup-*` 那一族
+> （exe / .sha256，由 `just installers` 走）——应用名单是会变的，删掉的那个应用留下的旧安装器同样会冒充最后一次构建。
+> `win-unpacked` 不在删除范围内（每次由 electron-builder 整体重写）。
+> 单独跑 `just app-installer <id>` 不经过 `apps` 那一档：它只删自己那一枚同名旧包（生成器里那条，同一条规矩）。
 
 ## 里面装了什么
 

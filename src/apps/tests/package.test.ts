@@ -6,18 +6,20 @@ import {
   APP_ID_PATTERN,
   MANIFEST_NAME,
   SCHEMA_VERSION,
+  WINDOWS_ICON_NAME,
   idShapeProblem,
   layoutProblems,
   manifestProblems,
   pack,
   referenceProblems
 } from '../../../code/pack-app.mjs'
+import { WINDOWS_ICON_NAME as CONTRACT_WINDOWS_ICON_NAME } from '@airship/contract'
 import { badAppId } from '@airship/contract'
 import { APP_ID_PATTERN as CONTRACT_APP_ID_PATTERN } from '@airship/contract'
 import { manifestProblems as registryManifestProblems } from '@airship/contract'
 import { REAL_APPS } from '../../runtime/tests/helpers/realApps'
 import { DEFAULT_ENTRY } from '@airship/contract'
-import { archiveEntryNames, readArchiveText } from '../../runtime/main/services/packageArchive'
+import { archiveEntryNames, readArchiveEntry, readArchiveText } from '../../runtime/main/services/packageArchive'
 import { registerPackageAt } from '../../runtime/main/services/packageRegistry'
 import { writeArchive } from '../../runtime/tests/helpers/packages'
 
@@ -34,6 +36,9 @@ import { writeArchive } from '../../runtime/tests/helpers/packages'
 
 let work = ''
 
+/** 包根那张源图在用例里的样子：产包期要把它转成外壳认的 icon.ico，所以得是能渲染的 SVG */
+const ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>'
+
 /** 一个够格的产物目录：入口 + 图标 + 一份相对引用的资产 */
 function fixture(options?: { html?: string; icons?: string[]; extraFiles?: Record<string, string> }): string {
   const dir = mkdtempSync(join(work, 'src-'))
@@ -47,7 +52,7 @@ function fixture(options?: { html?: string; icons?: string[]; extraFiles?: Recor
       '</html>'
     ].join('\n')
   writeFileSync(join(dir, 'index.html'), html, 'utf8')
-  for (const icon of options?.icons ?? ['icon.svg']) writeFileSync(join(dir, icon), '<svg/>', 'utf8')
+  for (const icon of options?.icons ?? ['icon.svg']) writeFileSync(join(dir, icon), ICON_SVG, 'utf8')
   mkdirSync(join(dir, 'assets'))
   writeFileSync(join(dir, 'assets', 'main.js'), 'console.log(1)', 'utf8')
   writeFileSync(join(dir, 'assets', 'styles.css'), 'body{margin:0}', 'utf8')
@@ -145,6 +150,9 @@ describe('包清单只写应用自己的事实', () => {
 
     const two = layoutProblems({ fileNames: ['index.html', 'icon.svg', 'icon.png'], manifest: goodManifest })
     expect(two[0]).toBe('包里的图标有多张，只留一张：icon.svg, icon.png')
+
+    // 派生那份 icon.ico（PK-036）不算第二张图标：它是产物，外壳只认磁盘上的 .ico
+    expect(layoutProblems({ fileNames: ['index.html', 'icon.svg', 'icon.ico'], manifest: goodManifest })).toEqual([])
   })
 
   it('PK-005 runtime 不认的键、不像话的值，都点名到字段与收到的东西', () => {
@@ -221,5 +229,33 @@ describe('包里的东西只能在包内互相引用', () => {
     expect(readFileSync(missingEntry).equals(missingBytes), '缺入口那份归档字节没变').toBe(true)
     expect(readdirSync(dir).sort()).toEqual([...listing, 'demo.airship', 'noentry.airship'].sort())
     expect(readdirSync(dir).some((n) => /\.airship\.(tmp|prev)-/.test(n)), '不许留残留').toBe(false)
+  })
+})
+
+describe('包根那份派生的 Windows 外壳图标', () => {
+  it('PK-036 产包时把源图转成 icon.ico 放进包根；转不出来不放行包；安装器只取不转', () => {
+    // 两处常量必须是同一个名字：产包器写它、runtime 与安装器读它
+    expect(WINDOWS_ICON_NAME).toBe(CONTRACT_WINDOWS_ICON_NAME)
+
+    const out = outRoot()
+    const { file } = pack({ srcDir: fixture(), outRoot: out, manifestText: json() })
+    expect(archiveEntryNames(file), '包根要有派生的那份 ico').toContain(WINDOWS_ICON_NAME)
+    const ico = readArchiveEntry(file, WINDOWS_ICON_NAME)
+    expect(ico).not.toBeNull()
+    // ICO 头部前两档是保留字节 0、类型 1（单图图标）；Pillow 出的是 16~256 七档
+    expect([...ico!.subarray(0, 4)]).toEqual([0, 0, 1, 0])
+    expect(ico!.length, '多尺寸 ico 不该是个空壳').toBeGreaterThan(1000)
+
+    // 源图渲染不出来 → 产包失败，包根里不留一个"任务栏只能穿 runtime 图标"的包
+    const unrenderable = fixture()
+    writeFileSync(join(unrenderable, 'icon.svg'), '这不是 svg', 'utf8')
+    const out2 = outRoot()
+    expect(() => pack({ srcDir: unrenderable, outRoot: out2, manifestText: json() })).toThrow()
+    expect(readdirSync(out2), '转不出图标就一个包都不许留下').toEqual([])
+
+    // 图标只在一处生成：安装器取包内那一份，不再自己转第二遍
+    const installer = readFileSync(join(__dirname, '..', '..', '..', 'code', 'make-app-installer.mjs'), 'utf8')
+    expect(installer, '安装器要取包内那份 icon.ico').toContain(WINDOWS_ICON_NAME)
+    expect(installer, '转 ico 只许住在产包器一处').not.toContain('app-ico.py')
   })
 })

@@ -14,31 +14,19 @@
 
 ## runtime 与发布
 
-### TD-001 任务栏上八个应用还是一个「飞船」
+### TD-001 快捷方式（`.lnk`）上还没有 per-app 的身份
 
-八个应用窗口的任务栏按钮、预览图与名字全是 runtime 的样子，因为它们共用同一个宿主身份。
+窗口的任务栏身份已经按应用分开了：`setAppDetails` 逐窗口给 `dev.xyzwp.airship.<id>`、图标取包内那份产包期
+派生的 `icon.ico`、重启动作与快捷方式同形（判据 SH-010 / SH-034 / SH-035，派生那一份见 PK-036）。
+原先列的四处里前三处 2026-11-19 落了，**只剩第四处**：应用安装器落的 `.lnk` 上没有 `System.AppUserModel.ID`。
 
-为什么挂着：`src/runtime/main/windows.ts`（约 165-166 行）里写的是
-`window.setAppUserModelId?.(...)`，而那个方法只挂在 `app`（进程级）上，BrowserWindow 没有——
-可选链把失败吞成一次空操作，代码看着做了、真机什么都没发生。进程级那句
-`app.setAppUserModelId('dev.xyzwp.airship')` 是真生效的，所以按钮仍归一个 runtime 身份。
+为什么挂着：`code/make-app-installer.mjs` 用的是 NSIS 裸 `CreateShortcut`，它写不了 `.lnk` 的属性——
+那是 `IPropertyStore`，要 ShellLink 那一类插件，还没找到"不额外下插件"的解法。
+症状也没验过：窗口身份已经分开，桌面与开始菜单那两颗、以及固定到任务栏的按钮会不会仍归到 runtime 一组，
+要在真机上固定一次才知道。
 
-动它要碰四处（缺一不可，2026-11-06 做到第二件就撤了，路线已验通）：
-
-1. 窗口身份改用 `win.setAppDetails({ appId, appIconPath, relaunchCommand, relaunchDisplayName })`；
-2. 每应用一张 `.ico`——图标由系统外壳读，asar 里的路径它不认。应用安装器已经把包内那张图转成
-   `icon.ico` 落在安装目录里（`code/app-ico.py`，SVG 先经 `@resvg/resvg-js` 出 256 PNG 再交 Pillow），
-   窗口身份要用的是这份磁盘上的 ico，不是 asar 里的 png；
-3. runtime 现在按 argv 注册包、`second-instance` 转发包路径，`relaunchCommand` 要写成
-   `"<runtime>\airship.exe" "<安装目录>\<id>.airship"`（与应用快捷方式同形），否则固定上去的按钮点了唤不对应用；
-4. 快捷方式上写 per-app 的 AUMID。应用安装器（`code/make-app-installer.mjs`）现在用裸 `CreateShortcut`，
-   没有给 `.lnk` 写 `System.AppUserModel.ID` 的能力（那是 IPropertyStore，要 ShellLink 插件），
-   还没找到"不额外下插件"的解法。
-
-顺带要修的假绿：`src/runtime/tests/appWindowCreate.test.ts` 的替身窗口把 `setAppUserModelId` 一起写了进去，
-于是那条用例一直绿着。替身只能实现真 API 面上存在的方法。
-
-来源：原记在 `docs/architecture.md` 的任务栏段与 §14；那两处现在只留状态标记指回这里。
+动它要碰哪里：`code/make-app-installer.mjs` 的 `installerScript` 里那两处 `CreateShortcut`（桌面 + 开始菜单），
+要么带一枚能写 `.lnk` 属性的 NSIS 插件，要么走 `IShellLink` 那条 COM 路。
 
 ### TD-013 SDK 独立发布与版本协商
 

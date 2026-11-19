@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, wr
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { strToU8, unzipSync, zipSync } from 'fflate'
-import { DEFAULT_ENTRY, MANIFEST_NAME, PACKAGE_SUFFIX } from '@airship/contract'
+import { DEFAULT_ENTRY, MANIFEST_NAME, PACKAGE_SUFFIX, WINDOWS_ICON_NAME } from '@airship/contract'
 import { REAL_APPS, manifestOf } from './realApps'
 import type { AppMeta } from '@airship/contract'
 
@@ -30,6 +30,14 @@ const ENTRY_HTML = [
 ].join('\n')
 
 const ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>\n'
+
+/**
+ * 包根那份派生的 Windows 外壳图标（PK-036）在用例里的样子。
+ *
+ * 外壳不参与用例，所以这里放的是一段够短的假字节：
+ * 用例钉的是"落盘那份与包内那份逐字节相同"（SH-034），与图标画的是什么无关。
+ */
+const WINDOWS_ICON_BYTES = new Uint8Array([0, 0, 1, 0, 1, 0, 16, 16, 0, 0, 1, 0, 32, 0, 0, 0])
 
 /**
  * 每次新开一个包根，不按 pid 复用。
@@ -64,6 +72,7 @@ export function installPackageAt(root: string, meta: AppMeta): string {
     [MANIFEST_NAME]: `${JSON.stringify(manifestOf(meta), null, 2)}\n`,
     [DEFAULT_ENTRY]: ENTRY_HTML,
     'icon.svg': ICON_SVG,
+    [WINDOWS_ICON_NAME]: WINDOWS_ICON_BYTES,
     'assets/index.js': 'export default 1\n'
   })
 }

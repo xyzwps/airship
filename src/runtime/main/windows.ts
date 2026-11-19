@@ -4,7 +4,8 @@ import { packageFor, unavailableReason, hasCapability } from './services/appRegi
 import { platformIdOf } from '@airship/contract'
 import { notRegistered, platformUnsupported } from '@airship/contract'
 import { targetsFor, type WindowRef } from './services/routing'
-import { WindowLedger, appUserModelIdFor, defaultSizeFor } from './services/windowLedger'
+import { WindowLedger, defaultSizeFor } from './services/windowLedger'
+import { applyTaskbarIdentity, taskbarIdentityFor } from './services/taskbarIdentity'
 import { log } from './services/logging'
 import { proc } from './services/proc'
 import { trayService } from './services/tray'
@@ -150,20 +151,22 @@ export function openAppWindow(appId: string): BrowserWindow {
 
   // 尺寸只认清单（没写就跟 runtime 的默认），位置不记：每次由系统摆
   const size = defaultSizeFor(meta, APP_SIZE)
+  // 任务栏身份要在建窗口之前算好：窗口自己那张图标与外壳那颗按钮用的是同一份落盘 ico
+  const identity = taskbarIdentityFor(pkg)
   const window = new BrowserWindow({
     ...size,
     show: false,
     frame: false,
     titleBarStyle: 'hidden',
     backgroundColor: '#1b1d23',
-    icon: join(__dirname, '../../assets/icon.png'),
+    icon: identity.appIconPath ?? join(__dirname, '../../assets/icon.png'),
     webPreferences: baseWebPreferences(appId)
   })
 
   // 独立任务栏条目：能单独固定、单独预览，看起来就是个独立应用。
-  // Windows 专有、且不在 BrowserWindow 的类型定义里，所以按可选方法调用。
-  const withModelId = window as unknown as { setAppUserModelId?: (id: string) => void }
-  withModelId.setAppUserModelId?.(appUserModelIdFor(appId))
+  // 身份是**逐窗口**给的——`app.setAppUserModelId()` 只有进程级那一份，八个应用共用一个
+  // runtime 进程时它只会给出一个身份（这正是 TD-001 从前假绿的地方：那句是空操作）。
+  applyTaskbarIdentity(window, identity)
 
   appWindows.set(appId, window)
   wireWindow(window, appId, meta.name)

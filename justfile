@@ -7,7 +7,8 @@
 #   just                列出全部配方
 #   just dev <id>       开发模式：直跑那一个应用（文档热更，清单与图标走包）
 #   just app-installer <id>  产那一个应用的安装器（release/apps/ 下的 setup.exe）
-#   just build          两条都跑：打 runtime 的安装包 + 产各应用的 airship 包
+#   just installers    一次产全部应用的安装器（名单与 build-apps 同源）
+#   just build          三样都跑：打 runtime 的安装包 + 产各应用的包 + 产各应用的安装器
 #   just build-runtime  只打 runtime 的安装包
 #   just build-apps     只产各应用的包
 #   just check          提交前一轮：类型 + 单测 + 册子差集
@@ -122,8 +123,23 @@ build-runtime: clean-release compile
     {{builder}} --projectDir src/runtime --win nsis
     node code/verify-installer.mjs
 
-# 两条都跑：产各应用的包 + 打 runtime 的安装包。两者互不包含——安装包是纯 runtime，包只落在 dist-apps/。
-build: build-apps build-runtime
+# 清掉 release/apps/ 里上一次留下的应用安装器（与 runtime 那一族同一条规矩：宁可没有，不可有旧的）。
+# 名单是会变的——应用删了、或这轮没产出来，它在 release/apps/ 里留下的那枚旧 exe 一样会冒充最后一次构建。
+# 单独跑 just app-installer <id> 不经过这一条：它只删自己那一枚同名旧包（生成器里那条）。
+clean-app-installers:
+    node code/clean-installer.mjs apps
+
+# 一次产全部应用的安装器：先产全部的包，再清掉旧的那一批，然后逐个裹成每用户的 setup.exe（release/apps/）。
+# 名单与 just build-apps 同源（code/app-dirs.mjs 那四件文件的判据），
+# 所以不会出现"包产了八个、安装器只有七枚"这种对不上的发布物。
+installers: build-apps clean-app-installers
+    node code/make-app-installer.mjs
+
+# 三样一起出：runtime 的安装包 + 各应用的包 + 各应用的安装器。
+# runtime 安装包是纯 runtime，包只落在 dist-apps/，两者互不包含。
+# 顺序有讲究：build-runtime 会把 NSIS 落进 electron-builder 的缓存，installers 用的 makensis 就是那一份——
+# 排它后面，这台机器上第一次跑也不会撞见"缓存里没有 makensis"那一嗓子。
+build: build-runtime installers
 
 # 单独跑一次出包自检（安装包已存在时）
 verify-installer:

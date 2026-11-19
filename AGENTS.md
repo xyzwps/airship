@@ -24,11 +24,12 @@ just new-app id 名     从 templates/app 造一个新应用（复制、换名�
 just compile           编译 runtime 的两个目标（src/runtime/out/{main,preload}，没有 renderer）
 just shot              逐窗口截图（先 compile + build-apps），打每窗口内存与首屏耗时
 just app-installer id  产那一个应用的每用户安装器（release/apps/<id>-Setup-<版本>.exe）
+just installers        产全部应用的安装器（先 build-apps；名单与产包同源 code/app-dirs.mjs）
 just test              单测            just casecov        册子编号与用例编号的双向差集
 just typecheck         两个 tsconfig   just check          提交前一轮（类型 + 单测 + 差集）
 just icon              由母版重出 runtime 的 icon.ico
 just build-runtime     打 runtime 安装包（清场 → 编译 → NSIS → 自检）
-just build             两条一起跑（产各应用的包 + 打 runtime 安装包）   just verify-installer  出包自检
+just build             三样一起跑（runtime 安装包 → 各应用的包 → 各应用的安装器）   just verify-installer  出包自检
 just e2e / just wsld-real           要真环境的那两档（ffmpeg / wslc）
 ```
 
@@ -113,9 +114,13 @@ sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `iconPath`
   主 exe 叫 `airship.exe`）。runtime 自己没有界面，不留快捷方式，只留控制面板卸载项。
 - `just app-installer id` = 先产它那份包，再裹成**每用户**安装器（`RequestExecutionLevel user`，不要管理员），
   落 `%LOCALAPPDATA%\airship\apps\<id>\`，桌面 + 开始菜单各一枚快捷方式（目标 runtime 的 `airship.exe` + 引号包路径 + 应用 `icon.ico`）。
-  版本读 `src/apps/<id>/package.json`。**先跑一次 `just build-runtime`**：应用安装器用的 makensis 是 electron-builder 缓存里那份。
+  版本读 `src/apps/<id>/package.json`。
+- `just installers` = 先 `build-apps`，再对**全部**应用各产一枚安装器（不给 id 就是全部，名单与产包同源
+  `code/app-dirs.mjs`）。应用安装器用的 makensis 是 electron-builder 缓存里那份，所以**这台机器上第一次要先跑过
+  `just build-runtime`**——`just build` 把它排在 build-runtime 之后，一条命令里就顺了。
 
-出包入口必须先删旧包：**宁可响亮报错没有，不许旧包冒充新包**（`code/clean-installer.mjs` 只删 `airship-runtime-Setup-*` 那一族）。
+出包入口必须先删旧包：**宁可响亮报错没有，不许旧包冒充新包**（`code/clean-installer.mjs` 两档：默认删
+`airship-runtime-Setup-*` 那一族，`apps` 那一档删 `release/apps/*-Setup-*` 那一族，由 `just installers` 走）。
 没有代码签名，第一次运行会被 SmartScreen 拦一道。
 
 **装包只有一条路：跑应用自己的安装器**（契约 PK-031~035）。从前"把归档拖到启动器上"那一族随启动器退场了
@@ -164,7 +169,7 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
 - 系统级动作（重启 explorer、清图标缓存、覆盖安装、**把 runtime 装进 Program Files**）**只给命令，由使用者执行**，别自己跑。
 - 工具脚本一律放 `code/`（现成有 `make-ico.py`、`make-icons.py`、`app-ico.py`、`make-jingang-epub.py`、`make-mobi.py`、
   `make-rustfs-demo.mjs`、`clean-installer.mjs`、`verify-installer.mjs`、`pack-app.mjs`、`build-apps.mjs`、
-  `make-app-installer.mjs`、`new-app.mjs`、`app.vite.config.mts`）；中间产物写到系统临时目录，别落在仓库里。
+  `make-app-installer.mjs`、`app-dirs.mjs`（应用名单的唯一判据，产包与产安装器共用）、`new-app.mjs`、`app.vite.config.mts`）；中间产物写到系统临时目录，别落在仓库里。
   `src/runtime/out/`、`dist-apps/`、`release/`、`shots/` 都不入库，根目录保持干净。
 - `mkdtempSync` 在 `node:fs` 不在 `node:os`（踩过：从 os 引拿到 undefined，症状是包工装静默失效）。
   用例的包目录每次 `mkdtempSync` 新开一个，不按 pid 复用——Windows 上 `rmSync(force)` 会把"删不掉"咽下去，

@@ -17,36 +17,20 @@
  * 中间产物（构建输出与抹掉类型的清单）都写在系统临时目录，只有包本身进 dist-apps/。
  */
 
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build, transformWithOxc } from 'vite'
 import { pack, SCHEMA_VERSION } from './pack-app.mjs'
+import { appIds, SRC_APPS } from './app-dirs.mjs'
 
 process.env.VITE_CONFIG_NATIVE_IGNORE_WARNING = 'true'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const SRC_APPS = join(ROOT, 'src', 'apps')
 const CONFIG = join(ROOT, 'code', 'app.vite.config.mts')
 const OUT_ROOT = resolve(process.env.AIRSHIP_APPS_OUT ?? join(ROOT, 'dist-apps'))
 const SDK_VERSION = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version
-
-/** 应用目录的判据：清单、入口文档、入口脚本、一张图标，四样齐了才算一个应用 */
-function appDirs() {
-  return readdirSync(SRC_APPS)
-    .filter((name) => {
-      const dir = join(SRC_APPS, name)
-      if (!statSync(dir).isDirectory()) return false
-      return (
-        existsSync(join(dir, 'app.ts')) &&
-        existsSync(join(dir, 'index.html')) &&
-        existsSync(join(dir, 'main.tsx')) &&
-        readdirSync(dir).some((n) => /^icon\.(svg|png|jpe?g|webp)$/.test(n))
-      )
-    })
-    .sort()
-}
 
 /** app.ts → 包清单：抹掉类型、import 那份纯数据、补上包格式的三个字段 */
 async function readManifest(dirId, work) {
@@ -90,11 +74,12 @@ async function buildOne(dirId, work) {
   })
 
   // 图标是文件约定，不是 html 里的引用，vite 不会替我们搬——自己放进包根
+  // （包根那份 Windows 外壳用的 icon.ico 由产包器从这张源图派生，见 PK-036）
   const icon = readdirSync(join(SRC_APPS, dirId)).find((n) => /^icon\.(svg|png|jpe?g|webp)$/.test(n))
   cpSync(join(SRC_APPS, dirId, icon), join(built, icon))
 
   const manifest = await readManifest(dirId, work)
-  const { file } = pack({ srcDir: built, outRoot: OUT_ROOT, manifestText: JSON.stringify(manifest, null, 2) })
+  const { file } = await pack({ srcDir: built, outRoot: OUT_ROOT, manifestText: JSON.stringify(manifest, null, 2) })
   // 归档大小与归档内那堆产物的字节一起报：前者是发出去的分发物，
   // 后者是"一个包自带全部东西"（含自己那份 React）的真实体积
   const packed = Math.round(statSync(file).size / 1024)
@@ -106,7 +91,7 @@ async function buildOne(dirId, work) {
 
 async function main() {
   const wanted = process.argv.slice(2).filter((a) => !a.startsWith('-'))
-  const dirs = appDirs()
+  const dirs = appIds()
   if (dirs.length === 0) throw new Error(`src/apps 下一个完整的应用都没有（要 app.ts + index.html + main.tsx + 一张 icon.*）`)
   const picked = wanted.length > 0 ? dirs.filter((d) => wanted.includes(d)) : dirs
   const missing = wanted.filter((w) => !dirs.includes(w))

@@ -106,12 +106,14 @@ runtime 装一次，钉死在 `C:\Program Files\airship\runtime`（perMachine，
 **事件只投归属窗口**（`routing.ts` 的 `targetsFor`）：子进程进度、托盘点击这类事件只回到归属那个窗口，
 没有全局广播。窗口没了事件就丢弃。这条抽成纯函数是为了能被测试——隔离的最后一环就是它。
 
-**任务栏身份今天是假绿（TD-001）。** `windows.ts` 里写的是
-`window.setAppUserModelId?.(...)`，而那个方法只挂在 `app`（进程级）上，BrowserWindow 没有——
-可选链把失败吞成一次空操作，代码看着做了、真机什么都没发生。进程级那句
-`app.setAppUserModelId('dev.xyzwp.airship')` 是真生效的，所以八个应用的任务栏按钮仍共用一个 runtime 身份。
-应用快捷方式带了各自的 `icon.ico`，但 `.lnk` 上没有 per-app 的 AUMID（NSIS 裸 `CreateShortCut` 写不了
-`System.AppUserModel.ID`，那要 ShellLink 插件）。路线与四件要碰的事记在 todo.md TD-001。
+**任务栏身份逐窗口给。** `windows.ts` 在建窗之后调 `setAppDetails({ appId, appIconPath, relaunchCommand,
+relaunchDisplayName })`（win32 专有；后两条必须成对，否则外壳两条一起忽略）。从前那句
+`window.setAppUserModelId?.(...)` 是假绿——方法只挂在 `app`（进程级）上，BrowserWindow 没有，可选链把失败
+吞成空操作，八个应用仍共用 `dev.xyzwp.airship` 一个身份。现在 `appId` 是 `dev.xyzwp.airship.<id>`，
+图标取包根那份产包期派生的 `icon.ico`（PK-036）落到 `%APPDATA%\airship\icons\<id>.ico` 交给外壳——
+外壳只认磁盘上的 `.ico`，asar 与 `airship://` 它不认；包里缺那一份时身份照样分开、只回落 runtime 的图标并在日志念一句。
+判据在 `runtime.md` 的 SH-010 / SH-034 / SH-035。**还没做的那半件**：`.lnk` 上没有 per-app 的 AUMID
+（NSIS 裸 `CreateShortCut` 写不了 `System.AppUserModel.ID`，那要 ShellLink 插件），记在 todo.md TD-001。
 
 **崩溃隔离**：一个渲染进程崩了不带崩主进程与别的窗口。主进程的未捕获异常 / 未处理拒绝写日志不致命。
 
@@ -430,10 +432,13 @@ runtime 自己没有界面：`createDesktopShortcut` / `createStartMenuShortcut`
 不跟 runtime 跳。runtime 的 `package.json` 里 electron 写**固定版本**（`45.2.3`，不带 `^`）——
 electron-builder 要按它取二进制，写范围会被拒。
 
-**清场**（`code/clean-installer.mjs`）：`build-runtime` 以它开头，删 `release/` 里上一次留下的
-`airship-runtime-Setup-*` 那一族（exe / .blockmap / .sha256）。安装包名字只由 version 决定，
-不 bump 就永远是同一个文件名；一次没写成安装包的运行会让上一次那颗原地留着冒充刚出的那版。
-规矩：**宁可响亮报错没有，不许旧包冒充新包**。`win-unpacked` 不在删除范围内（每次由 electron-builder 整体重写）。
+**清场**（`code/clean-installer.mjs`）两档：默认那档由 `build-runtime` 开头走，删 `release/` 里上一次留下的
+`airship-runtime-Setup-*` 那一族（exe / .blockmap / .sha256）；`apps` 那档由 `installers` 在出全部安装器之前走，
+删 `release/apps/*-Setup-*` 那一族（exe / .sha256）。安装包名字只由 version 决定，
+不 bump 就永远是同一个文件名；一次没写成安装包的运行会让上一次那颗原地留着冒充刚出的那版，
+而应用名单是会变的——删掉的那个应用留下的旧安装器同样在冒充最后一次构建。
+规矩：**宁可响亮报错没有，不许旧包冒充新包**。`win-unpacked` 不在删除范围内（每次由 electron-builder 整体重写）；
+单独跑 `app-installer <id>` 不经过 `apps` 那档，只由生成器删自己那一枚同名旧包。
 
 **自检**（`code/verify-installer.mjs`，`build-runtime` 以它收尾）看六件事：
 对应版本的安装包在不在、像不像 NSIS 向导（MZ 头 + NullsoftInst 签名）、`.sha256` 写好没、
@@ -489,7 +494,7 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
 
 **未尽**（细节与理由都在 [todo.md](todo.md)，这里只留状态标记）：
 
-- TD-001 任务栏上八个应用还是一个 runtime 身份（窗口身份那步今天是假绿，见 §3）。
+- TD-001 快捷方式（`.lnk`）上还没有 per-app 的 AUMID；窗口身份那一步已落（SH-010 / SH-034 / SH-035，见 §3）。
 - TD-003 没有代码签名证书；TD-004 没有自动更新链路；TD-005 想要 Inno Setup 那一档观感。
 - TD-006 多窗口的内存回收（现在没有触发这件事的症状）。
 - TD-007~010 wsld 原版有、这期先没有的四块（run 编排 / registry mirror / 拉取实时进度 / 自己的设置页）。

@@ -3,8 +3,8 @@
  * airship 产包器 —— 把一个**已经构建好**的应用产物目录装成一个 airship 包：
  * 校验 → 摊平成条目表 → zipSync → 写 `<id>.airship`（就是个 zip 换了扩展名）。
  *
- * 契约的唯一叙述在 `src/apps/specs/package.md`（PK-001 ~ PK-007）；这个文件只管三件事：
- * 校字段形状、拷文件、暂存后改名。它不构建应用（构建是应用自己的事），
+ * 契约的唯一叙述在 `src/apps/specs/package.md`（PK-001 ~ PK-007，加上 PK-036 那份派生图标）；这个文件只管三件事：
+ * 校字段形状、拷文件（含把包根那张源图转成外壳认的 `icon.ico`）、暂存后改名。它不构建应用（构建是应用自己的事），
  * 也不判定能力名——那份规矩在 `src/shared/contract/registryRules.ts` 只有一处，runtime 侧运行期再判一次。
  *
  * 读它的那一侧在 src/runtime/main/services/packageArchive.ts：fflate 的 unzipSync 带 filter，
@@ -19,10 +19,16 @@
  * 靠人记着同步是会分叉的，靠用例不会。
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { join, resolve } from 'node:path'
-import { strToU8, zipSync } from 'fflate'
+import { strFromU8, strToU8, zipSync } from 'fflate'
+import { Resvg } from '@resvg/resvg-js'
+
+/** 仓库根：code/ 的上一层。用文件路径算，不认 cwd */
+const REPO = resolve(fileURLToPath(import.meta.url), '..', '..')
 
 /** 归档文件名的后缀：`<id>` + 这个（一个 zip，换了扩展名） */
 export const PACKAGE_SUFFIX = '.airship'
@@ -44,6 +50,13 @@ export const APP_ID_PATTERN = /^[a-z][a-z0-9-]{0,31}$/
 
 /** 图标仍是文件约定，不进清单（AP-007 的同一理由） */
 const ICON_PATTERN = /^icon\.(svg|png|jpe?g|webp)$/
+
+/**
+ * 包根那份派生的 Windows 外壳图标（PK-036，与 src/shared/contract/packageRules.ts 同一份规矩，
+ * 由 src/apps/tests/package.test.ts 钉两处相等）。
+ * 它不是第二张图标：外壳只读磁盘上的 .ico，不认归档里的路径。
+ */
+export const WINDOWS_ICON_NAME = 'icon.ico'
 
 /** 包清单允许的键：应用自己的事实 + 包格式的三个字段 */
 const ALLOWED_KEYS = [
@@ -211,6 +224,39 @@ function fileNamesIn(dir) {
 }
 
 /**
+ * 包根那张源图 → 多尺寸 `.ico` 的字节（PK-036）。
+ *
+ * SVG 先经 @resvg/resvg-js 渲染成 256 宽 PNG（Pillow 不认 SVG 是本机事实），
+ * 再交 code/app-ico.py（Pillow）出 16~256 各档。中间文件落在系统临时目录的一个新目录里，用完就删。
+ * 转不出来就抛：任务栏那颗按钮的图标要靠它，产包不静默降级成"外壳用 runtime 的图标"。
+ * `@resvg/resvg-js` 是静态 import——产包全程同步（PK-007 那条"暂存后改名"不容异步插队）。
+ */
+export function windowsIconBytes(iconName, raw) {
+  const work = mkdtempSync(join(tmpdir(), 'airship-ico-'))
+  try {
+    let raster
+    if (iconName.endsWith('.svg')) {
+      raster = join(work, 'icon.png')
+      writeFileSync(raster, new Resvg(strFromU8(raw), { fitTo: { mode: 'width', value: 256 } }).render().asPng())
+    } else {
+      raster = join(work, iconName)
+      writeFileSync(raster, raw)
+    }
+    const ico = join(work, WINDOWS_ICON_NAME)
+    // 成功时不刷屏（Pillow 那句"已生成…"在 GBK 控制台下是乱码），失败时把它的报错原样交出来
+    const py = spawnSync('python', [join(REPO, 'code', 'app-ico.py'), raster, ico], {
+      stdio: ['ignore', 'ignore', 'inherit']
+    })
+    if (py.status !== 0) {
+      throw new Error(`图标转 .ico 失败（python code/app-ico.py，退出码 ${py.status}）：任务栏图标靠这一份，产包不降级`)
+    }
+    return readFileSync(ico)
+  } finally {
+    rmSync(work, { recursive: true, force: true })
+  }
+}
+
+/**
  * 把产物目录摊平成 zip 的条目表：条目名是包内的相对路径（正斜杠），值是字节。
  *
  * 源目录里那份 `manifest.json` 被丢掉——包根写的是校验过、补全过默认值的那一份，
@@ -271,6 +317,11 @@ export function pack({ srcDir, outRoot, manifestText }) {
   const layout = layoutProblems({ fileNames: fileNamesIn(source), manifest })
   if (layout.length > 0) throw new Error(`包不合格：\n${layout.join('\n')}`)
 
+  // PK-036：包根那张源图另存一份外壳认得的 .ico。在写盘之前转——
+  // 转换失败时旧包一个字节都没动，包根里也不留半成品（与 PK-007 同一条纪律）。
+  const sourceIcon = fileNamesIn(source).find((n) => ICON_PATTERN.test(n))
+  const icoBytes = windowsIconBytes(sourceIcon, readFileSync(join(source, sourceIcon)))
+
   const id = manifest.id
   const finalFile = join(root, `${id}${PACKAGE_SUFFIX}`)
   const staging = join(root, `${id}${PACKAGE_SUFFIX}.tmp-${process.pid}-${Date.now()}`)
@@ -280,6 +331,7 @@ export function pack({ srcDir, outRoot, manifestText }) {
   try {
     const entries = collectEntries(source)
     entries[MANIFEST_NAME] = strToU8(`${JSON.stringify(manifest, null, 2)}\n`)
+    entries[WINDOWS_ICON_NAME] = icoBytes
     // 9 档：包是发出去的文件，体积比产包快慢更要紧（实测六个包合起来比目录小一半左右）
     writeFileSync(staging, zipSync(entries, { level: 9 }))
 

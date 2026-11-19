@@ -25,6 +25,15 @@ export const DEFAULT_ENTRY = 'index.html'
 /** 图标仍是文件约定，不进清单 */
 export const ICON_PATTERN = /^icon\.(svg|png|jpe?g|webp)$/
 
+/**
+ * 包根那份**派生**的 Windows 外壳图标（PK-036）。
+ *
+ * 它不是第二张图标：外壳（任务栏按钮、固定到任务栏那颗）只读磁盘上的 `.ico`，
+ * 不认归档里的路径，也不认包内那张源图的格式。产包期由包根那张源图转出来放进去，
+ * 于是"一个归档自持"在真机上也成立——直接从命令行指包跑起来，任务栏就是应用自己的样子。
+ */
+export const WINDOWS_ICON_NAME = 'icon.ico'
+
 /** 包清单允许的键 */
 export const ALLOWED_KEYS = [
   'id',

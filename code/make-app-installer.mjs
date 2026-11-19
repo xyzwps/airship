@@ -9,11 +9,12 @@
  *   - 桌面快捷方式目标 "<runtime>\airship.exe"，参数 "<安装目录>\<id>.airship"，两段都带引号；
  *   - 卸载删安装目录与快捷方式，不碰 %APPDATA% 里的设置与数据。
  *
- * 用法：node code/make-app-installer.mjs <id>   （just app-installer <id> 会先产包再调它）
+ * 用法：node code/make-app-installer.mjs <id>    只出那一个（`just app-installer <id>` 会先产它的包再调它）
+ *       node code/make-app-installer.mjs         不给 id 就出全部，名单与产包同源（code/app-dirs.mjs）
  * 产物：release/apps/<id>-Setup-<版本>.exe + 同名 .sha256。版本读 src/apps/<id>/package.json。
  *
- * makensis 用 electron-builder 缓存里那份（不引新依赖）；SVG 图标走 @resvg/resvg-js 渲染成 PNG，
- * 再由 code/app-ico.py（Pillow）转多尺寸 .ico——Pillow 不认 SVG 是本机事实。
+ * makensis 用 electron-builder 缓存里那份（不引新依赖）；快捷方式那份多尺寸 .ico 不再自己转，
+ * 直接取归档里产包期派生的那一份（PK-036）——图标只有一处生成，就是 code/pack-app.mjs。
  *
  * 这个 .mjs 直接 import @airship/contract：Node 24 的类型剥离吃得下契约包
  * （它内部相对 import 都带扩展名）。措辞与 id 形状因此只有一份，不用像产包器那样两边各写再钉相等。
@@ -32,16 +33,17 @@ import {
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, extname, join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { strFromU8, unzipSync } from 'fflate'
+import { appIds, SRC_APPS } from './app-dirs.mjs'
 import {
   APP_ID_PATTERN,
-  ICON_PATTERN,
   MANIFEST_NAME,
   PACKAGE_SUFFIX,
+  WINDOWS_ICON_NAME,
   installConfirmDetail,
   installConfirmMessage,
   runtimeNotFound
@@ -146,35 +148,14 @@ SectionEnd
 `
 }
 
-/** 列归档条目名：filter 一律 false，不解压内容（与 packageArchive.ts 同一个做法） */
-function entryNames(bytes) {
-  const names = []
-  unzipSync(bytes, {
-    filter: (f) => {
-      names.push(f.name)
-      return false
-    }
-  })
-  return names
-}
-
-/** 包内那张图 → 多尺寸 .ico；SVG 先经 resvg 渲染成 256 宽 PNG */
-async function iconToIco(bytes, work) {
-  const iconName = entryNames(bytes).find((n) => ICON_PATTERN.test(n))
-  if (!iconName) throw new Error('包里没有图标（icon.svg|png|jpg|jpeg|webp 有且只有一张）')
-  const raw = unzipSync(bytes, { filter: (f) => f.name === iconName })[iconName]
-  let raster
-  if (iconName.endsWith('.svg')) {
-    const { Resvg } = await import('@resvg/resvg-js')
-    raster = join(work, 'icon.png')
-    writeFileSync(raster, new Resvg(strFromU8(raw), { fitTo: { mode: 'width', value: 256 } }).render().asPng())
-  } else {
-    raster = join(work, `icon${extname(iconName)}`)
-    writeFileSync(raster, raw)
+/** 取归档里产包期派生的那份 icon.ico（PK-036）：快捷方式与安装目录用的就是它 */
+function extractWindowsIcon(bytes, work) {
+  const entry = unzipSync(bytes, { filter: (f) => f.name === WINDOWS_ICON_NAME })[WINDOWS_ICON_NAME]
+  if (!entry) {
+    throw new Error(`包里缺 ${WINDOWS_ICON_NAME}：先跑 just build-apps 重产包（它从包根那张源图派生这一份，PK-036）`)
   }
-  const ico = join(work, 'icon.ico')
-  const py = spawnSync('python', [join(repo, 'code', 'app-ico.py'), raster, ico], { stdio: 'inherit' })
-  if (py.status !== 0) throw new Error('图标转 .ico 失败（python code/app-ico.py）')
+  const ico = join(work, WINDOWS_ICON_NAME)
+  writeFileSync(ico, entry)
   return ico
 }
 
@@ -197,12 +178,9 @@ function findMakensis() {
   throw new Error(`electron-builder 缓存里没有 makensis。${hint}`)
 }
 
-async function cli() {
-  const id = process.argv[2]
-  if (!id || !APP_ID_PATTERN.test(id)) {
-    throw new Error('用法：node code/make-app-installer.mjs <id>（id 要是小写字母开头的那一档形状）')
-  }
-  const appPkgPath = join(repo, 'src', 'apps', id, 'package.json')
+/** 一个应用的安装器：读那份归档、抽包内 ico、跑 makensis、落 release/apps/ 并写 .sha256 */
+function installerFor(id) {
+  const appPkgPath = join(SRC_APPS, id, 'package.json')
   if (!existsSync(appPkgPath)) throw new Error(`没有这个应用：src/apps/${id}/package.json 不在`)
   const version = JSON.parse(readFileSync(appPkgPath, 'utf8')).version
 
@@ -216,7 +194,7 @@ async function cli() {
 
   const work = mkdtempSync(join(tmpdir(), 'airship-installer-'))
   try {
-    await iconToIco(bytes, work)
+    extractWindowsIcon(bytes, work)
     copyFileSync(archive, join(work, `${id}${PACKAGE_SUFFIX}`))
     writeFileSync(
       join(work, 'installer.nsi'),
@@ -243,6 +221,22 @@ async function cli() {
   } finally {
     rmSync(work, { recursive: true, force: true })
   }
+}
+
+async function cli() {
+  // 不给 id 就是全部应用：名单与 just build-apps 同源（code/app-dirs.mjs），
+  // 所以 just build 出来的包与安装器必然是一批东西，不会一个八个、一个七个。
+  const wanted = process.argv.slice(2).filter((a) => !a.startsWith('-'))
+  if (wanted.length > 1) {
+    throw new Error('用法：node code/make-app-installer.mjs [<id>]（不给 id 就是全部应用，一次一个请走 just app-installer <id>）')
+  }
+  if (wanted.length === 1 && !APP_ID_PATTERN.test(wanted[0])) {
+    throw new Error('用法：node code/make-app-installer.mjs <id>（id 要是小写字母开头的那一档形状）')
+  }
+  const ids = wanted.length === 1 ? wanted : appIds()
+  if (ids.length === 0) throw new Error('src/apps 下一个完整的应用都没有（名单判据见 code/app-dirs.mjs）')
+  if (ids.length > 1) console.log(`产 ${ids.length} 枚应用安装器 → release/apps`)
+  for (const id of ids) installerFor(id)
 }
 
 // 直接跑就进 CLI，被用例 import 就不动（与 pack-app.mjs 同一个做法）。

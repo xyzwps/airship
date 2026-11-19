@@ -34,13 +34,23 @@
 #### Scenario: PK-004 包清单里没有图标字段，也没有顺序字段
 - **WHEN** 包清单出现 `iconPath`、`icon` 或 `order`
 - **THEN** 产包失败，原因说清图标是包根那一张文件、顺序由 runtime 按名字典序定
-- **AND** 归档根上的图标缺失或多于一张时，原因点出那些条目名
+- **AND** 归档根上的图标缺失或多于一张时，原因点出那些条目名（`icon.ico` 是 PK-036 那份派生产物，不算第二张图标）
 
 #### Scenario: PK-005 清单里不许有 runtime 不认的键
 - **WHEN** 包清单写了一个允许字段之外的键，例如 `capabilitis`
 - **THEN** 产包失败，原因点出「包清单有 runtime 不认的键 "capabilitis"」
 - **AND** `name`、`description` 缺或为空、`capabilities` 不是字符串数组、
   `defaultWidth` 不是正整数，各自在产包期点名是哪个字段与收到了什么
+
+### Requirement: 包根另带一份 Windows 外壳认得的派生图标
+依据：外壳（任务栏按钮、固定到任务栏那颗）读图标只认文件系统路径，既不认 asar 也不认 `airship://`，
+更不认包内那张源图的格式。要让"一个归档自持"在真机上成立，图标就得在产包期一并备好（窗口侧的用法见 runtime.md SH-034）。
+
+#### Scenario: PK-036 产出来的包根里有 `icon.ico`，且只由产包器生成一处
+- **WHEN** 产包完成，列出归档条目名
+- **THEN** 根上有 `icon.ico`，它是包根那张源图（svg / png / jpg / jpeg / webp）转出的多尺寸 ico
+- **AND** 转不出来产包就失败并点名 `python code/app-ico.py`，不放行一个"任务栏只能穿 runtime 图标"的包
+- **AND** 应用安装器快捷方式用的就是包内这一份（取出来落进安装目录），安装器不再自己转第二遍
 
 ### Requirement: 包里的东西只能在包内互相引用
 依据：包要能在别人机器上离线跑起来，装到机器上的东西不能依赖网络，也不能依赖 runtime 目录树的形状。
@@ -78,7 +88,7 @@
 #### Scenario: PK-032 落点与快捷方式的命令行
 - **WHEN** 安装完成
 - **THEN** 归档落在 `%LOCALAPPDATA%\airship\apps\<id>\<id>.airship`，桌面快捷方式的目标是那个 runtime 目录里的 `airship.exe`，参数是归档的绝对路径，两段都带引号
-- **AND** 快捷方式的图标用包内那张图转成的 `.ico`，不是 runtime 的图标
+- **AND** 快捷方式的图标用包内那份 `icon.ico`（PK-036 在产包期派生的那一份），不是 runtime 的图标
 
 #### Scenario: PK-033 装之前念能力清单
 - **WHEN** 安装器启动
