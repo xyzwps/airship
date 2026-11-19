@@ -30,21 +30,21 @@ import type {
 } from '@airship/contract'
 
 /**
- * 壳的测试替身 —— 应用侧用例的地基，地位等同 wslc-desktop 里的 FakeWslcCli。
+ * runtime 的测试替身 —— 应用侧用例的地基，地位等同 wslc-desktop 里的 FakeWslcCli。
  *
- * 它按契约把 `window.airship` 装成一个内存里的小壳：
+ * 它按契约把 `window.airship` 装成一个内存里的小 runtime：
  *   - 能力闸门照主进程的样子判，**措辞直接从 shared/errors 取**（那里是唯一的措辞真源），
  *     所以"应用没声明 settings 时用户看到的那句中文"在测试里就是真实界面里的那句；
- *   - 文件走一个内存卷，授权规则与壳一致：自己的 data/cache 自由读写，
+ *   - 文件走一个内存卷，授权规则与 runtime 一致：自己的 data/cache 自由读写，
  *     声明过的共享命名空间可读写，别的路径必须先用对话框"选中"；
  *   - proc 只跑已解析的工具路径（白名单），命令行全记下来供断言；
  *     `start` 出去的流式任务由用例自己喂 chunk 与 exit，事件走真实订阅通道。
  *
- * 它**不是**主进程的复刻：壳自己的规则（授权、越界、路由）另有对真实模块跑的用例
- * （tests/shell/*）。这里只求给应用一个可信的壳，让应用的册子能钉住"用户看得见什么"。
+ * 它**不是**主进程的复刻：runtime 自己的规则（授权、越界、路由）另有对真实模块跑的用例
+ * （tests/runtime/*）。这里只求给应用一个可信的 runtime，让应用的册子能钉住"用户看得见什么"。
  *
  * 路径一律用正斜杠的假路径（`/fake/userData/...`），大小写敏感——
- * 真壳在 Windows 上不区分大小写，但用例里的路径都由用例自己写出来，不存在歧义。
+ * 真 runtime 在 Windows 上不区分大小写，但用例里的路径都由用例自己写出来，不存在歧义。
  */
 
 const ROOT = '/fake/userData'
@@ -70,7 +70,7 @@ export interface FakeOptions {
   files?: Record<string, Content>
   /** 预置目录 */
   dirs?: string[]
-  /** 壳已发现的外部工具；null = 这台机器上没有 */
+  /** runtime 已发现的外部工具；null = 这台机器上没有 */
   toolPaths?: Partial<Record<ToolName, string | null>>
   /** 一次性调用的应答：按命令行决定，不填就是干净退出 */
   run?: (exe: string, args: string[]) => Partial<ProcResult>
@@ -122,7 +122,7 @@ export class FakeAirship implements AirshipBridge {
     this.picks = [...(opts.picks ?? [])]
     for (const [p, c] of Object.entries(opts.files ?? {})) this.vol.set(p, c)
     for (const d of opts.dirs ?? []) this.dirSet.add(d)
-    // 应用自己的目录与声明过的共享区天然存在（真壳在启动时就建好了）
+    // 应用自己的目录与声明过的共享区天然存在（真 runtime 在启动时就建好了）
     for (const d of [this.dataDir, this.cacheDir, ...this.sharedRoots()]) this.dirSet.add(d)
   }
 
@@ -156,7 +156,7 @@ export class FakeAirship implements AirshipBridge {
     return this.readGrants.has(path)
   }
 
-  /** 把事件推给应用（子进程输出、托盘点击、主题变更…） */
+  /** 把事件推给应用（子进程输出、托盘点击、窗口最大化…） */
   emit(event: ShellEvent): void {
     for (const fn of [...this.listeners]) fn(event)
   }
@@ -225,12 +225,42 @@ export class FakeAirship implements AirshipBridge {
       root: ROOT,
       shared,
       platform: 'win32',
-      shellVersion: '0.0.0-test'
+      runtimeVersion: '0.0.0-test'
     }
   }
 
   async theme(): Promise<ThemeSnapshot> {
-    return this.opts.theme ?? { mode: 'system', resolved: 'dark' }
+    return this.themeSnapshot()
+  }
+
+  /**
+   * 改本应用的主题档。窗口观感族，**不占 settings 能力**——
+   * 与主进程 theme:set 同一套规矩：写 'theme'/'lastResolved' 两个键，不广播。
+   */
+  async setTheme(mode: ThemeSnapshot['mode'], resolvedHint?: 'light' | 'dark'): Promise<ThemeSnapshot> {
+    this.needString(mode, 'mode')
+    if (!['light', 'dark', 'system'].includes(mode)) throw new Error(`不认识的主题档：${mode}`)
+    this.settingsStore['theme'] = { mode }
+    const fallback = this.themeSnapshot().resolved
+    const resolved =
+      mode === 'system'
+        ? resolvedHint === 'dark' || resolvedHint === 'light'
+          ? resolvedHint
+          : ((this.settingsStore['lastResolved'] as 'light' | 'dark' | undefined) ?? fallback)
+        : mode
+    this.settingsStore['lastResolved'] = resolved
+    return { mode, resolved }
+  }
+
+  /** 与主进程 readThemeFor 同一套读法：先看设置里的档，没有才用预置 */
+  private themeSnapshot(): ThemeSnapshot {
+    const stored = this.settingsStore['theme'] as { mode?: ThemeSnapshot['mode'] } | undefined
+    const mode = stored?.mode ?? this.opts.theme?.mode ?? 'system'
+    const resolved =
+      mode === 'system'
+        ? ((this.settingsStore['lastResolved'] as 'light' | 'dark' | undefined) ?? this.opts.theme?.resolved ?? 'dark')
+        : mode
+    return { mode, resolved }
   }
 
   readonly settings = {

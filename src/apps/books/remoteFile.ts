@@ -1,7 +1,7 @@
 import type { AppApi } from '@airship/contract'
 
 /**
- * 把壳的范围读包装成 foliate-js 需要的 File-like。
+ * 把 runtime 的范围读包装成 foliate-js 需要的 File-like。
  *
  * 关键点：slice(from, to) 不是一次性读整本，而是返回一个"用到才去取字节"的
  * 懒 Blob。foliate 渲染某一节时只会 slice 那一节用到的范围，

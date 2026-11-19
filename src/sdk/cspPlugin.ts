@@ -5,12 +5,12 @@ import { pickCsp } from './csp.ts'
 /**
  * 往**应用入口 html** 里注入 CSP 的 vite 插件。
  *
- * CSP 不由各应用自己抄写：一条权限字符串在六个应用里各抄一遍，
- * 就会有第六个版本悄悄少一个 `worker-src`。写在一处、构建时注入，
+ * CSP 不由各应用自己抄写：一条权限字符串在每个应用里各抄一遍，
+ * 就会有第 N 个版本悄悄少一个 `worker-src`。写在一处、构建时注入，
  * 产包后每个包的 `index.html` 里确实带着这一条（包自持），但源头只有一份。
  *
- * 只管 `src/apps/<id>/index.html`：启动器是壳自己的文档，它的 CSP 手写在
- * `launcher.html` 里，不经过这里。dev 注入带 localhost 的那条（react-refresh 要一段
+ * 只管 `src/apps/<id>/index.html`：runtime 自己没有界面，也没有别的入口文档。
+ * dev 注入带 localhost 的那条（react-refresh 要一段
  * 内联脚本，`script-src 'self'` 会把它挡掉），产包注入收紧的那条。
  * 判据是 ctx 里有没有 bundle：build 才有 bundle，dev 没有。
  * 清单里声明了 `net` 的应用换放宽 `connect-src` 的那一档——选哪一条的逻辑在 `csp.ts` 的 `pickCsp`。

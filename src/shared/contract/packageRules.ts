@@ -5,7 +5,7 @@ import { badAppId } from './errors.ts'
 /**
  * 一个 airship 包的清单形状（契约见 `src/apps/specs/package.md`）。
  *
- * 这份文件是**壳侧**判的规矩；`code/pack-app.mjs` 是产包侧判的规矩。
+ * 这份文件是**runtime 侧**判的规矩；`code/pack-app.mjs` 是产包侧判的规矩。
  * 两份必须逐条一致——由 `src/apps/tests/package.test.ts` 拿同一批坏清单喂两边，
  * 比对两边的原因列表完全相同来钉住（Node 跑不了本仓 TS，没法直接共用一份实现）。
  */
@@ -16,7 +16,7 @@ export const PACKAGE_SUFFIX = '.airship'
 /** 包清单的文件名，在包根 */
 export const MANIFEST_NAME = 'manifest.json'
 
-/** 壳只认这一档包格式 */
+/** runtime 只认这一档包格式 */
 export const SCHEMA_VERSION = 1
 
 /** 入口文档的默认名字（清单不写 entry 就是它） */
@@ -100,7 +100,7 @@ export function packageManifestProblems(manifest: unknown, at: string): string[]
   if (m.schemaVersion !== SCHEMA_VERSION) {
     out.push(
       `${at}: 包清单 schemaVersion 只认 ${SCHEMA_VERSION}，收到 ${JSON.stringify(m.schemaVersion)}` +
-        `（包格式与壳不同档时别硬装，先对齐壳的版本）`
+        `（包格式与 runtime 不同档时别硬装，先对齐 runtime 的版本）`
     )
   }
   if (typeof m.sdkVersion !== 'string' || m.sdkVersion.trim() === '') {
@@ -127,13 +127,13 @@ export function packageManifestProblems(manifest: unknown, at: string): string[]
     if (key in m) {
       out.push(
         `${at}: 包清单里不写 ${key}：图标是包根那一张文件（icon.svg / png / jpg / jpeg / webp），` +
-          `显示顺序由壳按名字典序定，两者都不是应用自己能决定的`
+          `显示顺序由 runtime 按名字典序定，两者都不是应用自己能决定的`
       )
     }
   }
   for (const key of Object.keys(m)) {
     if (!(ALLOWED_KEYS as readonly string[]).includes(key)) {
-      out.push(`${at}: 包清单有壳不认的键 "${key}"（要么拼错，要么包格式与壳不同档）`)
+      out.push(`${at}: 包清单有 runtime 不认的键 "${key}"（要么拼错，要么包格式与 runtime 不同档）`)
     }
   }
   return out

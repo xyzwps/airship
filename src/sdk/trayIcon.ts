@@ -2,7 +2,7 @@
  * 托盘徽标图标。
  *
  * Windows 托盘吃的是位图，主进程没有画字的能力，所以在渲染侧用 canvas 画，
- * 转成 PNG dataURL 交给壳。dagogo 用它显示"今天勾掉几个"。
+ * 转成 PNG dataURL 交给 runtime。dagogo 用它显示"今天勾掉几个"。
  */
 export async function renderTrayIcon(
   text: string,

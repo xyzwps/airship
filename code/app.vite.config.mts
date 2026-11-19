@@ -32,7 +32,7 @@ export default defineConfig({
   root: resolve(SRC, 'apps', APP_ID),
   base: './',
   resolve: {
-    // 同壳侧那条：一个包内两份 react 会让 hooks 立刻炸
+    // 同 runtime 侧那条：一个包内两份 react 会让 hooks 立刻炸
     dedupe: ['react', 'react-dom', 'react/jsx-runtime']
   },
   plugins: [react(), airshipCspPlugin()],

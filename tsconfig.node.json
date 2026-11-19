@@ -22,11 +22,12 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "src/shell/main/**/*.ts",
-    "src/shell/preload/**/*.ts",
+    "src/runtime/main/**/*.ts",
+    "src/runtime/preload/**/*.ts",
     "src/shared/**/*.ts",
     "src/apps/*/app.ts",
-    "src/shell/electron.vite.config.ts"
+    "src/runtime/electron.vite.config.ts",
+    "src/runtime/electron.vite.dev.config.ts"
   ],
   "exclude": [
     "src/**/tests/**",

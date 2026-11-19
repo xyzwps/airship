@@ -2,7 +2,7 @@ import type { AppApi } from '@airship/contract'
 import type { JobQueue, JobSpec } from './jobs'
 
 /**
- * 任务运行器：把 JobQueue 接到壳的 proc 服务上。
+ * 任务运行器：把 JobQueue 接到 runtime 的 proc 服务上。
  *
  * 进度解析对应 Avalonia 版 Ffmpeg.Job.Feed：
  * ffmpeg 用 `-progress pipe:1` 往 stdout 打 key=value 行，
@@ -62,7 +62,7 @@ export class Runner {
     return this.exe
   }
 
-  /** 订阅壳的进程事件 */
+  /** 订阅 runtime 的进程事件 */
   attach(): void {
     this.unsub = this.api.on((event) => {
       if (event.kind === 'proc:chunk') {
@@ -129,7 +129,7 @@ export class Runner {
     if (!next) return
     if (!this.exe) {
       next.state = 'error'
-      next.error = '没找到 ffmpeg，去总览页看壳状态'
+      next.error = '没找到 ffmpeg：装一个，或设环境变量 AIRSHIP_FFMPEG_PATH 指向它的完整路径'
       this.onChange()
       return
     }

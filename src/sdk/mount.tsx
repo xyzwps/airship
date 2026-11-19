@@ -2,7 +2,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { JSX, ReactNode } from 'react'
 import { FakeAirship } from './fakeAirship.ts'
-import type { AirshipBridge, ShellBridge } from '@airship/contract'
+import type { AirshipBridge } from '@airship/contract'
 
 /**
  * 界面挂载器：把应用真渲染到 jsdom 里，然后按"用户看得见的话"来断言与点击。
@@ -22,7 +22,6 @@ import type { AirshipBridge, ShellBridge } from '@airship/contract'
 
 type AnyWindow = typeof globalThis & {
   airship: AirshipBridge
-  airshipShell: ShellBridge
   IS_REACT_ACT_ENVIRONMENT: boolean
 }
 
@@ -32,8 +31,6 @@ w.IS_REACT_ACT_ENVIRONMENT = true
 export interface MountOptions {
   /** 应用侧契约替身；给了就挂到 window.airship */
   fake?: FakeAirship
-  /** 启动器才需要的另一套面，按用例给最小够用的一份 */
-  shell?: Partial<ShellBridge>
   /** 应用里的"确定要删吗"式确认框，用例直接给定结果 */
   confirm?: boolean
 }
@@ -69,10 +66,6 @@ export interface Mount {
 
 export async function mountUi(node: ReactNode, opts: MountOptions = {}): Promise<Mount> {
   if (opts.fake) w.airship = opts.fake
-  // 没给启动器面就得真删掉：应用窗口的 preload 根本不暴露 airshipShell，
-  // 留着上一个用例挂上去的那份，"应用里改不了主题"这类用例就会假绿
-  if (opts.shell) w.airshipShell = { ...shellStub(), ...opts.shell }
-  else delete (w as Partial<{ airshipShell: ShellBridge }>).airshipShell
   if (opts.confirm !== undefined) {
     const answer = opts.confirm
     Object.defineProperty(globalThis, 'confirm', { value: () => answer, configurable: true, writable: true })
@@ -233,32 +226,4 @@ export async function mountUi(node: ReactNode, opts: MountOptions = {}): Promise
 function trim(s: string, max = 600): string {
   const flat = s.replace(/\s+/g, ' ').trim()
   return flat.length > max ? `${flat.slice(0, max)}…` : flat
-}
-
-/** 启动器面的空壳：用例只覆盖自己需要的那几颗方法 */
-function shellStub(): ShellBridge {
-  const no = async (): Promise<never> => {
-    throw new Error('这个用例没装配启动器面的这个方法')
-  }
-  return {
-    apps: no,
-    openApp: no,
-    inspectPackage: no,
-    installPackage: no,
-    uninstallPackage: no,
-    openApps: no,
-    setTheme: no,
-    theme: no,
-    settings: { get: no, set: no },
-    rootPaths: no,
-    shellInfo: no,
-    currentPlatform: no,
-    toolPath: no,
-    setToolPath: no,
-    grants: no,
-    openExternal: no,
-    metrics: no,
-    window: { minimize: no, toggleMaximize: no, close: no, isMaximized: no, setTitle: no },
-    on: () => () => undefined
-  }
 }

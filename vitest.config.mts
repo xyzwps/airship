@@ -8,7 +8,7 @@ import { defineConfig } from 'vitest/config'
  * 默认环境是 node（壳的主进程服务、纯逻辑都在 node 下测）；
  * 需要 DOM 的用例在文件顶部写 `// @vitest-environment jsdom`，只给那几个文件开界面环境。
  *
- * 用例跟着它们管的代码走（`src/shell/tests`、`src/sdk/tests`、`src/apps/<id>/tests`、
+ * 用例跟着它们管的代码走（`src/runtime/tests`、`src/sdk/tests`、`src/apps/<id>/tests`、
  * `src/shared/<包>/tests`），所以这里不写 include 名单，vitest 自己递归找。
  */
 
@@ -16,7 +16,7 @@ export default defineConfig({
   test: {
     // templates/ 里的用例是范本的样例（编号还没落到真应用上），不跟着仓库一起跑
     exclude: ['templates/**', '**/node_modules/**', '**/dist/**'],
-    setupFiles: ['./src/shell/tests/setup.ts'],
+    setupFiles: ['./src/runtime/tests/setup.ts'],
     server: {
       deps: {
         /**

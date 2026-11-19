@@ -1,0 +1,63 @@
+# 打包配置（Windows 安装包）——**这个文件属于 runtime 那个包**：项目根是 src/runtime，
+# 版本号读 src/runtime/package.json，安装包落仓库根的 release/。
+#
+# runtime 是全机器共享的运行时：perMachine（要管理员），落点钉死 C:\Program Files\airship\runtime
+# （目录的唯一真源在 build/installer.nsh 的 customInit）。产物名是 runtime 口径：
+# airship-runtime-Setup-<版本>-x64.exe，主 exe 叫 airship.exe（应用快捷方式的目标就是它）。
+# 向导双语（按系统界面语言自动选）；runtime 自己没有界面，不留快捷方式，只留控制面板里的卸载项。
+
+appId: dev.xyzwp.airship
+productName: airship
+copyright: © 2026 xyzwp
+
+directories:
+  # 相对本包：安装包与解包目录回到仓库根
+  output: ../../release
+  buildResources: build
+
+# 装进 app.asar 的东西：electron-vite 的两个构建目标 + runtime 的清单 + 它自己的两张图
+# （windows.ts 与 tray.ts 按 ../../assets/ 相对路径找它们——out 在本包下一层，
+# 所以那两条相对路径正好指到本包的 assets/，打包后仍在 asar 内）
+files:
+  - out/**/*
+  - package.json
+  - assets/icon.png
+  - assets/tray.png
+  # 根 package.json 已经没有 dependencies 了：foliate-js 与 pdfjs-dist 各自记在
+  # 用它的那个应用名下，而且都是 devDependencies（构建期打进各家的包，运行时不需要）。
+  # 所以这里不再需要"排除某个 node_modules 目录"那几条——没有生产依赖会跟着进 asar。
+
+# 安装包是**纯 runtime**：不带任何 airship 包。应用由各自的安装器装进每用户目录
+# （code/make-app-installer.mjs，契约 PK-031~035）；verify-installer 反过来钉
+# "resources/ 里不该有任何 airship 包"。
+
+compression: maximum
+
+win:
+  icon: assets/icon.ico
+  target:
+    - nsis
+  # 产物名：airship-runtime-Setup-<版本>-x64.exe
+  artifactName: airship-runtime-Setup-${version}-x64.exe
+
+nsis:
+  oneClick: false
+  # 完成页不带「运行」勾选、点完成直接关窗（2026-11-19）：runtime 自己没有界面，
+  # 装完不该弹一个"要不要运行 airship"的提示——双击一个没带包的 runtime 只会念用法。
+  # false → electron-builder 定义 HIDE_RUN_AFTER_FINISH，去掉完成页的 StartApp。
+  runAfterFinish: false
+  # runtime 是全机器共享的运行时：装一次要管理员，落点钉死 C:\Program Files\airship\runtime
+  # （目录的唯一真源在 build/installer.nsh 的 customInit，这里只负责提权与去掉换目录页）
+  perMachine: true
+  allowToChangeInstallationDirectory: false
+  include: installer.nsh
+  # runtime 自己没有界面：不留桌面/开始菜单快捷方式（双击一个没带包的 runtime 只会念用法）。
+  # 快捷方式是应用安装器的事（PK-032）；这里只留控制面板的卸载项。
+  createDesktopShortcut: false
+  createStartMenuShortcut: false
+  uninstallDisplayName: airship runtime
+  # 卸载不动用户数据：%APPDATA%/airship 里是书架与设置，删掉太狠
+  deleteAppDataOnUninstall: false
+  installerLanguages:
+    - zh_CN
+    - en

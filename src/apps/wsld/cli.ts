@@ -7,9 +7,9 @@ import type { AppApi, ProcResult } from '@airship/contract'
  * 命令行在这里拼、进程在这里起，界面只管要数据和听结果：
  *   - 一次性读（列表、查看日志、拉取收尾）走 `proc.run`；
  *   - 要看得见"正在做"的动作（起停删、实时日志、删除镜像）走 `proc.start`，
- *     结束由壳推回来的 `proc:exit` 说了算——不然界面没法把"进行中"这段摆出来。
+ *     结束由 runtime 推回来的 `proc:exit` 说了算——不然界面没法把"进行中"这段摆出来。
  *
- * 可执行文件一律由壳定位（见壳的 proc-tools 册子）：应用只声明"我要用 wslc"，
+ * 可执行文件一律由 runtime 定位（见 runtime 的 proc-tools 册子）：应用只声明"我要用 wslc"，
  * 拿到 null 就按"这台机器上没有"处理，别自己找一条路径去跑。
  */
 
@@ -17,7 +17,7 @@ export const WSLC_TOOL = 'wslc' as const
 
 /** 定位不到 wslc 时给用户的句子：说清下一步该怎么办，而不是一堆报错 */
 export const WSLC_MISSING =
-  '这台机器上没有 wslc：请安装并启用 WSL 3（自带 wslc.exe），或在启动器的壳设置里指定它的完整路径。'
+  '这台机器上没有 wslc：请安装并启用 WSL 3（自带 wslc.exe），或设环境变量 AIRSHIP_WSLC_PATH 指向它的完整路径。'
 
 /* ---------------- 命令行 ---------------- */
 
@@ -135,7 +135,7 @@ export const nowEpochSeconds = (): number => Math.floor(Date.now() / 1000)
 
 let jobSeq = 0
 
-/** 任务标识在同一应用内要唯一，结束后可复用的那一段由壳负责清理 */
+/** 任务标识在同一应用内要唯一，结束后可复用的那一段由 runtime 负责清理 */
 export function nextJobId(kind: string): string {
   jobSeq += 1
   return `${kind}-${jobSeq}`

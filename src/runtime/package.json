@@ -1,0 +1,16 @@
+{
+  "name": "@airship/runtime",
+  "version": "0.4.0",
+  "private": true,
+  "description": "飞船的 runtime：窗口、能力实现、包协议与单实例转发",
+  "main": "out/main/index.js",
+  "author": "xyzwps",
+  "devDependencies": {
+    "electron": "45.2.3",
+    "electron-builder": "^26.18.0",
+    "electron-vite": "^6.0.0"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3"
+  }
+}

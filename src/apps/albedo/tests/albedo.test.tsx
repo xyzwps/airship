@@ -303,7 +303,7 @@ describe('自动保存', () => {
     const fake = freshFake()
     const m = await openAlbedo(fake)
     await wait(400)
-    // 让落盘必炸：settings 键塞一个会让写盘抛错的坏结构（假壳按 JSON 可序列化判）
+    // 让落盘必炸：settings 键塞一个会让写盘抛错的坏结构（假 runtime 按 JSON 可序列化判）
     const bomb = {
       throws: true,
       set() {

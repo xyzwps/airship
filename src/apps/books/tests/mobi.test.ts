@@ -37,7 +37,7 @@ type OpenedBook = {
 
 describe('MOBI 读得开（BK-032）', () => {
   it('BK-032 交一个 MOBI 出去，读得出书名、作者与分节', async () => {
-    // 只问我们这一侧的事：把这个文件交出去，壳拿到的是一本有名字、有节、能翻页的书。
+    // 只问我们这一侧的事：把这个文件交出去，runtime 拿到的是一本有名字、有节、能翻页的书。
     // 解压器那三条分支（不压 / PalmDOC LZ77 / huff）在 foliate-js 里，是它的实现细节，不在这里的契约上。
     const file = fileFrom(bytes(), '道德经.mobi')
     const book = (await makeBook(file as never)) as OpenedBook

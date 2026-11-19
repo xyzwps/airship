@@ -1,7 +1,7 @@
 import type { AppApi } from '@airship/contract'
 
 /**
- * 壳侧设置与 localStorage 形状之间的适配器。
+ * runtime 侧设置与 localStorage 形状之间的适配器。
  *
  * Albedo 的自动保存、语言、最近字体原来都走 localStorage（同步读写、失败靠抛）；
  * 在包里这层换成 `api.settings`（能力 settings），但给上层留**同一个同步面**：

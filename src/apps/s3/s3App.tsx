@@ -43,7 +43,7 @@ import './s3.css'
  * 措辞是契约的一部分（见 `specs/s3.md`）：哪一句跟着哪个状态写死在这里，
  * 用例逐句比对，所以改一句话等于改一次契约。
  *
- * 一切网络请求由这个窗口自己发（清单里的 `net`），壳不代发也不改包里的东西。
+ * 一切网络请求由这个窗口自己发（清单里的 `net`），runtime 不代发也不改包里的东西。
  */
 export default function S3App({ api }: { api: AppApi }): JSX.Element {
   const { resolved } = useTheme()

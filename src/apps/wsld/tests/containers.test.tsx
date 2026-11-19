@@ -24,7 +24,7 @@ import type { Mount } from '@airship/sdk/testing'
  * 容器与镜像数据一律从 wslc 3.0.1 的真样本改出来（见 tests/fixtures/）。
  */
 
-/** 按 `wslc list -a --format json` 的应答造一个壳 */
+/** 按 `wslc list -a --format json` 的应答造一个假 runtime */
 async function mountList(stdout: string, extra: { code?: number; stderr?: string } = {}): Promise<Mount> {
   const fake = makeFake({
     run: (_exe, args) =>

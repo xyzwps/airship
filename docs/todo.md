@@ -12,73 +12,79 @@
 
 ---
 
-## 壳与发布
+## runtime 与发布
 
-### TD-001 任务栏上六个应用还是一个「飞船」
+### TD-001 任务栏上八个应用还是一个「飞船」
 
-三个应用窗口的任务栏按钮、预览图与名字全是壳的样子，因为它们共用同一个宿主身份。
+八个应用窗口的任务栏按钮、预览图与名字全是 runtime 的样子，因为它们共用同一个宿主身份。
 
-为什么挂着：`src/shell/main/windows.ts` 里写的是 `window.setAppUserModelId?.(...)`，而那个方法只挂在 `app`
-（进程级）上，BrowserWindow 没有——可选链把失败吞成一次空操作，代码看着做了、真机什么都没发生。
+为什么挂着：`src/runtime/main/windows.ts`（约 165-166 行）里写的是
+`window.setAppUserModelId?.(...)`，而那个方法只挂在 `app`（进程级）上，BrowserWindow 没有——
+可选链把失败吞成一次空操作，代码看着做了、真机什么都没发生。进程级那句
+`app.setAppUserModelId('dev.xyzwp.airship')` 是真生效的，所以按钮仍归一个 runtime 身份。
 
 动它要碰四处（缺一不可，2026-11-06 做到第二件就撤了，路线已验通）：
 
 1. 窗口身份改用 `win.setAppDetails({ appId, appIconPath, relaunchCommand, relaunchDisplayName })`；
-2. 每应用一张 `.ico`——图标由系统外壳读，asar 里的路径它不认，得靠 `extraResources` 拷成
-   `resources/app-icons/<id>.ico`。烘法验过能用：`@resvg/resvg-js` 把 SVG 出成 256 PNG，再交给 Pillow
-   以最大档为基准出多尺寸 ico（Pillow 不认 SVG、无头 Chrome 截内联 SVG 出空白，这两个坑都绕开了）；
-3. 壳要认 `--app=<id>` 启动参数（现在只认 `--shot`），`second-instance` 也要按它唤对应应用，
-   否则固定上去的按钮点了只是把启动器顶到前台；
-4. 开始菜单给每个应用一枚带同样 AUMID 的快捷方式。electron-builder 的 NSIS 模板只用裸 `CreateShortCut`，
+2. 每应用一张 `.ico`——图标由系统外壳读，asar 里的路径它不认。应用安装器已经把包内那张图转成
+   `icon.ico` 落在安装目录里（`code/app-ico.py`，SVG 先经 `@resvg/resvg-js` 出 256 PNG 再交 Pillow），
+   窗口身份要用的是这份磁盘上的 ico，不是 asar 里的 png；
+3. runtime 现在按 argv 注册包、`second-instance` 转发包路径，`relaunchCommand` 要写成
+   `"<runtime>\airship.exe" "<安装目录>\<id>.airship"`（与应用快捷方式同形），否则固定上去的按钮点了唤不对应用；
+4. 快捷方式上写 per-app 的 AUMID。应用安装器（`code/make-app-installer.mjs`）现在用裸 `CreateShortcut`，
    没有给 `.lnk` 写 `System.AppUserModel.ID` 的能力（那是 IPropertyStore，要 ShellLink 插件），
    还没找到"不额外下插件"的解法。
 
-顺带要修的假绿：`src/shell/tests/appWindowCreate.test.ts` 的替身窗口把 `setAppUserModelId` 一起写了进去，
-于是 SH-010 一直绿着。替身只能实现真 API 面上存在的方法。
+顺带要修的假绿：`src/runtime/tests/appWindowCreate.test.ts` 的替身窗口把 `setAppUserModelId` 一起写了进去，
+于是那条用例一直绿着。替身只能实现真 API 面上存在的方法。
 
-来源：原记在 `docs/architecture.md` §7 表格「任务栏」那行与 §14；那两处现在只留状态标记指回这里。
+来源：原记在 `docs/architecture.md` 的任务栏段与 §14；那两处现在只留状态标记指回这里。
 
 ### TD-013 SDK 独立发布与版本协商
 
-包按某个 SDK 版本构建，却要跑在用户机器上任意一个壳版本里——这条边今天是靠"同仓同一次构建"侥幸对齐的。
-要补三样：包清单里 `sdkVersion` / 壳侧对 `requiresShell` 的判定（现在只记录不判）、
-不兼容时格子里读得到的那句原因（而不是点开一个白屏）、壳侧 API 只加不改不删的纪律。
+包按某个 SDK 版本构建，却要跑在用户机器上任意一个 runtime 版本里——这条边今天是靠"同仓同一次构建"侥幸对齐的
+（根 `package.json` 与 `src/runtime/package.json` 版本一致，包清单 `sdkVersion` 取根那份）。
+要补三样：包清单里 `sdkVersion` / runtime 侧对 `requiresRuntime` 的判定（现在只记录不判）、
+不兼容时直跑前读得到的那句原因（而不是点开一个白屏）、runtime 侧 API 只加不改不删的纪律。
 `src/sdk` 是将来要独立发布的那一份，改它的导出等于改公开面。
 来源：2026-11-07 拆包时定下的第三步（A/B/C/D 四档已落，这一步是它的后续）。
 
-### TD-014 装包的来源信任、更新与商店链路
+### TD-014 装包的来源信任与更新
 
-拖放装包这条已经落了（PK-015~020）：拖进启动器就装进自装根，同 id 要确认才覆盖，装完不开窗口。
-卸包也落了（PK-021~026 / SH-025~029）：顶栏那颗管理键点出每格的卸载记号，卡片上选删不删数据，
-窗口开着就不动磁盘。"退回出厂版"那一半不再存在——安装包是纯壳，没有出厂那份可退（2026-11-07 定）。
-还缺两件事，都在这条入口变方便之后才更要紧：
+装包现在只有一条路：跑应用自己的每用户安装器（`code/make-app-installer.mjs`，PK-031~035）——
+找 runtime、念能力清单、落进 `%LOCALAPPDATA%\airship\apps\<id>\`、留快捷方式。
+卸载删安装目录 / 快捷方式 / HKCU 注册表，不碰数据（PK-034）。
+从前"拖进启动器就装"与"启动器顶栏管理键卸载"那一族随启动器退场了；"退回出厂版"也不存在——
+安装包是纯 runtime，没有出厂那份可退。还缺两件事，都在这条入口变方便之后才更要紧：
 
-1. **来源信任**。现在任何归档拖进来，只要形状合格就装，壳不认它出自谁。要有签名或校验和，
-   前提是 TD-003 那张证书。
-2. **更新**。装了 0.3.0 之后没人告诉你有 0.4.0；这条和 TD-004（壳自己的自动更新）是同一条链的两半。
+1. **来源信任**。现在任何归档只要形状合格就装，runtime 与安装器都不认它出自谁。要有签名或校验和，
+   前提是 TD-003 那张证书。（安装器旁边那份 `.sha256` 只防传输被改，不证明来源。）
+2. **更新**。装了 0.3.0 之后没人告诉你有 0.4.0；这条和 TD-004（runtime 自己的自动更新）是同一条链的两半。
+   应用版本独立演化，更新一个应用 = 重跑它的安装器覆盖那份归档，今天全靠人手动。
 
-来源：2026-11-07 拆包路线的第四、五步。
+来源：2026-11-07 拆包路线的第四、五步；2026-11-19 runtime 化后装包入口换成应用安装器。
 
 ### TD-003 没有代码签名证书
 
 第一次运行 Windows SmartScreen 会拦一道"未知发布者"，点"仍要运行"即可。要消掉这道提示得买 OV/EV 证书，
-或者走 Microsoft Store。来源：`docs/release-packaging.md` 没做的事。
+或者走 Microsoft Store。runtime 安装包与应用安装器都没签名。来源：`docs/release-packaging.md` 没做的事。
 
 ### TD-004 没有自动更新链路
 
-`latest.yml` 只是 electron-builder 的产物，应用里没接 `electron-updater`——发新版目前只能重新拷安装包。
+`latest.yml` 只是 electron-builder 的产物，runtime 里没接 `electron-updater`——发新版目前只能重新拷安装包。
 来源：`docs/release-packaging.md` 没做的事。
 
 ### TD-005 想要 Inno Setup 那一档观感
 
-现在用 NSIS。要 Inno 的观感（同一份 `.isl` 双语文案、LZMA2 极限压缩），得先本机装 Inno Setup 6
-（`winget install JRSoftware.InnoSetup`），再照 wslc-desktop 的 `wsld.iss` 写一份 `installer/airship.iss`，
-拿 `release/win-unpacked/` 当输入。来源：`docs/release-packaging.md` 没做的事。
+现在 runtime 与应用安装器都用 NSIS。要 Inno 的观感（同一份 `.isl` 双语文案、LZMA2 极限压缩），
+得先本机装 Inno Setup 6（`winget install JRSoftware.InnoSetup`），再照 wslc-desktop 的 `wsld.iss` 写一份
+`installer/airship.iss`，拿 `release/win-unpacked/` 当输入。来源：`docs/release-packaging.md` 没做的事。
 
 ### TD-006 多窗口的内存回收
 
-窗口数不设上限，六个应用全开约 500 MB。真觉得吃紧再加"同应用多窗口"或闲置回收策略——现在还没有触发这件事的症状。
-来源：`docs/architecture.md` §14。
+窗口数不设上限，八个应用各开一扇。每窗口工作集的隔离实测见 `docs/architecture.md` §3.1
+（本轮 86~112 MB 一扇）；八扇全开的累计数没单独采过。真觉得吃紧再加"同应用多窗口"或闲置回收策略——
+现在还没有触发这件事的症状。来源：`docs/architecture.md` §14。
 
 ---
 
@@ -102,7 +108,7 @@
 
 ### TD-010 wsld 自己的设置页（`settings`）
 
-本期只留镜像列表那几颗键，走壳的 `src/shell/specs/storage.md`。来源：`docs/specs/index.md`。
+本期只留镜像列表那几颗键，走 runtime 的 `src/runtime/specs/storage.md`。来源：`docs/specs/index.md`。
 
 ---
 
@@ -117,6 +123,6 @@
 
 ## 不做，只留理由（别再当 TODO 找上门）
 
-- **界面语言（`i18n`）**：本项目只做中文；换皮与语言归壳自己。
-- **壳的窗口与导航册子（`shell.md` / `theme.md`）**：不搬原版那两本，窗口、导航、换皮由 airship 壳的
-  SH / TH 两本管（见 `docs/specs/index.md` 的能力索引）。
+- **界面语言（`i18n`）**：本项目只做中文；换皮与语言归 runtime 自己。
+- **原版的窗口与导航册子（`shell.md` / `theme.md`）**：不搬原版那两本，窗口、直跑、换皮由 airship runtime
+  自己的 `runtime.md`（SH）与 `theme.md`（TH）管（见 `docs/specs/index.md` 的能力索引）。

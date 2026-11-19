@@ -6,7 +6,7 @@ import { isTask, normalizeImportedTasks, type ExportFile, type Task, type TaskFi
  * 存储层。
  *
  * 数据落在应用自己的 data 目录（dagogo.json），不再像 Expo 版那样
- * 自己维护 documentDirectory 路径——壳已经把目录分好了。
+ * 自己维护 documentDirectory 路径——runtime 已经把目录分好了。
  *
  * 写盘走串行队列：连续勾选时后一次写不能把前一次覆盖掉，
  * Expo 版踩过这个坑，这里保留同样的做法。

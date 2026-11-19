@@ -4,9 +4,9 @@ import { badAppId, unknownTool } from './errors.ts'
 import { PLATFORM_IDS, TOOL_NAMES } from './protocol.ts'
 
 /**
- * 应用注册表的规矩（两侧共用一份）。
+ * 应用注册表的规矩（产包器与 runtime 注册共用一份）。
  *
- * 主进程与渲染侧各自 glob 出同一批清单，如果各写一套校验，就会出现
+ * 产包器与运行期注册各自校验同一份清单，如果各写一套校验，就会出现
  * "一侧收下了、另一侧炸了"的分裂。规矩只有这些条，写在一处，测在一处。
  * 返回值是**人读的原因列表**——注册期直接炸，比运行到一半"能力查不到"好解释得多。
  */
@@ -45,7 +45,7 @@ export function manifestProblems(
  * 图标是文件约定：一张，也不能没有。
  *
  * 组件入口那一条判据原来也在这里（"缺 index.tsx"），随着构建期 glob 一起退场了：
- * 现在入口文档是包的一部分，缺不缺由产包器与运行期扫包各自喊一次
+ * 现在入口文档是包的一部分，缺不缺由产包器与运行期注册各自喊一次
  * （`code/pack-app.mjs` 的 `layoutProblems`、`services/packageRegistry.ts`）。
  */
 export function iconProblems(id: string, iconKeys: readonly string[]): string[] {
@@ -57,9 +57,3 @@ export function iconProblems(id: string, iconKeys: readonly string[]): string[] 
   }
   return []
 }
-
-/**
- * 组件入口那一条判据原来也在这里（"缺 index.tsx"），随着构建期 glob 一起退场了：
- * 入口文档现在是包的一部分，缺不缺由产包器与运行期扫包各自喊一次
- * （`code/pack-app.mjs` 的 `layoutProblems`、`services/packageRegistry.ts`）。
- */

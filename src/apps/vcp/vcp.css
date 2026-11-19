@@ -422,7 +422,7 @@
   place-items: center;
   padding: 0;
   border: 0;
-  /* 悬停底色是方的，与壳里其余动作键一路：圆的是图形，不是热区 */
+  /* 悬停底色是方的，与宿主里其余动作键一路：圆的是图形，不是热区 */
   border-radius: 0;
   background: transparent;
   color: var(--fg-faint);
@@ -445,7 +445,7 @@
   outline-offset: 1px;
 }
 
-/* 卡片吃鼠标：它与问号是同一块热区，指针挪过来不算离开（`.selectable` 是壳的公用类，文字选得中） */
+/* 卡片吃鼠标：它与问号是同一块热区，指针挪过来不算离开（`.selectable` 是 SDK 的公用类，文字选得中） */
 .vcp__help-card {
   /* 面板自己会滚，绝对定位会被 overflow 剪掉半张卡 */
   position: fixed;

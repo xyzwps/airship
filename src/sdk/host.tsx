@@ -12,14 +12,14 @@ import type { AppMeta } from '@airship/contract'
  * SDK 的应用宿主。
  *
  * 一个 airship 包自持一份文档（`airship://<id>/index.html`），这份文档里长出来的
- * 壳性东西由这里给：标题栏（应用名 + `api.window.setTitle` 那行的中段）、主题落地、
- * `flush` 留白、加载占位。这些原来住在壳的 `AppHost.tsx` 里，窗口加载的是壳的 app.html；
- * 搬过来之后**壳不再往应用窗口注入任何 DOM**。
+ * 宿主件由这里给：标题栏（应用名 + `api.window.setTitle` 那行的中段 + 主题键）、主题落地、
+ * `flush` 留白、加载占位。这些原来住在 runtime 的 `AppHost.tsx` 里、窗口加载的是 runtime 的 app.html；
+ * 搬过来之后**runtime 不再往应用窗口注入任何 DOM**。
  *
  * 留给工装的一条接缝：宿主画完把 `document.documentElement.dataset.airshipMounted`
  * 置成应用 id——"这个窗口真的画出东西了"由此可查，不需要应用配合。
  *
- * 主题三档只有启动器能改，应用窗口读到的就是壳定的那一档。
+ * 主题三档由标题栏那颗键改，各应用各记各的档（落在应用自己的设置文件里）。
  */
 
 export interface AirshipAppOptions {
@@ -57,7 +57,7 @@ export function createAirshipApp(options: AirshipAppOptions): void {
 export function AirshipRoot({ meta, component: Component, icon }: AirshipAppOptions): JSX.Element {
   const [docTitle, setDocTitle] = useState<string | null>(null)
   const [api] = useState<AppApi>(() => createAirshipApi(meta.id, { onWindowTitle: setDocTitle }))
-  // 只读：应用不能改主题，但必须把主题画出来
+  // 把主题画出来；改档的键在标题栏上，改完本文档所有 useTheme 实例一起跟上
   useTheme()
 
   /**

@@ -5,9 +5,9 @@ import ChangeMeApp from '../CHANGE_MEApp.tsx'
 import { app } from '../app.ts'
 
 /**
- * 用例的地基是 `@airship/sdk/testing` 那个假壳：能力闸门、内存卷、命令行记录都在它身上，
+ * 用例的地基是 `@airship/sdk/testing` 那个假 runtime：能力闸门、内存卷、命令行记录都在它身上，
  * 措辞直接取 `@airship/contract` 的真源，所以"没声明 settings 时用户看见的那句中文"
- * 在这里与在真壳里是同一句。
+ * 在这里与在真 runtime 里是同一句。
  *
  * 标题必须以册子里的编号开头（`just casecov` 做双向差集）。
  */

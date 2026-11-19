@@ -1,11 +1,17 @@
 import { useEffect, useState, type JSX } from 'react'
+import { THEME_LABEL, nextThemeMode, useTheme, type ThemeMode } from './theme.ts'
 
 /**
  * 自绘标题栏。窗口是 frame:false，所以最小化/最大化/关闭得自己画。
  * 整条是可拖拽区（CSS 里的 -webkit-app-region: drag），按钮那一块显式排除。
+ *
+ * 主题键也在这条上：每个应用各改各的档（措辞与三档循环照搬原来启动器那颗），
+ * 改完只影响本应用——runtime 不持有全局主题。
  */
 export function Titlebar({ here, center, icon }: { here?: string | null; center?: string | null; icon?: React.ReactNode }): JSX.Element {
   const [maximized, setMaximized] = useState(false)
+  const { mode, setMode } = useTheme()
+  const next = nextThemeMode(mode)
 
   useEffect(() => {
     let alive = true
@@ -39,6 +45,16 @@ export function Titlebar({ here, center, icon }: { here?: string | null; center?
       <div className="titlebar__center">{center ?? ''}</div>
 
       <div className="titlebar__controls">
+        <button
+          type="button"
+          className="titlebar__btn"
+          onClick={() => setMode(next)}
+          aria-label={`主题：${THEME_LABEL[mode]}，点一下换成${THEME_LABEL[next]}`}
+          title={`主题：${THEME_LABEL[mode]}（点一下换成${THEME_LABEL[next]}）`}
+        >
+          <ThemeGlyph mode={mode} />
+        </button>
+
         <button
           type="button"
           className="titlebar__btn"
@@ -80,5 +96,42 @@ export function Titlebar({ here, center, icon }: { here?: string | null; center?
         </button>
       </div>
     </header>
+  )
+}
+
+/** 三档各一个记号：月牙 / 太阳 / 半实半空的圆（原样搬自启动器那颗键） */
+function ThemeGlyph({ mode }: { mode: ThemeMode }): JSX.Element {
+  const box = { width: 15, height: 15, viewBox: '0 0 16 16', 'aria-hidden': true } as const
+  if (mode === 'dark') {
+    // 月牙
+    return (
+      <svg {...box}>
+        <path
+          d="M10.2 1.6a6.4 6.4 0 1 0 4.2 8.6A5.2 5.2 0 0 1 10.2 1.6Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+  if (mode === 'light') {
+    // 太阳：中间一个圆，四周八道光芒
+    return (
+      <svg {...box}>
+        <circle cx="8" cy="8" r="3.1" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        <g stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+          <path d="M8 .9v1.9M8 13.2v1.9M.9 8h1.9M13.2 8h1.9M3 3l1.4 1.4M11.6 11.6 13 13M13 3l-1.4 1.4M4.4 11.6 3 13" />
+        </g>
+      </svg>
+    )
+  }
+  // 跟随系统：一半实心一半空的圆
+  return (
+    <svg {...box}>
+      <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M8 1.8a6.2 6.2 0 0 1 0 12.4Z" fill="currentColor" />
+    </svg>
   )
 }

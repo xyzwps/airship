@@ -4,10 +4,14 @@ import type { ThemeSnapshot } from '@airship/contract'
 /**
  * 主题。
  *
- * 窗口化之后每个窗口是独立文档，所以主题不能各自为政：
- *   - 谁生效由壳决定，渲染侧只读 `airship.theme()` 并订阅 `theme:changed`；
- *   - "跟随系统"的实际结果由**启动器**用 matchMedia 算出来回报给壳，
- *     应用窗口不重复算，免得两个窗口对同一档给出不同结论。
+ * 每个应用各记各的档，落在它自己那份设置文件里（runtime 不持有全局主题，
+ * 也没有"别的窗口跟着换"这回事——一个应用只有一个窗口）。
+ * 渲染侧读 `airship.theme()`，改档走 `airship.setTheme()`；
+ * "跟随系统"的实际亮暗由**本窗口**用 matchMedia 算好传进去——主进程没有 matchMedia，不该去猜。
+ *
+ * 同一个文档里可能有多处 useTheme（宿主一处、应用组件拿 resolved 画布又一处）：
+ * 挂载时各读各的，但**改档一次，本文档所有实例一起更新**——靠模块级订阅者表，
+ * 不靠 runtime 广播（一个应用只有一个窗口，没有跨窗口同步这回事）。
  *
  * 用 <html data-theme> + CSS 变量落地，应用侧不各自实现配色。
  */
@@ -15,7 +19,7 @@ import type { ThemeSnapshot } from '@airship/contract'
 export type ThemeMode = ThemeSnapshot['mode']
 
 /**
- * 三档的名字。启动器上那颗键按这个顺序循环：跟随系统 → 暗 → 亮 → 跟随系统。
+ * 三档的名字。标题栏上那颗键按这个顺序循环：跟随系统 → 暗 → 亮 → 跟随系统。
  * 顺序是表现层的决定，写在一处，别散在按钮里。
  */
 export const THEME_ORDER: ThemeMode[] = ['system', 'dark', 'light']
@@ -47,56 +51,67 @@ function initial(): ThemeSnapshot {
   return { mode: 'system', resolved }
 }
 
+/* ---------------- 本文档内的同步 ---------------- */
+
+const subscribers = new Set<(s: ThemeSnapshot) => void>()
+
+/** 最近一次落定的快照：只用来判"系统偏好变了要不要跟"，不当挂载初值（各实例自己读桥） */
+let latest: ThemeSnapshot | null = null
+
+function publish(snapshot: ThemeSnapshot): void {
+  latest = snapshot
+  for (const fn of [...subscribers]) fn(snapshot)
+}
+
+/** 改本应用的主题档，立刻生效；不占 settings 能力（窗口观感族） */
+function setMode(mode: ThemeMode): void {
+  // 'system' 这一档的实际亮暗由本窗口算：主进程没有 matchMedia，不该去猜
+  const hint = mode === 'system' ? (prefersDark() ? 'dark' : 'light') : undefined
+  void window.airship
+    .setTheme(mode, hint)
+    .then((s) => publish(s))
+    .catch(() => undefined)
+}
+
+/** 系统偏好变了，跟随系统的那一档要重新走一次设置。整个文档只挂一条监听 */
+let mqWired = false
+function wireSystemPreference(): void {
+  if (mqWired || typeof window === 'undefined') return
+  mqWired = true
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (latest?.mode === 'system') setMode('system')
+  })
+}
+
 export function useTheme(): {
   mode: ThemeMode
   resolved: 'light' | 'dark'
-  /** 只有启动器有；应用窗口里主题是只读的，调它会静默无效 */
-  setMode?: (mode: ThemeMode) => void
+  setMode: (mode: ThemeMode) => void
 } {
   const [snapshot, setSnapshot] = useState<ThemeSnapshot>(initial)
 
   useEffect(() => {
     let alive = true
+    const sync = (s: ThemeSnapshot): void => {
+      if (alive) setSnapshot(s)
+    }
+    subscribers.add(sync)
+    wireSystemPreference()
     void window.airship
       .theme()
-      .then((s) => alive && setSnapshot(s))
+      .then((s) => {
+        if (!alive) return
+        latest = s
+        setSnapshot(s)
+      })
       .catch(() => undefined)
-
-    const off = window.airship.on((event) => {
-      if (event.kind === 'theme:changed' && alive) setSnapshot(event.value)
-    })
     return () => {
       alive = false
-      off()
+      subscribers.delete(sync)
     }
   }, [])
 
   useEffect(() => apply(snapshot), [snapshot])
 
-  const shell = (globalThis as { airshipShell?: ShellThemeApi }).airshipShell
-
-  const setMode = (mode: ThemeMode): void => {
-    if (!shell) return
-    // 'system' 这一档的实际亮暗由启动器算：主进程没有 matchMedia，不该去猜
-    const hint = mode === 'system' ? (prefersDark() ? 'dark' : 'light') : undefined
-    void shell
-      .setTheme(mode, hint)
-      .then((s) => setSnapshot(s))
-      .catch(() => undefined)
-  }
-
-  // 跟随系统时，系统偏好变了就重新走一次设置，让所有窗口一起跟上
-  useEffect(() => {
-    if (!shell || snapshot.mode !== 'system') return
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    mq.addEventListener('change', () => setMode('system'))
-    return () => mq.removeEventListener('change', () => setMode('system'))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shell, snapshot.mode])
-
-  return { mode: snapshot.mode, resolved: snapshot.resolved, setMode: shell ? setMode : undefined }
-}
-
-interface ShellThemeApi {
-  setTheme(mode: ThemeMode, hint?: 'light' | 'dark'): Promise<ThemeSnapshot>
+  return { mode: snapshot.mode, resolved: snapshot.resolved, setMode }
 }

@@ -1,7 +1,7 @@
 import type { AppApi } from '@airship/contract'
 
 /**
- * 壳级共享书库——一个按外部依赖规则管理的共享包。
+ * runtime 级共享书库——一个按外部依赖规则管理的共享包。
  *
  * 规则（见 docs/architecture.md §8）：
  *   1. 单一入口：外部只 import `@airship/library`，不摸包内文件。
@@ -126,10 +126,10 @@ export function bookPath(api: AppApi, book: BookRecord): Promise<string> {
 /**
  * 封面转成能直接给 `<img>` 用的地址。
  *
- * 走"经壳读字节 → blob: URL"而不是拼一个 `file:///` 地址：应用窗口的 CSP 只放行
+ * 走"经 runtime 读字节 → blob: URL"而不是拼一个 `file:///` 地址：应用窗口的 CSP 只放行
  * `'self' blob: data:`，而页面本身是 `file://` 加载的——Chromium 不把 `file:` 子资源算作
  * `'self'`，拼出来的地址会被拦下来，书架上就是一座破图。
- * 走 blob 也就不用为了显示封面去放宽渲染侧的文件访问，数据仍然只由壳递出来。
+ * 走 blob 也就不用为了显示封面去放宽渲染侧的文件访问，数据仍然只由 runtime 递出来。
  *
  * 同一张图按共享区里的位置缓存：书架每次刷新都重新取一遍地址，不该每次都读盘。
  */

@@ -1,95 +1,141 @@
 # 打包分发（Windows 安装包）
 
-一条命令产出一个 `setup.exe`，拷给别人双击安装即可。**客户机不需要装 Node、不需要装 Electron。**
+飞船有**两个分发物**，互不包含：
 
-装完是**一个空壳**：格子里一个应用都没有（那是预期，不是坏了）。应用是 airship 包，
-把 `<id>.airship` 拖到启动器上就装进 `%LOCALAPPDATA%\airship\apps`。
+1. **runtime 安装包**——一个 `airship-runtime-Setup-<版本>-x64.exe`，装一次、大家共用，
+   钉死装进 `C:\Program Files\airship\runtime`（要管理员）。它是**纯 runtime**：一个应用都不带。
+2. **应用安装器**——每个应用一个 `<id>-Setup-<版本>.exe`，每用户安装（不要管理员），
+   把那份 `<id>.airship` 装进 `%LOCALAPPDATA%\airship\apps\<id>\`，留一枚快捷方式当启动程序。
+
+**客户机不需要装 Node、不需要装 Electron。** runtime 安装包自带 Electron；应用安装器只裹一个归档，
+跑起来靠已装好的 runtime。
 
 ```bash
-just build
+just build            # 产各应用的包 + 打 runtime 安装包
+just app-installer life   # 再逐个产应用安装器（要八个就跑八次）
 ```
 
 产物：
 
 | 路径 | 说明 |
 |---|---|
-| `release/win-unpacked/` | 免安装的散装目录（`飞船.exe` 直接双击也能跑，给自己调试用） |
-| `release/airship-Setup-<版本>-x64.exe` | 安装包（纯壳），**分发只发这一个文件** |
-| `dist-apps/<id>.airship` | 各应用包，另一个分发物：拖到启动器上装 |
-| `release/airship-Setup-<版本>-x64.exe.sha256` | 同内容的 SHA256，发给客户防止下载/传输被改动 |
+| `release/airship-runtime-Setup-<版本>-x64.exe` | runtime 安装包（纯 runtime），**分发 runtime 只发这一个文件** |
+| `release/airship-runtime-Setup-<版本>-x64.exe.sha256` | 同内容的 SHA256，防下载/传输被改动 |
+| `release/win-unpacked/` | 免安装的散装目录（`airship.exe` 带一份包路径直接双击也能跑，给自己调试用） |
+| `release/apps/<id>-Setup-<版本>.exe` | 各应用的每用户安装器（+ 同名 `.sha256`），**分发应用发这个** |
+| `dist-apps/<id>.airship` | 各应用包（zip 归档换了扩展名），应用安装器的输入 |
 | `release/*.blockmap` / `latest.yml` | 增量更新用的旁文件，现在用不上，留着不碍事 |
 
 ## 命令速查
 
 | 命令 | 做什么 |
 |---|---|
-| `just build` | 两条都跑：先 `build-apps` 产包，再 `build-shell` 出安装包。要发东西就跑这条 |
+| `just build` | 两条都跑：先 `build-apps` 产包，再 `build-runtime` 出 runtime 安装包 |
 | `just build-apps` | 只逐应用构建并打成 `dist-apps/<id>.airship` 归档 |
-| `just build-shell` | 只打壳的安装包：清场 → 编译壳 → NSIS → 自检（`.sha256` 由自检写） |
-| `just compile` | 只编译壳的三个目标 → `src/shell/out/`（`dev` 之外的两条都要它） |
-| `just verify-installer` | 出包后自检：安装包在不在、是不是 NSIS 向导、体积、写 `.sha256`、六个包齐不齐 |
-| `just icon` | 由母版 `assets/icon-master.png` 重出 `assets/icon.ico`（16/24/32/48/64/128/256） |
+| `just build-runtime` | 只打 runtime 安装包：清场 → 编译 → NSIS → 自检（`.sha256` 由自检写） |
+| `just app-installer <id>` | 产那一个应用的安装器：先产它那份包，再裹成每用户 `setup.exe` |
+| `just compile` | 只编译 runtime 的两个目标 → `src/runtime/out/{main,preload}`（没有 renderer） |
+| `just verify-installer` | 出包后自检（六件事，见下） |
+| `just icon` | 由母版 `assets/icon-master.png` 重出 `assets/icon.ico` |
 | `just shot` | 逐窗口截图，验证"真的跑起来了"（安装包出之前至少跑一遍） |
 
-> 清场（`code/clean-installer.mjs`）为什么算必要步骤：安装包的名字只由 `package.json` 的 version
-> 决定，不 bump 版本号就永远是同一个文件名；一次没写成安装包的运行（`dist` 半路失败，或只跑了解包）
-> 会让上一次那颗原地留着冒充刚出的那版。`verify-installer` 按名字匹配、只验 PE 头与 NSIS 签名，
-> 对旧包照样全绿，还会把 `.sha256` 一起改成旧包的。规矩：**release/ 里的安装包永远等于最后一次构建，
-> 宁可没有，不可有旧的**。清掉的这颗重跑一次 `dist` 就回来；`win-unpacked` 不在删除范围内。
+> **顺序**：应用安装器用的 `makensis` 是 electron-builder 缓存里那份（不引新依赖），
+> 所以**先跑一次 `just build-runtime`**（electron-builder 会下载 NSIS 到缓存），再产应用安装器。
+> 缓存里没有 makensis 时生成器会响亮报错并指回这条。
+
+> 清场（`code/clean-installer.mjs`）为什么算必要步骤：runtime 安装包的名字只由
+> `src/runtime/package.json` 的 version 决定，不 bump 版本号就永远是同一个文件名；一次没写成安装包的运行
+> （`dist` 半路失败，或只跑了解包）会让上一次那颗原地留着冒充刚出的那版。`verify-installer` 按名字匹配、
+> 只验 PE 头与 NSIS 签名，对旧包照样全绿，还会把 `.sha256` 一起改成旧包的。规矩：**release/ 里的安装包
+> 永远等于最后一次构建，宁可没有，不可有旧的**。清场只删 `airship-runtime-Setup-*` 那一族
+> （exe / .blockmap / .sha256）；`win-unpacked` 不在删除范围内（每次由 electron-builder 整体重写）。
+> 应用安装器同名旧包也由生成器自己先删（同一条规矩）。
 
 ## 里面装了什么
 
-1. `just build-apps` → `code/build-apps.mjs` 逐应用构建，打成 `dist-apps/<id>.airship`（zip 归档换了扩展名）。
-   **这些归档不进安装包**——壳是纯的。壳的产物里也没有应用代码：`src/shell/out/renderer` 只有启动器那一份文档。
-2. `electron-vite build` → `out/main` + `out/preload` + `out/renderer`（只有 `shell/launcher.html`）。
-3. `electron-builder --win nsis`：
+1. `just build-apps` → `code/build-apps.mjs` 逐应用构建，打成 `dist-apps/<id>.airship`。
+   **这些归档不进 runtime 安装包**——runtime 是纯的。包清单里的 `sdkVersion` 取**根** `package.json` 的 version。
+2. `just compile` → `electron-vite build` 出 `out/main` + `out/preload` **两个**目标。
+   runtime 没有自己的文档：配置里没有 renderer 目标，产物里也不许有 `out/renderer`
+   （先 `rm -rf src/runtime/out` 再编，旧时代留下的 renderer 不清就会一直躺着冒充产物）。
+3. `electron-builder --win nsis`（配置在 `src/runtime/electron-builder.yml` + `build/installer.nsh`）：
    - `app.asar` ← `out/**`、`package.json`、`assets/icon.png`、`assets/tray.png`；
-   - `resources/` 里只有 `app.asar` 与 NSIS 的 `elevate.exe`：**没有任何 airship 包**（纯壳）。
-   - `pdfjs-dist`、`foliate-js`、`@napi-rs/canvas` 被显式排除——渲染侧的东西 vite 已经打进各家的包里，
-     node_modules 里那份只是构建期依赖，留着纯属占地方（排除后安装包 132 MB → 116 MB）。
-4. NSIS 向导：`只为我安装`（不需要管理员权限）、可选安装目录、开始菜单 + 桌面快捷方式、
-   控制面板里的卸载项；卸载**不动**用户数据（`%APPDATA%/airship` 里是书架与设置），
-   也**不动**自装根 `%LOCALAPPDATA%\airship\apps`——重装壳立刻认出这些包。
-   向导语言按系统界面语言自动选中简中或英文。
+   - `resources/` 里只有 `app.asar` 与 NSIS 的 `elevate.exe`：**没有任何 airship 包**（纯 runtime）。
+     根 package.json 已经没有 dependencies（foliate-js / pdfjs-dist 各自记在用它的应用名下，都是
+     devDependencies，构建期打进各家的包），所以不再需要"排除某个 node_modules 目录"那几条。
+   - `perMachine: true`（要管理员），落点钉死 `C:\Program Files\airship\runtime`——目录的唯一真源在
+     `installer.nsh` 的 `customInit`（`StrCpy $INSTDIR "$PROGRAMFILES64\airship\runtime"`），
+     `allowToChangeInstallationDirectory: false` 去掉换目录页。升级时读到的旧 InstallLocation 同样被覆盖。
+   - 主 exe 叫 `airship.exe`（`productName: airship`），应用快捷方式的目标就是它。
+   - runtime 自己没有界面：不留桌面/开始菜单快捷方式，只留控制面板卸载项（`airship runtime`）。
+     卸载**不动**用户数据（`deleteAppDataOnUninstall: false`，`%APPDATA%/airship` 里是书架与设置）。
+   - 欢迎页（`installer.nsh` 的 `customWelcomePage`）把固定安装目录念给人看——安装过程能查看装哪，
+     但目录仍钉死、不给改（`allowToChangeInstallationDirectory: false`）。
+   - 完成页不带「运行」勾选、点「完成」直接关窗（`runAfterFinish: false` → `HIDE_RUN_AFTER_FINISH`）：
+     runtime 自己没有界面，装完不该弹一个"要不要运行 airship"的提示。
+   - 向导语言按系统界面语言自动选中简中或英文。
+4. `just app-installer <id>` → `code/make-app-installer.mjs` 把 `dist-apps/<id>.airship` 裹成每用户
+   `setup.exe`（契约 PK-031~035）。NSIS `RequestExecutionLevel user`：
+   - 界面走 MUI2 向导（欢迎 / 进度 / 完成 + 卸载三页，简中+英文，图标用包内那张 `.ico`）：
+     欢迎页念安装目录，进度页不刷日志，完成页点「完成」直接关窗。
+   - `.onInit` 先念能力清单（措辞从 `@airship/contract` 烘进脚本，单一真源），取消就中止、一个文件都不写；
+     再找 runtime（`AIRSHIP_PATH` > `C:\Program Files\airship\runtime`），找不到念一句"没找到 airship runtime"中止。
+   - 落点 `$LOCALAPPDATA\airship\apps\<id>`，放进归档与包内那张图转成的 `icon.ico`。
+   - 桌面 + 开始菜单各一枚快捷方式：目标 `"<runtime>\airship.exe"`，参数 `"<安装目录>\<id>.airship"`，
+     两段都带引号，图标用应用自己那张 `.ico`（不是 runtime 的）。
+   - HKCU 卸载项。卸载删安装目录、两处快捷方式、注册表，**不碰** `%APPDATA%` 里的设置与数据。
+   - 这个 `.mjs` 直接 import `@airship/contract`（Node 24 的类型剥离吃得下契约包），措辞与 id 形状只有一份。
 
 ## 版本号
 
-安装包文件名、exe 的文件版本、卸载项显示都取自 **`src/shell/package.json` 的 `version`**——
-出包的项目根是壳那个包（`electron-builder --projectDir src/shell`），版本号就在这一处。
-包清单里的 `sdkVersion` 另取 `src/sdk/package.json`：SDK 与壳将来分开发版，这两个数会分开走（TD-013）。
-壳的 `package.json` 里 electron 写**固定版本**（`45.2.3`，不带 `^`）——electron-builder 要按它取二进制，写范围会被拒。
+- **runtime 安装包**文件名、exe 文件版本、卸载项显示都取自 `src/runtime/package.json` 的 `version`
+  （出包项目根是 `src/runtime`，`electron-builder --projectDir src/runtime`）。
+- **包清单的 `sdkVersion`** 取**根** `package.json` 的 `version`（`code/build-apps.mjs`）。
+  根与 `src/runtime/package.json` 这两个数**保持一致**——它们是同一个发布物，不一致等于清单在说谎。
+- **应用安装器**文件名取 `src/apps/<id>/package.json` 的 `version`：各应用版本**独立演化**，不跟 runtime 跳。
+- runtime 的 `package.json` 里 electron 写**固定版本**（`45.2.3`，不带 `^`）——electron-builder 要按它取二进制，写范围会被拒。
+
+## 出包自检（六件事）
+
+`code/verify-installer.mjs`（`build-runtime` 以它收尾）：
+
+1. `release/` 里有对应 `src/runtime/package.json` 版本号的安装包；
+2. 它像不像一个 Windows 安装程序（PE 的 MZ 头 + NSIS 的 NullsoftInst 签名）；
+3. 旁边那份 `.sha256` 写好了没；
+4. 免安装的 `win-unpacked` 里主 exe（`airship.exe`）在不在；
+5. **安装包是不是纯 runtime**——`resources/` 里只有 `app.asar` 与 `elevate.exe`，不该有任何 airship 包；
+6. **runtime 产物里没有渲染目标与启动器通道**——`out/renderer` 不该存在，`out/main` 与 `out/preload`
+   里不该出现 `launcher:` 或 `airshipShell`（启动器那一族退场之后，它们留在产物里就是有人把旧面合回去了）。
 
 ## 已验证到哪一步
 
-- `just build` 出包 + `just verify-installer` 自检通过：MZ 头、NSIS 签名、SHA256、win-unpacked 主 exe，
-  外加拆包后新加的两条——**安装包里各归档齐不齐**（读 zip 的中央目录，每个都要有 `manifest.json` + `index.html` + 一张图标），
-  以及**壳的产物里不该再留着应用的 chunk**（`src/shell/out/renderer/assets` 只有壳自己的文件）。
-- **纯壳装出来确实没有应用**：`release/win-unpacked/飞船.exe` 不带 `AIRSHIP_APPS_ROOT` 跑起来，
-  日志喊「一个应用都没装进来」并把找过的包根列出来，界面上是 SH-020 那句，不是空白一屏。
-  把一个归档放进 `%LOCALAPPDATA%\airship\apps` 再跑，日志变成 `origin:"installed"`、格子里出现它。
-- **打包版真跑过**（开发根喂 `dist-apps/`）：`--shot` 七个窗口（启动器 + 六个应用）都开出来并截到图；
-  再带 `AIRSHIP_AUTOTEST` 导入一份真 PDF，页面渲染正常。
-  拆包后这条重跑过一次：窗口加载的是 `airship://<id>/index.html`，PDF 的 worker 从包里取、
-  EPUB 的章节样式表（`blob:airship://books/…`）也画得出来——后者是拆包时撞出来的一处 CSP 回归，
-  补了 `style-src blob:` 才对齐。
-- **范本真造过一次应用**：`just new-app hello 你好` → 壳扫出七个包、启动器多一格、窗口开得出来，
-  壳侧与 SDK 一个字没改；验完删掉（不变量 I-5 的第二次演练）。
-- 打包版与开发版共用 `%APPDATA%/airship`，装上去书架是同一份。
-  这个目录名靠主进程开头一句 `app.setName('airship')` 钉住——壳的包名是 `@airship/shell`，
-  不钉的话 Electron 会把数据写进 `%APPDATA%/@airship/`，老用户的书架看着就像空了。
+- **八窗口真跑过**（本轮 `just shot`，编译产物直跑）：argv 一次指来全部八份包，截图工装逐个开窗口、
+  按下快门、关掉再下一个，八张图都截到（`shots/<id>.png`），窗口加载的是 `airship://<id>/index.html`。
+  每窗口工作集与首屏耗时见 `docs/architecture.md` §3.1。
+- **runtime 安装包出包 + 自检通过**：`just build-runtime` 产 `airship-runtime-Setup-0.4.0-x64.exe`，
+  六件自检全绿（MZ 头、NSIS 签名、SHA256、win-unpacked 主 exe、纯 runtime、产物无 renderer/启动器通道）。
+- **本轮四处安装 UX 改动**（2026-11-19）：runtime 欢迎页念固定安装目录（`installer.nsh` 的 `customWelcomePage`）、
+  完成页点「完成」直接关窗（`runAfterFinish: false`）；应用安装器套 MUI2 向导；首次直跑的能力确认卡片删除
+  （授权只在安装期，PK-033）。验证到：`just check` 全绿（558 过 / 10 跳过，casecov 零差集）、runtime 安装包重出六检全绿、
+  八个应用安装器带 MUI2 真编译产出。**真机安装走查**（欢迎页真念出路径、完成真不弹窗、双击应用真不再弹卡片）
+  要装一遍才算数——把 runtime 装进 Program Files 是系统级动作，由使用者执行。
+- **应用安装器真装真卸过**（第三档样件，life）：双击快捷方式跑得起（日志 `[life] 应用窗口已打开`）；
+  卸载把安装目录、两处快捷方式、HKCU 注册表删净，`%APPDATA%` 里的数据 SHA256 前后相同。
+- 打包版与开发版共用 `%APPDATA%/airship`，装上去书架是同一份。这个目录名靠主进程开头一句
+  `app.setName('airship')` 钉住——runtime 的包名是 `@airship/runtime`，不钉的话 Electron 会把数据写进
+  `%APPDATA%/@airship/`，老用户的书架看着就像空了。
 
 ## 没做的事（实话）
 
-集中在 [todo.md](todo.md)：TD-003 没有代码签名、TD-004 没有自动更新链路、TD-005 想要 Inno Setup 那一档观感要先装 Inno 6、
-TD-013 SDK 独立发布与版本协商、TD-014 装包与商店链路。
-**拆包不减安装包体积**：`app.asar` 从 3.4 MB 降到壳自己的约 0.7 MB，六个归档合计约 1.2 MB 换个地方放着
-（zip 压过，比目录形态小一半上下），React 还复制了六份——换来的是"改一个应用只重出一个包"与"应用能独立分发"，不是体积。
+集中在 [todo.md](todo.md)：TD-003 没有代码签名、TD-004 没有自动更新链路、TD-005 想要 Inno Setup 那一档观感
+要先装 Inno 6、TD-013 SDK 独立发布与版本协商、TD-014 装包的来源信任与更新链路。
 
 对拿到安装包的人来说只有一条要预告：**没有签名，第一次运行会被 SmartScreen 拦一道"未知发布者"**，
-点"仍要运行"就过去了。
+点"仍要运行"就过去了。runtime 安装包要管理员（装进 Program Files）；应用安装器不要（每用户）。
 
 ## 客户机要求
 
 - Windows 10 起（Electron 45 的下限），实际建议 Windows 11；
-- 只有容器台还有额外要求：本机要有 `C:\Program Files\WSL\wslc.exe`（WSL 3 自带）。
-  没有也能装能跑，容器台会读得到"这台机器上没有 wslc"，其余应用不受影响。
+- 先装 runtime，再装应用（应用安装器找不到 runtime 会中止）；
+- 只有容器台还有额外要求：本机要有 `C:\Program Files\WSL\wslc.exe`（WSL 3 自带），
+  或用 `AIRSHIP_WSLC_PATH` 显式指一个。没有也能装能跑，容器台会读得到"这台机器上没有 wslc"，其余应用不受影响。

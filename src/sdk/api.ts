@@ -6,7 +6,7 @@ import type { AirshipBridge, AppApi, AppId } from '@airship/contract'
  * `AppApi` 这个类型住在 `@airship/contract`（它是契约的一部分，共享包也要用）；
  * 这里只留"怎么造出来"——读 `window.airship` 并补上 id。
  * id 只给应用做显示与日志用，不参与任何权限判定：
- * 身份是壳按窗口的 `event.sender` 反查出来的，应用侧根本没有"传 id"这个动作。
+ * 身份是 runtime 按窗口的 `event.sender` 反查出来的，应用侧根本没有"传 id"这个动作。
  */
 
 /**
@@ -20,8 +20,8 @@ export function createAirshipApi(
   const bridge = (globalThis as { airship?: AirshipBridge }).airship
   if (!bridge) {
     throw new Error(
-      `window.airship 不存在（应用 ${id}）：这个包不是由 airship 壳装的，或 preload 没加载成功。` +
-        '正常入口是壳按 `airship://<id>/index.html` 开窗口；直接在浏览器里打开这份 html 是跑不起来的。'
+      `window.airship 不存在（应用 ${id}）：这个包不是由 airship runtime 打开的，或 preload 没加载成功。` +
+        '正常入口是 runtime 按 `airship://<id>/index.html` 开窗口；直接在浏览器里打开这份 html 是跑不起来的。'
     )
   }
   const api = { id, ...bridge } as AppApi

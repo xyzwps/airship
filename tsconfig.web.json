@@ -25,9 +25,9 @@
     "noEmit": true
   },
   "include": [
-    "src/shell/*.ts",
-    "src/shell/*.tsx",
-    "src/shell/*.d.ts",
+    "src/runtime/*.ts",
+    "src/runtime/*.tsx",
+    "src/runtime/*.d.ts",
     "src/sdk/**/*.ts",
     "src/sdk/**/*.tsx",
     "src/apps/**/*.ts",

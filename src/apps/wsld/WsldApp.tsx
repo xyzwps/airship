@@ -11,8 +11,8 @@ import './wsld.css'
  * 容器台 —— wslc 的图形外壳。
  *
  * 两页：容器（列表 + 详情 + 生命周期动作 + 日志）与镜像（列表 + 拉取 + 删除）。
- * 数据与动作全靠 `wslc.exe`，路径由壳定位：应用只声明"我要用 wslc"，
- * 壳给不出路径就按"这台机器上没有 wslc"说话，其余界面照常。
+ * 数据与动作全靠 `wslc.exe`，路径由 runtime 定位：应用只声明"我要用 wslc"，
+ * runtime 给不出路径就按"这台机器上没有 wslc"说话，其余界面照常。
  */
 
 type Page = 'containers' | 'images'

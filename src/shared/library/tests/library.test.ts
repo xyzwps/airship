@@ -16,7 +16,7 @@ import { FakeAirship } from '@airship/sdk/testing'
 /**
  * LB 册子（docs/specs/library.md）。
  *
- * 拿 FakeAirship 当壳：书库落在共享命名空间 `library` 里，
+ * 拿 FakeAirship 当 runtime：书库落在共享命名空间 `library` 里，
  * 所有断言读的都是那份内存卷与索引文件的原文，不看内部实现。
  */
 

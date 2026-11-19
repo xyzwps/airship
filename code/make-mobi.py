@@ -6,7 +6,7 @@
 
 格式这一层不凭记忆写：每个字段都对着 `node_modules/foliate-js/mobi.js` 里
 `PDB_HEADER / PALMDOC_HEADER / MOBI_HEADER / EXTH_HEADER` 实际读的位置来的——
-壳的 MOBI 通路就是那份解析器，能把它读对才算验到点上。刻意选最朴素的一档：
+墨读的 MOBI 通路就是那份解析器，能把它读对才算验到点上。刻意选最朴素的一档：
 
 - `compression = 1`（不压）、`encryption = 0`、`trailingFlags = 0`：解析器对应
   `f => f` 与"不删尾部字节"，少两处可能出错的地方；

@@ -345,7 +345,7 @@ describe('命令、检查与修正都在同一屏上', () => {
 })
 
 describe('提交任务与右栏队列', () => {
-  it('VC-065 提交后右栏出现 #1，壳收到的命令行带着进度管道', async () => {
+  it('VC-065 提交后右栏出现 #1，runtime 收到的命令行带着进度管道', async () => {
     const { fake, api, jobs } = rig()
     const m = await mount(api, fake)
     await openVideo(m)
@@ -361,7 +361,7 @@ describe('提交任务与右栏队列', () => {
     m.unmount()
   })
 
-  it('VC-066 进行中：状态与速度念得出壳推来的那一截', async () => {
+  it('VC-066 进行中：状态与速度念得出 runtime 推来的那一截', async () => {
     const { fake, api, jobs } = rig()
     const m = await mount(api, fake)
     await openVideo(m)

@@ -16,7 +16,7 @@ import type { Source } from './connection.ts'
  *
  * SDK 只做两件事：把命令拼成签名好的 HTTP 请求、把响应 XML 解成这里的行形状。
  * 传输走渲染进程自己的 `fetch`——这就是清单里那条 `net` 能力的全部含义
- * （判据见 `src/shell/specs/bridge.md` BR-011）。
+ * （判据见 `src/runtime/specs/bridge.md` BR-011）。
  *
  * 两处是照着**真端点**调出来的，不是照文档写的，改之前先连一次 RustFS 看看：
  *

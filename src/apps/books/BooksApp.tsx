@@ -22,7 +22,7 @@ import './books.css'
 /**
  * 墨读 —— EPUB / MOBI。
  *
- * 书架与阅读器两个视图。书库在壳级共享区，pdf 应用看到的是同一份索引，
+ * 书架与阅读器两个视图。书库在 runtime 级共享区，pdf 应用看到的是同一份索引，
  * 这里只按格式筛出非 PDF 的。
  *
  * 导入时元数据和封面用 foliate 的 makeBook 读（EPUB 与 MOBI 都支持 getCover），

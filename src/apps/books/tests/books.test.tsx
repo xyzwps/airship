@@ -473,7 +473,7 @@ describe('交出去的是按范围取字节的文件', () => {
     const file = lastRec().opened[0] as { name: string; size: number; slice(from?: number, to?: number): { arrayBuffer(): Promise<ArrayBuffer> } }
     expect(file.name).toBe('一本EPUB')
     expect(file.size).toBe(bytes.length)
-    // 只取头四个字节也拿得到，靠的是壳的范围读
+    // 只取头四个字节也拿得到，靠的是 runtime 的范围读
     const head = new Uint8Array(await file.slice(0, 4).arrayBuffer())
     expect(new TextDecoder().decode(head)).toBe('PKxx')
     m.unmount()

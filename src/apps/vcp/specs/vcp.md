@@ -3,17 +3,17 @@
 ## Purpose
 vcp —— FFmpeg 编排台：打开一个媒体文件，挑要保留的流、勾处理链、看将要执行的那行命令，
 把任务丢进串行队列。这本册子钉的是界面念得出什么、发给 ffmpeg 的命令行是什么形状、任务栏里念得出什么。
-窗口、主题、能力闸门、路径授权与 proc 白名单归壳（`src/shell/specs/`），不在这里重复。
+窗口、主题、能力闸门、路径授权与 proc 白名单归 runtime（`src/runtime/specs/`），不在这里重复。
 
 > 真素材与真编码那一档（`just e2e`）要本机 ffmpeg 与素材才跑，
 > 默认跳过；实测数据记在 [架构](../../../../docs/architecture.md) §3.1。
 
 ### Requirement: 打开文件就是问 ffmpeg 一句话，答案念到顶栏上
-探测与转码只走壳发现的那一个 ffmpeg（依据：[架构](../../../../docs/architecture.md) §6.3 工具表与 proc 白名单）。
+探测与转码只走 runtime 发现的那一个 ffmpeg（依据：[架构](../../../../docs/architecture.md) §6.3 工具表与 proc 白名单）。
 
 #### Scenario: VC-001 探测就问 ffmpeg 一句话：-hide_banner -i <文件>
 - **WHEN** 点「打开视频」并选中一个媒体文件
-- **THEN** 交给壳执行的是壳发现的那个 ffmpeg，参数逐字三条：`-hide_banner`、`-i`、所选文件的路径
+- **THEN** 交给 runtime 执行的是 runtime 发现的那个 ffmpeg，参数逐字三条：`-hide_banner`、`-i`、所选文件的路径
 - **AND** 探测这一步不写出任何输出文件
 
 #### Scenario: VC-002 顶栏念得出时长、格式、码率、大小与流数
@@ -38,7 +38,7 @@ vcp —— FFmpeg 编排台：打开一个媒体文件，挑要保留的流、�
 #### Scenario: VC-069 ffmpeg 不可用时顶栏那枚与硬开视频的原因
 - **WHEN** 这台机器上没有可用的 ffmpeg，点「打开视频」
 - **THEN** 顶栏那枚读得到「ffmpeg 不可用」，点完之后错误条原样是「没找到 ffmpeg」
-- **AND** 界面上不出现 `Error invoking remote method` 这类壳的内部措辞
+- **AND** 界面上不出现 `Error invoking remote method` 这类 runtime 的内部措辞
 
 ### Requirement: 保留哪些流，决定命令里的 -map / -vn / -an
 命令用的是同类型内的相对序号（`0:v:0`、`0:a:1`），不是 ffmpeg 报出来的全局流号。
@@ -293,12 +293,12 @@ vcp —— FFmpeg 编排台：打开一个媒体文件，挑要保留的流、�
 ### Requirement: 任务跑起来之后，右栏的队列念得出来
 一次只跑一条，跑完自动接下一条；停止与清掉完成各管各的（依据：[架构](../../../../docs/architecture.md) §6.3 流式任务）。
 
-#### Scenario: VC-065 提交后右栏出现 #1，壳收到的命令行带着进度管道
+#### Scenario: VC-065 提交后右栏出现 #1，runtime 收到的命令行带着进度管道
 - **WHEN** 打开视频后点「提交任务」
 - **THEN** 右栏出现 `#1` 与源文件名 `4k_demo.mkv`
-- **AND** 交给壳执行的参数前四位是 `-hide_banner -nostats -progress pipe:1`，最后一位是输出路径
+- **AND** 交给 runtime 执行的参数前四位是 `-hide_banner -nostats -progress pipe:1`，最后一位是输出路径
 
-#### Scenario: VC-066 进行中：状态与速度念得出壳推来的那一截
+#### Scenario: VC-066 进行中：状态与速度念得出 runtime 推来的那一截
 - **WHEN** 这条任务报回 `out_time=00:00:50.000000` 与 `speed=2.35x`
 - **THEN** 状态念「进行中 50%」，第二行念得出「2.35x」与「已用」
 - **AND** 这一条带着「停止」那颗键

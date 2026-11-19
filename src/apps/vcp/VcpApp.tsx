@@ -39,7 +39,7 @@ import './vcp.css'
  *
  * 与 Avalonia 版的差别：
  *   - 界面从 XAML 换成 React，布局改成"左配置 / 右队列"两栏，宽屏下不用滚来滚去。
- *   - 进程管理交给壳的 proc 服务（白名单只放行壳发现的 ffmpeg），不再自己 Process.Start。
+ *   - 进程管理交给 runtime 的 proc 服务（白名单只放行 runtime 发现的 ffmpeg），不再自己 Process.Start。
  *   - 临时字幕落在应用 cache 目录，不再用系统 %TEMP%，卸载/清缓存就干净了。
  *   - 文件浏览从自绘目录树换成系统对话框 + 父目录授权（grantParentDir），
  *     少一整棵树的代码，代价是不能在界面里翻目录——这点是退步，认。

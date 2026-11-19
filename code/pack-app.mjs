@@ -5,9 +5,9 @@
  *
  * 契约的唯一叙述在 `src/apps/specs/package.md`（PK-001 ~ PK-007）；这个文件只管三件事：
  * 校字段形状、拷文件、暂存后改名。它不构建应用（构建是应用自己的事），
- * 也不判定能力名——那份规矩在 `src/shared/registryRules.ts` 只有一处，壳侧运行期再判一次。
+ * 也不判定能力名——那份规矩在 `src/shared/contract/registryRules.ts` 只有一处，runtime 侧运行期再判一次。
  *
- * 读它的那一侧在 src/shell/main/services/packageArchive.ts：fflate 的 unzipSync 带 filter，
+ * 读它的那一侧在 src/runtime/main/services/packageArchive.ts：fflate 的 unzipSync 带 filter，
  * 只解要用的那一个条目，不整包展开。
  *
  * 用法：
@@ -27,7 +27,7 @@ import { strToU8, zipSync } from 'fflate'
 /** 归档文件名的后缀：`<id>` + 这个（一个 zip，换了扩展名） */
 export const PACKAGE_SUFFIX = '.airship'
 
-/** 壳只认这一档包格式；写别的产包期就拒 */
+/** runtime 只认这一档包格式；写别的产包期就拒 */
 export const SCHEMA_VERSION = 1
 
 /** 包清单的文件名，在包根 */
@@ -118,7 +118,7 @@ export function manifestProblems(manifest) {
   if (manifest.schemaVersion !== SCHEMA_VERSION) {
     out.push(
       `包清单 schemaVersion 只认 ${SCHEMA_VERSION}，收到 ${JSON.stringify(manifest.schemaVersion)}` +
-        `（包格式与壳不同档时别硬装，先对齐壳的版本）`
+        `（包格式与 runtime 不同档时别硬装，先对齐 runtime 的版本）`
     )
   }
   if (typeof manifest.sdkVersion !== 'string' || manifest.sdkVersion.trim() === '') {
@@ -145,12 +145,12 @@ export function manifestProblems(manifest) {
     if (key in manifest) {
       out.push(
         `包清单里不写 ${key}：图标是包根那一张文件（icon.svg / png / jpg / jpeg / webp），` +
-          `显示顺序由壳按名字典序定，两者都不是应用自己能决定的`
+          `显示顺序由 runtime 按名字典序定，两者都不是应用自己能决定的`
       )
     }
   }
   for (const key of Object.keys(manifest)) {
-    if (!ALLOWED_KEYS.includes(key)) out.push(`包清单有壳不认的键 "${key}"（要么拼错，要么包格式与壳不同档）`)
+    if (!ALLOWED_KEYS.includes(key)) out.push(`包清单有 runtime 不认的键 "${key}"（要么拼错，要么包格式与 runtime 不同档）`)
   }
   return out
 }

@@ -7,9 +7,9 @@ import { mountUi } from '@airship/sdk/testing'
 import type { AppApi, AppMeta } from '@airship/contract'
 
 /**
- * SH-011 / SH-012 / SH-013 / SH-019：应用窗口里壳添的那三样东西。
+ * SH-011 / SH-012 / SH-013 / SH-019：应用窗口里宿主添的那三样东西。
  *
- * 实现住在 `src/sdk/host.tsx`（一个包自持一份文档，壳不往应用窗口里注 DOM），
+ * 实现住在 `src/sdk/host.tsx`（一个包自持一份文档，runtime 不往应用窗口里注 DOM），
  * 用例也就住到这里；契约编号没变——用户看见的还是那三样：
  * 标题栏只念应用名、留白按清单给、界面在路上时有占位。
  *
@@ -29,7 +29,7 @@ function mountSdkHost(manifest: AppMeta, component: ComponentType<{ api: AppApi 
   return mountUi(<AirshipRoot meta={manifest} component={component} icon={icon} />, { fake })
 }
 
-describe('应用窗口里壳只添三样东西', () => {
+describe('应用窗口里宿主只添三样东西', () => {
   it('SH-011 应用窗口的标题栏只念应用名，三颗键各有可读名称', async () => {
     const m = await mountSdkHost(meta({ id: 'vcp', name: 'vcp' }), () => <div className="app-body">编排台正文</div>)
     const visible = m.text()

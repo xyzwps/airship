@@ -19,7 +19,7 @@ const EDGE = 8
 const LEAVE_MS = 160
 
 /**
- * 圈里一个问号。描边风格跟着壳的 IconButton 那批图形走（同宽、同圆头），
+ * 圈里一个问号。描边风格跟着 SDK 的 IconButton 那批图形走（同宽、同圆头），
  * 这样它与「详情」那颗圈里带 i 的键在视觉上是同一家人。
  */
 function QuestionGlyph(): JSX.Element {

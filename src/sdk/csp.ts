@@ -1,7 +1,7 @@
 /**
  * 应用包入口 html 的 CSP——**唯一的一份**。
  *
- * 每个包的 `index.html` 里都要原样带上这一条（壳不替应用注入：包自持的文档，
+ * 每个包的 `index.html` 里都要原样带上这一条（runtime 不替应用注入：包自持的文档，
  * 它的权限就该写在它自己的文件里），六个应用的应用侧用例把这条与应用 html 里的
  * `content` 逐字比对（AP-014），改一处就会红。
  *
@@ -39,8 +39,8 @@ export const AIRSHIP_CSP_DEV =
  * 端点是运行期才知道的东西，写不进构建期就定死的 CSP，所以这一档放到 `http:` 与 `https:` 两个协议。
  * **只放 `connect-src`**：脚本、文档、frame 一概照旧收紧，"能连网"不等于"能加载外站脚本"。
  *
- * 窗口那侧还有另一半：跨源许可由壳在建窗口时按同一条能力位放行
- * （`src/shell/main/windows.ts`，判据见 `src/shell/specs/bridge.md` BR-011）。
+ * 窗口那侧还有另一半：跨源许可由 runtime 在建窗口时按同一条能力位放行
+ * （`src/runtime/main/windows.ts`，判据见 `src/runtime/specs/bridge.md` BR-011）。
  * 两处问的都是清单里那一个 `net`——少一处就是 dev 里绿、出包后死的那种坏法。
  */
 export const AIRSHIP_CSP_NET =
