@@ -43,6 +43,11 @@ input[type="number"], .coord-readout { font-variant-numeric: tabular-nums; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: -1px; }
 ::selection { background: rgba(227, 91, 63, 0.45); }
 
+/* Albedo 外壳固定深色，不跟主题的三档走——标题栏那颗主题键在这里是个切不动任何东西的空键。
+   那颗键由 SDK 标题栏统一画，本应用用这条把它藏掉（display:none 一并移出无障碍树，不留点不到的死键）。
+   选择器带属性，比 SDK 的 .titlebar__btn 更具体，不靠 !important 也不靠引入顺序。 */
+.titlebar__btn[aria-label^="主题"] { display: none; }
+
 /* ---------- 骨架 ---------- */
 .app { height: 100%; display: flex; flex-direction: column; min-width: 900px; }
 
