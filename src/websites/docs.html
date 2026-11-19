@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>文档 · Airship 的架构与开发方式</title>
+    <meta name="description" content="两部分：airship 的系统架构——runtime 与包如何分层、七条不变量、进程与窗口模型、契约与授权、包格式、构建出包；以及怎样为本项目开发软件——从范本加一个应用、规格册与用例、三档验证。" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4.2' fill='%23e2e1f1'/%3E%3Crect x='3.4' y='3' width='4.6' height='4.6' rx='1.3' fill='%23f86e51'/%3E%3Crect x='8.9' y='3' width='4.6' height='4.6' rx='1.3' fill='%2380b6a8'/%3E%3Ccircle cx='5.7' cy='10.6' r='2.3' fill='%2398a5e9'/%3E%3Crect x='8.9' y='8.3' width='4.6' height='4.6' rx='2' fill='%23eba6b8'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./assets/site.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+
+    <header class="site-header">
+      <div class="wrap bar">
+        <a class="brand" href="./index.html">
+          <svg class="mark" viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="0" y="0" width="16" height="16" rx="4.2" fill="#e2e1f1" />
+            <rect x="3.4" y="3" width="4.6" height="4.6" rx="1.3" fill="#f86e51" />
+            <rect x="8.9" y="3" width="4.6" height="4.6" rx="1.3" fill="#80b6a8" />
+            <circle cx="5.7" cy="10.6" r="2.3" fill="#98a5e9" />
+            <rect x="8.9" y="8.3" width="4.6" height="4.6" rx="2" fill="#eba6b8" />
+          </svg>
+          <span class="zh">Airship</span>
+        </a>
+        <nav class="site-nav" aria-label="主导航">
+          <a href="./index.html">首页</a>
+          <a href="./docs.html" aria-current="page">文档</a>
+          <a href="./apps.html">预置应用</a>
+        </nav>
+        <button class="theme-btn" id="theme-toggle" type="button">◐</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <div class="wrap docs-layout">
+        <nav class="toc" aria-label="文档目录">
+          <div class="part">第一部分</div>
+          <a href="#architecture">本项目架构</a>
+          <a class="sub" href="#composition">系统组成</a>
+          <a class="sub" href="#layers">五个区与依赖方向</a>
+          <a class="sub" href="#invariants">七条不变量</a>
+          <a class="sub" href="#boundary">能力与边界图</a>
+          <a class="sub" href="#process">进程与窗口模型</a>
+          <a class="sub" href="#bridge">契约桥与 API 面</a>
+          <a class="sub" href="#capabilities">能力与授权</a>
+          <a class="sub" href="#package">包格式与文档加载</a>
+          <a class="sub" href="#data">数据与存储</a>
+          <a class="sub" href="#ui">界面与主题</a>
+          <a class="sub" href="#build">构建与出包</a>
+          <a class="sub" href="#metrics">实测数字</a>
+
+          <div class="part">第二部分</div>
+          <a href="#develop">如何为本项目开发软件</a>
+          <a class="sub" href="#start">环境与起步</a>
+          <a class="sub" href="#rules">动手之前的规矩</a>
+          <a class="sub" href="#commands">命令只走 justfile</a>
+          <a class="sub" href="#newapp">加一个应用</a>
+          <a class="sub" href="#manifest">清单怎么写</a>
+          <a class="sub" href="#code">代码怎么写</a>
+          <a class="sub" href="#spec">规格册</a>
+          <a class="sub" href="#tests">用例与替身</a>
+          <a class="sub" href="#verify">三档验证</a>
+          <a class="sub" href="#release">出包与分发</a>
+          <a class="sub" href="#versioning">版本号规矩</a>
+          <a class="sub" href="#pitfalls">踩过的坑</a>
+          <a class="sub" href="#checklist">收尾检查单</a>
+        </nav>
+
+        <article class="doc">
+          <div class="part-head" id="architecture">
+            <div class="part-kicker">第一部分</div>
+            <h2>本项目架构</h2>
+            <p>
+              这一部分讲<strong>为什么这样搭</strong>，以及搭的时候撞过哪些坑。用户可见的契约（界面上读得到哪句话、落盘文件是什么形状）在仓库的规格册里；还没做 /
+              做不了 / 这期不做的事集中在 <code>docs/todo.md</code>。这一页只讲结构与依据。
+            </p>
+          </div>
+
+          <h2 class="sub" id="composition">系统组成</h2>
+          <p>
+            Airship 是一个 <strong>Electron app runtime + 外挂应用</strong> 的结构，像 JVM / .NET 那样：运行时只装一份、大家共用，应用是各自独立安装、各自带一个启动快捷方式的小包。八个预置应用的清单与能力声明在<a href="./apps.html">预置应用</a>那一页。
+          </p>
+          <figure class="figure">
+            <pre><code>airship runtime（一个 Electron 进程，src/runtime/，@airship/runtime）
+  ├─ 主进程：注册命令行指来的包、开窗口、能力实现、包协议、单实例转发
+  ├─ preload：只暴露 window.airship 这一面
+  └─ 没有自己的界面：不画启动器，不扫磁盘找应用
+
+应用（八个，src/apps/&lt;id&gt;/，各自一个 airship 包）
+  books 墨读 · pdf PDF · dagogo 打勾勾 · life 生命游戏
+  vcp · wsld 容器台 · albedo Albedo · s3 S3
+  每个应用 = &lt;id&gt;.airship 归档 + 它自己的每用户安装器 + 一枚快捷方式</code></pre>
+          </figure>
+          <p>
+            runtime 装一次，钉死在 <code>C:\Program Files\airship\runtime</code>（<code>perMachine</code>，要管理员）。应用由<strong>它自己的安装器</strong>装进每用户目录
+            <code>%LOCALAPPDATA%\airship\apps\&lt;id&gt;\</code>（不要管理员），安装器在桌面与开始菜单留一枚快捷方式，目标就是 runtime 的 <code>airship.exe</code>
+            加上那份包的绝对路径。双击快捷方式 → runtime 注册那份包 → 开出这个应用的窗口。
+          </p>
+          <p>
+            <strong>runtime 不认识任何具体应用。</strong>跑哪些包由命令行决定（<code>airship.exe &lt;id&gt;.airship</code>，可以一次指多份），注册一份、开一个窗口；没带包路径就念一句用法退出，不存在"开一个空启动器等人挑"这条路。安装包的产物里没有一行应用代码，runtime
+            自己也没有渲染目标。加 / 更新 / 卸一个应用都不动 runtime。
+          </p>
+
+          <h2 class="sub" id="layers">五个区与依赖方向</h2>
+          <table>
+            <thead><tr><th>区</th><th>包名</th><th>管什么</th></tr></thead>
+            <tbody>
+              <tr><td><code>src/runtime</code></td><td><code>@airship/runtime</code></td><td>主进程、preload、窗口、能力实现、包协议、单实例转发</td></tr>
+              <tr><td><code>src/sdk</code></td><td><code>@airship/sdk</code></td><td>宿主（标题栏 / 主题落地 / 留白 / 占位）、图标键、CSP、工装钩子；将来独立发布的那一份</td></tr>
+              <tr><td><code>src/apps/&lt;id&gt;</code></td><td><code>@airship/&lt;id&gt;</code></td><td>八个应用，各自自持 <code>index.html</code> + <code>main.tsx</code></td></tr>
+              <tr><td><code>src/shared/contract</code></td><td><code>@airship/contract</code></td><td>契约、清单类型、拒绝措辞、注册与包形状的规矩</td></tr>
+              <tr><td><code>src/shared/library</code></td><td><code>@airship/library</code></td><td>共享书库（墨读与 PDF 同一份数据）</td></tr>
+              <tr><td><code>src/shared/textdecode</code></td><td><code>@airship/textdecode</code></td><td>中文解码</td></tr>
+            </tbody>
+          </table>
+          <figure class="figure">
+            <pre><code>应用（src/apps/&lt;id&gt;）  ──依赖──▶  SDK（src/sdk）  ──依赖──▶  契约（src/shared/contract）
+       │                            │                            ▲
+       └──────依赖──────────────────┴────────────────────────────┘
+                                    │
+                          共享包（library / textdecode）──依赖──▶ 契约
+runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM）</code></pre>
+            <figcaption>方向不许反：契约层在最底下，谁都可以依赖它，它不依赖任何上层。</figcaption>
+          </figure>
+          <ul>
+            <li>
+              <strong>应用与 SDK 不许 import <code>src/runtime/**</code></strong>（用例 AP-013 守着）。runtime 也不 import 任何具体应用——名单来自命令行指来的包。这条由
+              node 的解析器守：说明符一律写包名（<code>@airship/...</code>），手写别名已全部拆掉。
+            </li>
+            <li>
+              契约层里 <code>protocol.ts</code> 是 runtime 与应用之间的能力契约（<code>AirshipBridge</code>），这是 airship 唯一重要的文件：应用能做什么全部由这里声明，preload
+              只按这张表暴露，主进程只按这张表实现。
+            </li>
+            <li>
+              共享包属于依赖图的下层，反过来依赖 runtime 的界面代码就破了自己定的规则——所以 <code>AppApi</code>（契约 + 自己的 id）放在契约层而不是 runtime 的 UI 层。
+            </li>
+            <li>
+              <strong>SDK 是将来要独立发布的那一份</strong>，改它的导出等于改公开面。runtime 给应用窗口的 DOM 只有 SDK 那一份——<code>src/runtime</code> 里没有
+              <code>AppHost</code>，也没有 <code>app.html</code>，更没有启动器。
+            </li>
+          </ul>
+          <p>
+            每个区都是一个 npm workspace 包。根 <code>package.json</code> 只声明 <code>workspaces</code>，<strong>没有 scripts</strong>；命令只走 justfile。各包的 SDK 与
+            react 记在 <code>devDependencies</code>——它们被构建进包，运行时不需要机器上装着（AP-016 钉这条）。
+          </p>
+
+          <h2 class="sub" id="invariants">七条不变量</h2>
+          <p>这几条是"不照做就会做错"的硬约束，多数有册子编号或用例守着。</p>
+          <ul class="invariants">
+            <li><span class="no">I-1</span><p><strong>一个应用一个窗口一个渲染进程。</strong>隔离是窗口化真正买到的东西：一个应用崩了不带崩别人，改一个应用不用管其余七个。</p></li>
+            <li><span class="no">I-2</span><p><strong>应用只能通过 <code>window.airship</code> 碰系统。</strong>看不到 <code>ipcRenderer</code>，也拿不到绝对路径以外的系统面；能碰什么由清单 <code>capabilities</code> 声明，没声明的一律拒绝并给出读得懂的原因（措辞在 <code>@airship/contract</code>）。</p></li>
+            <li><span class="no">I-3</span><p><strong>身份由 runtime 绑定注入，应用冒充不了别人。</strong>preload 从启动参数注入 id，主进程再用 <code>event.sender</code> 反查归属二次确认。应用代码从不传自己的 id。</p></li>
+            <li><span class="no">I-4</span><p><strong>数据由 runtime 统一托管。</strong>各应用的数据落在 <code>%APPDATA%\airship\apps\&lt;id&gt;\</code> 下它自己那一族，应用不自己挑落盘位置。共享数据区（书库）由 runtime 创建与托管。</p></li>
+            <li><span class="no">I-5</span><p><strong>加一个应用不改 runtime 侧任何文件。</strong>名单来自命令行指来的包，不是写死的 id 表。契约层刻意不维护 id 名单（<code>AppId = string</code>，运行期校验）。AP-010 守着：runtime 产品代码里不许出现具体应用 id 的字面量。</p></li>
+            <li><span class="no">I-6</span><p><strong>应用与 SDK 不许 import runtime。</strong>边界由 node 的解析器守（说明符一律写包名），不靠注释。AP-013 守着这条。</p></li>
+            <li><span class="no">I-7</span><p><strong>子进程只跑 runtime 发现的东西。</strong>proc 白名单的来历只有一个：runtime 按工具登记表发现的（含环境变量显式指的那一档）。应用既不能自己找一个来跑，也不能借 runtime 发现的名义跑没声明的工具。</p></li>
+          </ul>
+
+          <h2 class="sub" id="boundary">能力与边界图</h2>
+          <p>
+            上面七条不变量画在一张图上：从上到下就是<strong>依赖方向</strong>，珊瑚色那四条是<strong>边界</strong>——每一道都写着"不照做就会做错"的那件事，以及守着它的用例编号。
+            能力位（<code>capabilities</code>）是第三道闸门上的东西：应用能碰系统的哪几面，全在那儿声明过才放行。
+          </p>
+
+          <figure class="diagram">
+            <figcaption class="dg-cap">
+              图 1 · airship 的分层、能力与边界（判据编号取自规格册与架构文档；窄屏下自动折成一列，方向不变）
+            </figcaption>
+
+            <div class="dg-layer">
+              <p class="dg-title"><span class="no">I-1</span>应用区 · 一个应用一个窗口一个渲染进程</p>
+              <p class="dg-sub">各自一个 <code>@airship/&lt;id&gt;</code> 包、各自一本册子；改一个不用管其余七个，一个崩了不带崩别人。</p>
+              <div class="dg-row win">
+                <div class="dg-cell app"><b>墨读 books</b>600×800 · 与 PDF 共用同一份书库</div>
+                <div class="dg-cell app"><b>vcp</b>要外部工具 <code>ffmpeg</code></div>
+                <div class="dg-cell app"><b>容器台 wsld</b><code>platforms: ['windows']</code> · 要 <code>wslc</code></div>
+                <div class="dg-cell app"><b>生命游戏 life</b><code>capabilities: []</code>——不碰你的文件</div>
+                <div class="dg-cell app"><b>你的应用 hello</b><code>just new-app</code> 从范本造</div>
+              </div>
+              <div class="dg-row" style="margin-top: 10px">
+                <div class="dg-cell pkg"><b>包自持</b><span class="mono">airship://&lt;id&gt;/index.html</span> · 归档 <code>&lt;id&gt;.airship</code>（一个 zip 换了扩展名）· 入口里的引用不许越出包（PK-006）</div>
+                <div class="dg-cell pkg"><b>清单 app.ts</b><span class="mono">id · name · capabilities · tools · platforms · sharedNamespaces · flush · default*</span> 只写这个应用自己的事实</div>
+              </div>
+            </div>
+
+            <div class="dg-flow">依赖方向：应用 ──▶ SDK ──▶ 契约（方向不许反）</div>
+
+            <div class="dg-bound">
+              <span class="dg-id">I-6 / AP-013</span>应用与 SDK 不许 import <code>src/runtime/**</code>
+              <span class="dg-note">说明符一律写包名 <code>@airship/...</code>，手写别名已全部拆掉——边界由 node 的解析器守，不靠注释。</span>
+            </div>
+
+            <div class="dg-layer">
+              <p class="dg-title"><span class="no">宿主</span>SDK 与契约</p>
+              <p class="dg-sub">runtime 给应用窗口的 DOM 只有 SDK 那一份；契约层是最底下那份，谁都可以依赖它，它不依赖任何上层。</p>
+              <div class="dg-row">
+                <div class="dg-cell host"><b><code>@airship/sdk</code> 宿主</b>标题栏 · 主题落地 · 窗口留白 · 占位图 · <code>useAppApi()</code> · <code>IconButton</code> · <code>renderTrayIcon()</code> · 产包期注入 CSP</div>
+                <div class="dg-cell host"><b><code>@airship/contract</code> 契约</b><code>protocol.ts</code>（<code>AirshipBridge</code>）· <code>AppMeta</code> 与 <code>APP_ID_PATTERN</code> · <code>CAPABILITY_LABEL</code> 与拒绝措辞原文 · 注册与包形状的规矩</div>
+              </div>
+            </div>
+
+            <div class="dg-flow down">调用往下、事件往上，都只走这一道</div>
+
+            <div class="dg-bound">
+              <span class="dg-id">I-2 / I-3</span><code>window.airship</code> 是应用碰系统的唯一入口，身份由 runtime 绑定注入
+              <span class="dg-note">
+                渲染侧拿不到 <code>ipcRenderer</code>；绝对路径只能由 preload 的 <code>webUtils.getPathForFile(file)</code> 换出来。id 由该窗口 preload 从启动参数注入，主进程再用
+                <code>event.sender</code> 反查归属二次确认——应用代码从不传自己的 id，也就冒充不了别人。
+              </span>
+            </div>
+
+            <div class="dg-layer">
+              <p class="dg-title"><span class="no">闸门</span>能力位：<code>capabilities</code> 声明过才放行</p>
+              <p class="dg-sub">
+                没声明的一律拒绝，界面上读得到的是契约层那句中文，不是 "Error invoking remote method"。用了 <code>api.settings.</code> / <code>api.proc.</code>
+                这些域就必须声明对应能力（AP-011 扫源码核对）。
+              </p>
+
+              <div class="dg-group">
+                <div class="dg-g">文件</div>
+                <div>
+                  <div class="dg-chips"><span class="dg-chip">fs.read</span><span class="dg-chip">fs.write</span><span class="dg-chip">dialog</span></div>
+                  <p class="dg-why">数据目录内随便读写；目录外只读本次会话中用户经对话框显式选中的路径（<code>grantParentDir</code> 可连父目录一起授）。授权是会话级的，进程退出就没了（GR 册五条规则）。</p>
+                </div>
+              </div>
+
+              <div class="dg-group">
+                <div class="dg-g">数据</div>
+                <div>
+                  <div class="dg-chips"><span class="dg-chip">settings</span><span class="dg-chip">shared</span></div>
+                  <p class="dg-why">设置落 <code>apps/&lt;id&gt;/settings.json</code>，一个应用一份。<code>shared</code> 还要在清单 <code>sharedNamespaces</code> 里点名要哪一个——名单属于 runtime，现只有 <code>library</code>。</p>
+                </div>
+              </div>
+
+              <div class="dg-group">
+                <div class="dg-g">进程</div>
+                <div>
+                  <div class="dg-chips"><span class="dg-chip">proc</span><span class="dg-chip">tools</span></div>
+                  <p class="dg-why"><b>I-7</b>：proc 白名单的来历只有一个——runtime 按工具登记表发现的（<code>AIRSHIP_&lt;NAME&gt;_PATH</code> &gt; PATH &gt; 已知位置，现认识 <code>ffmpeg</code> / <code>wslc</code>）。声明了才拿得到路径，也不能借名义跑没声明的工具。</p>
+                </div>
+              </div>
+
+              <div class="dg-group">
+                <div class="dg-g">系统</div>
+                <div>
+                  <div class="dg-chips"><span class="dg-chip">tray</span><span class="dg-chip">notify</span><span class="dg-chip">clipboard</span><span class="dg-chip">log</span></div>
+                  <p class="dg-why">子进程进度与托盘点击这类事件只投归属那个窗口，没有全局广播；日志按应用分命名空间、按天分文件。</p>
+                </div>
+              </div>
+
+              <div class="dg-group">
+                <div class="dg-g">窗口面</div>
+                <div>
+                  <div class="dg-chips"><span class="dg-chip">paths</span><span class="dg-chip">theme</span><span class="dg-chip">setTheme</span><span class="dg-chip">window</span><span class="dg-chip">on</span></div>
+                  <p class="dg-why">这一族作用于本窗口，<strong>不占能力位</strong>：主题按应用各记各的，由 <code>theme:set</code> 这条窗口面通道写。</p>
+                </div>
+              </div>
+
+              <div class="dg-group">
+                <div class="dg-g">网络</div>
+                <div>
+                  <div class="dg-chips"><span class="dg-chip bypass">net —— 唯一一个不经桥</span><span class="dg-chip">fetch 由应用自己的文档发</span></div>
+                  <p class="dg-why">对象存储的响应里没有跨源许可，代发就得伪造别人的响应头。runtime 只做两件事：产包时按清单给它放宽 <code>connect-src</code> 的那条 CSP，建窗口时给它豁免同源策略。没声明的应用拿到的还是收紧那条，同源策略照旧。</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="dg-flow down">能力实现只在这一侧：外部面全由 runtime 出手</div>
+
+            <div class="dg-bound">
+              <span class="dg-id">I-4</span>数据与外部世界由 runtime 统一托管，应用不自己挑落盘位置
+              <span class="dg-note">落盘原子写，坏文件挪成 <code>.bad</code> 不致命；卸载（应用安装器与 runtime 都算）不动这份数据。</span>
+            </div>
+
+            <div class="dg-layer">
+              <p class="dg-title"><span class="no">I-5</span>runtime 主进程 ⇄ 外部世界</p>
+              <p class="dg-sub">runtime 自己不画界面：没有启动器，也没有 renderer 目标。</p>
+              <div class="dg-row">
+                <div class="dg-cell rt"><b>主进程</b>从 argv 注册包 → <strong>活动包表</strong>（只装这次指来的那几份，不扫磁盘）· 按契约表实现每个方法 · 包协议 <code>airship://</code> · 单实例转发 · 关窗收子进程与托盘</div>
+                <div class="dg-cell rt"><b>不认识具体应用</b>名单来自命令行指来的包，不是写死的 id 表；契约层 <code>AppId = string</code>，运行期校验（AP-010 扫产品代码里的应用 id 字面量）</div>
+                <div class="dg-cell world"><b>磁盘</b><code>%APPDATA%\airship\apps\&lt;id&gt;\</code> 各家数据 · <code>library\</code> 共享书库 · 包落 <code>%LOCALAPPDATA%\airship\apps\&lt;id&gt;\</code></div>
+                <div class="dg-cell world"><b>外部</b>子进程 <code>ffmpeg</code> / <code>wslc</code> · 系统托盘 · 通知 · 剪贴板 · S3 兼容端点（<code>net</code> 那一档）</div>
+              </div>
+            </div>
+
+            <div class="dg-bound" style="margin-top: 12px">
+              <span class="dg-id">I-5 / AP-010</span>runtime 不 import 任何应用，安装包是纯 runtime
+              <span class="dg-note">加 / 更新 / 卸一个应用都不动 runtime：<code>resources/</code> 里只有 <code>app.asar</code>，出包自检反过来钉"不该有任何 airship 包"与"不该有 <code>out/renderer</code>"。</span>
+            </div>
+
+            <div class="dg-legend">
+              <span><i class="l-app"></i>应用区（渲染进程）</span>
+              <span><i class="l-host"></i>SDK 与契约</span>
+              <span><i class="l-rt"></i>runtime 主进程</span>
+              <span><i class="l-world"></i>外部面</span>
+              <span><i class="l-bound"></i>边界（不许穿过去）</span>
+              <span>编号：<code>I-n</code> 不变量 · <code>AP-nnn</code> / <code>PK-nnn</code> / <code>GR</code> / <code>PT</code> 册子判据</span>
+            </div>
+          </figure>
+
+          <p>
+            图上只画边界与判据编号；每条边界的完整理由在下面的小节里——<a href="#process">进程与窗口模型</a>讲身份注入与事件路由，<a href="#bridge">契约桥</a>讲那句中文从哪儿来，
+            <a href="#capabilities">能力与授权</a>讲五组能力位各自的判据，<a href="#package">包格式</a>讲"引用不许越出包"为什么是硬要求。
+          </p>
+
+          <h2 class="sub" id="process">进程与窗口模型</h2>
+          <p><strong>单 runtime 进程。</strong>所有应用窗口住在同一个 Electron 主进程里，各自一个渲染进程。没有启动器窗口，runtime 自己不画任何界面。</p>
+          <h3>启动流程</h3>
+          <ol class="steps">
+            <li><h4>钉死数据目录名</h4><p><code>app.setName('airship')</code>：Electron 的 userData 默认取 package.json 的 name，而那个 name 是 <code>@airship/runtime</code>——不钉住的话书架与设置会在某次升级后"凭空消失"，其实是换了目录。</p></li>
+            <li><h4>抢单实例锁，在 <code>whenReady</code> 之前</h4><p>抢不到不是错误——argv 会由 Electron 自动交给第一实例的 <code>second-instance</code>，这次直接 <code>app.quit()</code>。<code>whenReady</code> 首行 <code>if (!GOT_LOCK) return</code>：不然第二实例也会把启动跑完、开出一扇重复的窗再退出（真机抓到过：两扇 dagogo 各开一次）。</p></li>
+            <li><h4>挂协议、注册 IPC、接事件路由</h4><p>包协议处理器、IPC 方法、把子进程事件接到"只投归属窗口"的路由上。</p></li>
+            <li><h4>从 argv 挑包路径</h4><p>挑出以 <code>.airship</code> 结尾的路径（相对路径按 cwd 解）。一份都没有 → 念用法 + <code>app.exit(1)</code>，不开任何界面。</p></li>
+            <li><h4>逐份注册</h4><p>读归档里的清单、校验形状与引用边界、装进<strong>活动包表</strong>。不合格响亮退出（弹错误框 + exit 1），不静默少一个窗口。</p></li>
+            <li><h4>逐份开窗口</h4><p>授权已在安装期完成，直跑不再弹确认卡片。一个窗口都没开出来（全都开失败）→ <code>app.quit()</code>，没有理由继续占着进程。</p></li>
+          </ol>
+          <p>
+            <strong>活动包表是进程级的，只装 argv 指来的那几份包</strong>，不扫磁盘。"这台机器上装了哪些应用"不是 runtime 要知道的事——它只知道"这次被要求跑哪些包"。
+          </p>
+          <h3>单实例转发</h3>
+          <p>
+            第二次启动的 argv 转发给已在跑的那一份。相对路径按<strong>第二实例的 cwd</strong> 解，快捷方式给的是绝对路径不受影响。同 id 同归档 → 复用表里那一份、聚焦窗口；同 id
+            异归档 → 拒（措辞在契约层）；新包 → 直接开窗口。
+          </p>
+          <h3>窗口、事件与收尾</h3>
+          <ul>
+            <li><strong>窗口</strong>：无边框（<code>frame: false</code>，标题栏由 SDK 画），尺寸只认清单（没写就跟 runtime 默认 1100×740），位置不记、每次由系统摆。台账判"开新的还是聚焦旧的"。清单 <code>platforms</code> 不含本机的应用根本不开窗口，响亮念出原因。</li>
+            <li><strong>事件只投归属窗口</strong>：子进程进度、托盘点击这类事件只回到归属那个窗口，没有全局广播；窗口没了事件就丢弃。这条抽成纯函数是为了能被测试——隔离的最后一环就是它。</li>
+            <li><strong>崩溃隔离</strong>：一个渲染进程崩了不带崩主进程与别的窗口。主进程的未捕获异常 / 未处理拒绝写日志不致命。</li>
+            <li><strong>关窗收尾</strong>：<code>window-all-closed</code> → 收掉所有子进程、清托盘、退出。截图模式例外——它逐个开窗、关窗再下一个，<code>window-all-closed</code> 在该模式下直接 return，否则截完第一个就退出。</li>
+            <li><strong>任务栏身份今天是假绿</strong>（TD-001）：<code>window.setAppUserModelId?.(...)</code> 是空操作（那方法只挂在 <code>app</code> 上，BrowserWindow 没有），八个应用的任务栏按钮仍共用一个 runtime 身份。</li>
+          </ul>
+          <div class="note">
+            <b>一条踩过代价的运行时不变量</b>：名单来源从构建期改成运行期之后，任何"首次调用时把应用目录 / 能力表快照下来"的缓存都必须跟着作废，否则症状是每个应用报读不到数据（册子 ST-008 钉的就是这个）。
+          </div>
+
+          <h2 class="sub" id="bridge">契约桥与 API 面</h2>
+          <p>
+            <code>AirshipBridge</code> 声明应用能碰的全部面：<code>paths</code> / <code>theme</code> / <code>setTheme</code> / <code>settings</code> /
+            <code>dialog</code> / <code>fs</code> / <code>proc</code> / <code>tools</code> / <code>tray</code> / <code>notify</code> /
+            <code>clipboard</code> / <code>log</code> / <code>window</code> / <code>on</code>。
+            <strong>没有 app 参数</strong>：身份由该窗口的 preload 从启动参数注入，主进程再用 <code>event.sender</code> 反查归属二次确认。应用既看不到"传 id"这个动作，也就没法冒充别的应用。线格式（preload ↔ 主进程）仍然带 id，那是实现细节，不进契约。
+          </p>
+          <ul>
+            <li><code>AppApi = AirshipBridge &amp; { id }</code>：id 只用于显示与日志，不参与任何权限判定。</li>
+            <li>preload 只暴露 <code>window.airship</code> 这一面。渲染侧拿不到 <code>ipcRenderer</code>，也拿不到绝对路径——路径只能由 preload 的 <code>webUtils.getPathForFile(file)</code> 换出来（拖文件进窗口时用）。</li>
+            <li>主进程按契约表实现每个方法，按 <code>event.sender</code> 反查归属再查能力表。没声明的能力一律拒绝，错误措辞由 <code>@airship/contract</code> 的 <code>errors.ts</code> 供（中文句子原文，不出现 "Error invoking remote method" 这类 Electron 内部措辞）。</li>
+            <li>能力位的界面说法（<code>CAPABILITY_LABEL</code>）与人话摘要（<code>capabilitiesPhrase</code>）都在契约层，应用安装器的安装页念它——<strong>界面上不许再抄一遍</strong>。空清单念"不碰你的文件"，而不是念一个空字符串。</li>
+            <li>事件频道 <code>ShellEvent</code>：<code>proc:chunk</code> / <code>proc:exit</code> / <code>tray:click</code> / <code>window:maximized</code>。<strong>没有 <code>theme:changed</code> 全局广播</strong>——主题按应用各记各的，不需要广播。</li>
+          </ul>
+
+          <h2 class="sub" id="capabilities">能力与授权</h2>
+          <p>
+            <code>capabilities</code> 是唯一授权面，没声明的一律拒绝；用不到就写 <code>[]</code>（生命游戏就是这么起的）。用了 <code>api.settings.</code> /
+            <code>api.proc.</code> 这些域就必须声明对应能力，AP-011 会扫源码核对。
+          </p>
+          <table>
+            <thead><tr><th>能力位</th><th>管什么</th><th>界面上念作</th></tr></thead>
+            <tbody>
+              <tr><td><code>fs.read</code></td><td>读文件：限应用数据目录内，或本次会话中用户通过系统对话框显式选中的路径</td><td>读你的文件</td></tr>
+              <tr><td><code>fs.write</code></td><td>写文件：限应用数据目录内</td><td>写你的文件</td></tr>
+              <tr><td><code>dialog</code></td><td>弹系统文件 / 目录选择框（选中结果自动进入本应用的可读路径集合）</td><td>弹系统选择框</td></tr>
+              <tr><td><code>settings</code></td><td>读写本应用命名空间下的设置项</td><td>存自己的设置</td></tr>
+              <tr><td><code>shared</code></td><td>访问 runtime 级共享命名空间（具体哪几个由清单 <code>sharedNamespaces</code> 声明）</td><td>碰共享数据区</td></tr>
+              <tr><td><code>proc</code></td><td>派生子进程并接收 stdout / stderr 流</td><td>跑外部程序</td></tr>
+              <tr><td><code>tray</code></td><td>托盘图标与提示文字</td><td>占托盘</td></tr>
+              <tr><td><code>notify</code></td><td>系统通知</td><td>发系统通知</td></tr>
+              <tr><td><code>clipboard</code></td><td>剪贴板</td><td>读写剪贴板</td></tr>
+              <tr><td><code>log</code></td><td>写日志（按应用分命名空间）</td><td>写日志</td></tr>
+              <tr><td><code>net</code></td><td>应用在自己的窗口里发网络请求（唯一一个不经过桥的能力位，见下）</td><td>自己连外部服务</td></tr>
+            </tbody>
+          </table>
+          <h3><code>net</code> 为什么不经过桥</h3>
+          <p>
+            对象存储的响应里没有跨源许可（要按桶配 CORS，S3 与阿里云 OSS 都这样），runtime 代发就得伪造响应头，而把传输交回渲染侧才能保住流式上传与分块下载。所以请求由应用的文档自己发（<code>fetch</code>），runtime
+            只做两件事——产包时按清单给它那条放宽了 <code>connect-src</code> 的 CSP，建窗口时按清单给它豁免同源策略。边界仍由清单钉住：没声明的应用拿到的还是收紧那条 CSP，同源策略照旧。
+          </p>
+          <h3>路径授权</h3>
+          <p>
+            五条规则，会话内有效：应用数据目录内随便读写；数据目录外只读用户本次会话通过对话框显式选中的路径；<code>dialog</code> 选中的文件自动进入可读集合（<code>grantParentDir</code>
+            可连父目录一起授，给"输出落在源文件同目录"那种应用用）；共享命名空间要清单声明；越界直接拒。授权是会话级的，进程退出就没了。
+          </p>
+          <h3>共享命名空间与工具发现</h3>
+          <p>
+            <code>SHARED_NAMESPACES = ['library']</code>，这份名单<strong>属于 runtime</strong>：目录由 runtime 创建与托管，新增一个共享数据区是 runtime 的功能变更，不是应用变更。墨读与
+            PDF 是两个独立应用入口，但书架、导入记录、封面、阅读进度是同一套数据——各自存一份就会"同一本书在两个入口里各有一本"。
+          </p>
+          <p>
+            <code>TOOL_NAMES = ['ffmpeg', 'wslc']</code>，同样<strong>属于 runtime</strong>。发现顺序三档：<strong>环境变量 <code>AIRSHIP_&lt;NAME&gt;_PATH</code>（如
+            <code>AIRSHIP_FFMPEG_PATH</code>）&gt; PATH &gt; 已知位置</strong>。<strong>没有"用户指定"那一档</strong>（整档随启动器删了），要显式指就走环境变量。工具可用与否在启动第一份日志里就能读到。
+          </p>
+          <p>
+            子进程接口：<code>proc.run</code> 一次性跑完拿结果（探测类短命令），<code>proc.start</code> 后台跑、进度通过事件回流到本窗口，<code>proc.kill</code> /
+            <code>proc.list</code> 管生命周期；关窗与退出时收掉所有子进程。
+          </p>
+
+          <h2 class="sub" id="package">包格式与文档加载</h2>
+          <p>
+            归档文件名 <code>&lt;id&gt;.airship</code>——里面是一个 zip，条目名就是包内路径。<code>manifest.json</code> 由产包器从 <code>app.ts</code>
+            投影，带 <code>schemaVersion</code>（runtime 只认 1）与 <code>sdkVersion</code>。id 的形状、引用不许越出包，产包器（<code>code/pack-app.mjs</code>）与
+            runtime 侧（<code>@airship/contract</code>）各判一遍，两份由用例比对输出相等来钉。
+          </p>
+          <p>
+            为什么有两份判据：Node 自己解不开本仓 TS 里那种不带扩展名的相对 import，所以 <code>.mjs</code> 引不了 <code>.ts</code>。也因此，被 Node
+            直接加载的那几个源码包（<code>@airship/sdk</code>、<code>@airship/contract</code> 等）内部的相对 import
+            <strong>必须写扩展名</strong>（<code>./csp.ts</code>）。
+          </p>
+          <p>
+            <strong>包里的东西只能在包内互相引用</strong>（PK-006）：入口 html 的 <code>src</code> / <code>href</code> 出现 <code>http(s)://…</code>、<code>//cdn…</code>、以
+            <code>/</code> 开头的绝对路径、或解析后越出包根的 <code>../…</code>，产包期直接失败；<code>data:</code>、<code>blob:</code> 与锚点放行。理由：包要能在别人机器上离线跑起来，装到机器上的东西不能依赖网络，也不能依赖
+            runtime 目录树的形状。
+          </p>
+          <p>
+            文档面走自定义方案 <code>airship://&lt;id&gt;/&lt;entry&gt;</code>：一个应用只读到它自己那一个包。方案属性在 <code>app ready</code>
+            之前注册，处理器在 <code>whenReady</code> 里挂。PDF 的 worker 从包里取，EPUB 的章节样式表是 <code>blob:airship://books/…</code>。
+          </p>
+          <div class="note">
+            <b>CSP 的一个坑</b>：<code>airship://</code> 下 <code>blob:</code> 的 URL 不再被 <code>'self'</code> 覆盖——<code>style-src</code> 不写
+            <code>blob:</code> 就被拦掉（截图走查抓到过一次）。CSP 由 SDK 产包时按清单注入，应用的 <code>index.html</code> 里不写 CSP。
+          </div>
+          <p>
+            归档读取用 fflate：<code>unzipSync(data, { filter })</code> 只解需要的那个条目，列条目名时 filter 一律返回 false、不解压内容。别改成整包解压——八个包全展开是白给的内存。
+          </p>
+
+          <h2 class="sub" id="data">数据与存储</h2>
+          <p>全部在 Electron 的 userData（<code>%APPDATA%\airship</code>）下：</p>
+          <pre><code>userData/
+  apps/&lt;appId&gt;/settings.json   应用私有设置（含它自己的主题档）
+  apps/&lt;appId&gt;/data/           应用私有数据
+  apps/&lt;appId&gt;/cache/          可随时整体删除重建
+  library/                     共享书库（墨读与 PDF 同一份）</code></pre>
+          <p>
+            <strong>没有 runtime 级的 settings.json</strong>：从前那份全局设置（全局主题、工具手动路径）随启动器退场——主题按应用各记各的，工具"用户指定"那一档整档删了。目录布局只依赖 userData
+            根与 id，<strong>不需要知道"现在有哪些应用"</strong>（这条是踩过来的：<code>build()</code> 曾遍历当时的注册表建一张表并缓存，一开机就读失败）。
+          </p>
+          <p>落盘原子写（写暂存名再改名），坏文件挪成 <code>.bad</code> 不致命。应用安装器卸载不动这份数据；runtime 卸载也不动。</p>
+
+          <h2 class="sub" id="ui">界面与主题</h2>
+          <p>
+            runtime 自己没有界面。应用窗口的 DOM 只有 SDK 那一份宿主：标题栏、主题落地、窗口留白、占位图。应用作者只写自己的正文，标题栏中段念"正在看什么"（书名是应用内容，不是窗口名字）。
+          </p>
+          <p>
+            <strong>主题按应用</strong>：三档（亮 / 暗 / 跟随系统）由 SDK 标题栏那颗主题键改，各应用各记各的，落在它自己那份 <code>settings.json</code>，由
+            <code>theme:set</code> 这条窗口面通道写，不占应用的 settings 能力。"跟随系统"的亮暗判定在 SDK 用 <code>matchMedia</code> 算（主进程没有
+            matchMedia，不该去猜），<code>setTheme(mode, resolvedHint)</code> 把算好的亮暗传进来。改一个应用的主题不影响别的窗口。
+          </p>
+          <p>runtime <strong>不记窗口状态</strong>（尺寸与位置都不记）：宽高每次按清单的 <code>defaultWidth</code> / <code>defaultHeight</code>，位置每次由系统摆。所以改这两个数立刻生效，也不需要先清掉什么记忆。</p>
+
+          <h2 class="sub" id="build">构建与出包</h2>
+          <p>两个分发物，互不包含：</p>
+          <ul>
+            <li>
+              <strong>runtime 安装包</strong> = 清场 → 编译 → NSIS → 自检 + 写 <code>.sha256</code>。<code>perMachine: true</code>（要管理员），落点钉死
+              <code>C:\Program Files\airship\runtime</code>（目录唯一真源在安装器脚本的 <code>customInit</code>）。因为出包项目根是 <code>src/runtime</code>，安装包文件名只由
+              <code>src/runtime/package.json</code> 的 <code>version</code> 决定（<code>airship-runtime-Setup-&lt;版本&gt;-x64.exe</code>，主 exe 叫
+              <code>airship.exe</code>）。runtime 自己没有界面，不留快捷方式，只留控制面板卸载项。
+            </li>
+            <li>
+              <strong>应用安装器</strong> = 先产那一个应用的包，再裹成<strong>每用户</strong>安装器（<code>RequestExecutionLevel user</code>，不要管理员），落
+              <code>%LOCALAPPDATA%\airship\apps\&lt;id&gt;\</code>，桌面 + 开始菜单各一枚快捷方式（目标 runtime 的 <code>airship.exe</code> + 引号包路径 + 应用的
+              <code>icon.ico</code>）。版本读 <code>src/apps/&lt;id&gt;/package.json</code>。
+            </li>
+          </ul>
+          <p>
+            <code>just build-apps</code> 的产物只落在 <code>dist-apps/</code>，<strong>不进 runtime 安装包</strong>：安装包是纯的，<code>resources/</code>
+            里只有 <code>app.asar</code>。出包自检因此钉的是反面——<code>resources/</code> 里不该有任何 airship 包，runtime 产物里也不该有 <code>out/renderer</code>
+            或启动器通道。
+          </p>
+          <p>
+            <strong>装包只有一条路：跑应用自己的安装器</strong>。安装器先找 runtime（<code>AIRSHIP_PATH</code> &gt; 固定目录，找不到念一句 <code>runtimeNotFound</code>
+            中止），再念能力清单确认。从前"把归档拖到启动器上"那一族随启动器退场了。
+          </p>
+          <p><strong>清场</strong>是出包入口的第一步：删掉 <code>release/</code> 里上一次留下的安装包。规矩是<strong>宁可响亮报错没有，不许旧包冒充新包</strong>。没有代码签名，第一次运行会被 SmartScreen 拦一道。</p>
+
+          <h2 class="sub" id="metrics">实测数字</h2>
+          <p>
+            性能按<strong>用户可感知的指标</strong>报，并且要有实测数字（截图配方逐窗口采样，同时是"包真能被 runtime 跑起来"的端到端凭据）。下表是 2026-11-19 一轮编译产物直跑的结果（DPI
+            1.5，截图模式每扇窗在隔离状态下采样，不是八扇全开的累计）：
+          </p>
+          <table>
+            <thead><tr><th>窗口</th><th>工作集</th><th>首屏挂载</th></tr></thead>
+            <tbody>
+              <tr><td>打勾勾</td><td>88 MB</td><td>140 ms</td></tr>
+              <tr><td>墨读</td><td>100 MB</td><td>132 ms</td></tr>
+              <tr><td>容器台</td><td>99 MB</td><td>—（wslc 定位 136 ms）</td></tr>
+              <tr><td>生命游戏</td><td>101 MB</td><td>—</td></tr>
+              <tr><td>Albedo</td><td>113 MB</td><td>—</td></tr>
+              <tr><td>PDF</td><td>100 MB</td><td>141 ms</td></tr>
+              <tr><td>S3</td><td>105 MB</td><td>157 ms</td></tr>
+              <tr><td>vcp</td><td>104 MB</td><td>170 ms</td></tr>
+            </tbody>
+          </table>
+          <p>
+            首屏挂载只有报了就绪标记的那几扇有数字。EPUB 翻页延迟没单独采样（TD-012）——现在只有"打开到首屏"的数字。界面观感（真排版好不好看）不在这里，靠截图走查。
+          </p>
+          <a class="backtop" href="#architecture">↑ 回到第一部分开头</a>
+
+          <div class="part-head" id="develop">
+            <div class="part-kicker">第二部分</div>
+            <h2>如何为本项目开发软件</h2>
+            <p>
+              这一部分讲怎么在这套规矩下干活：命令走哪里、加一个应用要动哪几份文件、功能怎么先写成契约再写成用例、验证有哪三档、哪些坑已经踩过别再踩一次。开发者的日常对象是<strong>一个应用区</strong>——按 I-1 与
+              I-5，改它不需要知道其余七个怎么写的。
+            </p>
+          </div>
+
+          <h2 class="sub" id="start">环境与起步</h2>
+          <p>要 Windows、Node.js <code>^20.19.0 || &gt;=22.12.0</code>、<a href="https://github.com/casey/just">just</a> 和 Git Bash。</p>
+          <pre><code>npm install            <span class="c"># 各区是 npm workspaces，装完自动软链</span>
+just                   <span class="c"># 不带参数列出全部配方</span>
+just dev life          <span class="c"># 直跑那一个应用：文档热更，清单与图标走包</span>
+just check             <span class="c"># 类型 + 单测 + 册子差集</span></code></pre>
+          <p>
+            <code>just dev</code> 与截图配方都吃 <code>dist-apps/</code>：改了 <code>app.ts</code>（清单）要重跑一次 <code>just build-apps</code> 才生效，只改组件源码不用——应用的<strong>文档</strong>在
+            dev 下走 vite dev server，<strong>清单与图标</strong>走包。要看"与装好的 runtime 最接近的一条路"用 <code>just start &lt;id&gt;</code>（文档从包里加载）。
+          </p>
+
+          <h2 class="sub" id="rules">动手之前的规矩</h2>
+          <ul>
+            <li><strong>命令只走 justfile。</strong><code>package.json</code> 里没有 <code>scripts</code>，别再往回加。</li>
+            <li><strong>改之前先读对应的规格册</strong>（<code>src/&lt;区&gt;/&lt;名&gt;/specs/*.md</code>）。册子是契约，用例是它的影子，不是反过来。</li>
+            <li><strong>待办只看 <code>docs/todo.md</code></strong>，别处不留零碎待办；编号 <code>TD-###</code> 稳定不复用，做完整条删掉而不是标完成。<strong>没人做决定时不要擅自加条目。</strong></li>
+            <li><strong>clean break：不写旧数据迁移、不写兼容垫片</strong>。删功能就删干净——整族函数、册子里的契约条目（编号显式删除并写清为什么不再成立）、文档里的行与注释一起收。</li>
+            <li><strong>工作树里可能有使用者自己正在改的东西</strong>：不是这一轮改的文件别动；发现冲突先说清"发布物是否已包含它"，由人挑。</li>
+            <li><strong>提交由使用者发起</strong>，改完停在"未提交"，除非他明说提交。</li>
+            <li><strong>系统级动作只给命令</strong>（覆盖安装、把 runtime 装进 Program Files、重启 explorer 等），由使用者执行。</li>
+            <li><strong>汇报口径</strong>：性能按用户可感知的指标报且要有实测数字；没解决就说没解决，别用"符合设计"辩护；外部引用（法条、格式规范、他人库的行为）先查原文再断言。</li>
+          </ul>
+
+          <h2 class="sub" id="commands">命令只走 justfile</h2>
+          <table>
+            <thead><tr><th>配方</th><th>做什么</th></tr></thead>
+            <tbody>
+              <tr><td><code>just build-apps</code></td><td>产各应用的 airship 包到 <code>dist-apps/</code>（每应用一次独立构建）</td></tr>
+              <tr><td><code>just compile</code></td><td>编译 runtime 的两个目标 → <code>src/runtime/out/{main,preload}</code>（没有 renderer）</td></tr>
+              <tr><td><code>just dev &lt;id&gt;</code></td><td>直跑那一个应用（先 build-apps；文档热更，清单与图标走包）</td></tr>
+              <tr><td><code>just start &lt;id&gt;</code></td><td>跑构建好的产物，文档从包里加载</td></tr>
+              <tr><td><code>just new-app &lt;id&gt; &lt;名&gt;</code></td><td>从 <code>templates/app</code> 造一个新应用</td></tr>
+              <tr><td><code>just shot</code></td><td>逐窗口截图（先 compile + build-apps），打每窗口内存与首屏耗时</td></tr>
+              <tr><td><code>just site [端口]</code></td><td>本地预览官网（<code>src/websites</code> 是纯静态的，没有构建步骤；默认 4321，只绑 127.0.0.1）</td></tr>
+              <tr><td><code>just typecheck</code> / <code>just test</code> / <code>just casecov</code></td><td>两个 tsconfig / 全部单测 / 册子编号与用例编号的双向差集</td></tr>
+              <tr><td><code>just check</code></td><td>提交前一轮：类型 + 单测 + 差集</td></tr>
+              <tr><td><code>just app-installer &lt;id&gt;</code></td><td>产那一个应用的每用户安装器 → <code>release/apps/&lt;id&gt;-Setup-&lt;版本&gt;.exe</code></td></tr>
+              <tr><td><code>just build-runtime</code> / <code>just build</code></td><td>打 runtime 安装包 / 两条一起跑（产物互不包含）</td></tr>
+              <tr><td><code>just verify-installer</code></td><td>已存在安装包时单独跑一次出包自检</td></tr>
+              <tr><td><code>just e2e</code> / <code>just wsld-real</code></td><td>要真环境的那两档（本机 ffmpeg / 本机 wslc）</td></tr>
+              <tr><td><code>just icon</code></td><td>由母版重出 runtime 的 <code>icon.ico</code></td></tr>
+            </tbody>
+          </table>
+          <p>
+            两条不变式靠配方依赖钉住，不靠人记得住：<code>build-runtime</code> 以清场开头，以上一次那颗不可能活着躺在 <code>release/</code> 里冒充新包；以出包自检收尾，没有"忘了自检"这条路。
+          </p>
+
+          <h2 class="sub" id="newapp">加一个应用</h2>
+          <p>别手抄，用范本。<strong>runtime 侧任何文件都不用改。</strong></p>
+          <pre><code>just new-app hello 你好     <span class="c"># 复制 templates/app → src/apps/hello，换名、链 workspace、只产它的包</span>
+<span class="c"># 改三处：app.ts（清单）、hello.css（样式）、specs/hello.md（册子）</span>
+just build-apps            <span class="c"># 产 dist-apps/hello.airship</span>
+just dev hello             <span class="c"># 开窗口看，改代码热更</span>
+just shot                  <span class="c"># 逐窗口截图走查</span>
+just app-installer hello   <span class="c"># 产 release/apps/hello-Setup-&lt;版本&gt;.exe</span></code></pre>
+          <h3>一个应用该有的文件</h3>
+          <table>
+            <thead><tr><th>文件</th><th>规矩</th></tr></thead>
+            <tbody>
+              <tr><td><code>package.json</code></td><td>包名 <code>@airship/&lt;id&gt;</code>；SDK、契约、react 记在 <code>devDependencies</code>（构建进包，运行时不需要机器上装着）</td></tr>
+              <tr><td><code>app.ts</code></td><td>纯数据清单，导出 <code>app: AppMeta</code>；主进程也要读它，所以不带任何组件引用</td></tr>
+              <tr><td><code>index.html</code></td><td>入口文档，引 <code>./main.tsx</code>（相对路径）；<strong>里面不写 CSP</strong></td></tr>
+              <tr><td><code>main.tsx</code></td><td>一行 <code>createAirshipApp({ meta, component, icon })</code></td></tr>
+              <tr><td><code>icon.svg|png|jpg|jpeg|webp</code></td><td><strong>有且只有一张</strong>，不套底板，颜色烘进图里；缺或多在产包期炸</td></tr>
+              <tr><td><code>specs/&lt;名&gt;.md</code> + <code>tests/*.test.tsx</code></td><td>册子与用例跟着它们管的代码放在这个区里</td></tr>
+            </tbody>
+          </table>
+          <p>
+            清单缺哪件产包期炸哪件；图标路径不写进清单（那是文件约定），排序不存在（没有启动器格子要排）。<code>templates/app/</code> 不参与 <code>just casecov</code>
+            的双向差集、也不被 vitest 跑，复制进 <code>src/apps/&lt;id&gt;/</code> 之后才归这套规矩管。
+          </p>
+
+          <h2 class="sub" id="manifest">清单怎么写</h2>
+          <p>清单只写"这个应用自己的事实"：</p>
+          <pre><code>export const app: AppMeta = {
+  id: 'hello',                    <span class="c">// ^[a-z][a-z0-9-]{0,31}$：同时是包名前段、数据目录名、airship:// 里那一段</span>
+  name: '你好',                    <span class="c">// 界面显示名，不限字符</span>
+  description: '一句话说清它是干什么的',
+  capabilities: [],               <span class="c">// 唯一授权面，用不到就写空数组</span>
+  sharedNamespaces: ['library'],  <span class="c">// 可选：要访问哪个共享数据区（必须同时声明 shared 能力才有意义）</span>
+  flush: true,                    <span class="c">// 可选：内容区去掉 runtime 给的默认内边距</span>
+  defaultWidth: 1000,             <span class="c">// 可选：不写就用 1100×740，两维各自独立</span>
+  defaultHeight: 720,
+  platforms: ['windows'],         <span class="c">// 可选：不写 = 全平台</span>
+  tools: ['ffmpeg']               <span class="c">// 可选：声明了才拿得到路径，也只有这些进 proc 白名单</span>
+}</code></pre>
+          <p>
+            <strong>被明确驳回过的字段别加回来</strong>：<code>iconPath</code>（等于假定图标必须是某种形状）、<code>order</code>（顺序是应用之间的关系，单个应用决定不了自己的排位）、窗口状态的记忆（尺寸由
+            <code>defaultWidth/defaultHeight</code> 定，改了必须立刻生效）。
+          </p>
+          <p>
+            id 的字符集收严有四条硬理由，实测下来只有这四类会坏：<code>#</code> 与 <code>?</code> 把 URL 里的 id 截断；<code>%</code>
+            让校验用的串和要用的目录名分叉；<code>: &lt; &gt; " | * / \</code> 在 Windows 上做不了目录名；空白进 URL 段整个地址无效。全小写顺带把大小写折叠的撞名消掉。界面显示名在 <code>name</code>，那里不限字符。
+          </p>
+
+          <h2 class="sub" id="code">代码怎么写</h2>
+          <ul>
+            <li>
+              <strong>入口只有一行</strong>：<code>createAirshipApp({ meta, component, icon })</code> 把清单与组件交给 SDK 宿主，宿主画标题栏、落主题、按 <code>flush</code>
+              给不留白。应用侧除了这一行不需要知道 runtime 的存在——这就是"包自持"的意思。
+            </li>
+            <li>
+              <strong>拿 API 用 <code>useAppApi()</code></strong>（<code>src/sdk/api.ts</code>）。它不存在时响亮念出"这个包不是由 airship runtime 打开的，或 preload 没加载成功"，而不是静默空操作。
+            </li>
+            <li>
+              <strong>用不到就别声明能力</strong>；用了 <code>api.settings.</code> / <code>api.proc.</code> 这些域就必须声明对应能力，AP-011 会扫源码核对。没声明的调用被拒时，界面上读得到的是契约层那句中文，不是 Electron 内部措辞。
+            </li>
+            <li>
+              <strong>观感用宿主给的 CSS 变量与 <code>useTheme()</code></strong>，别另调一套配色。<code>IconButton</code> / <code>Titlebar</code> /
+              <code>renderTrayIcon()</code> 这些也从 SDK 拿。（Albedo 是"不跟壳主题联动"的显式例外，只此一家。）
+            </li>
+            <li>
+              <strong>需要"正在看什么"就 <code>api.window.setTitle(书名|null)</code></strong>：窗口中段念书名本身，任务栏那侧拼成「应用名 · 书名」。
+            </li>
+            <li>
+              <strong>包内引用不许越出包</strong>：入口 html 里的 <code>src</code>/<code>href</code> 必须是相对路径，外部资源要么打进包、要么内联（<code>data:</code> / <code>blob:</code>）。
+            </li>
+            <li><strong>不要新增手写别名</strong>：说明符一律写包名 <code>@airship/...</code>，边界由 node 的解析器守。</li>
+            <li><strong>改 SDK 的导出等于改公开面</strong>（TD-013 挂着独立发布），要动先在架构文档那节说清理由。</li>
+          </ul>
+
+          <h2 class="sub" id="spec">规格册</h2>
+          <p>
+            每个功能在动之前先有一份规格册，四档结构：<strong>Purpose → Requirement → Scenario → WHEN/THEN</strong>。册子是用户可见契约的唯一清单，给人读、给人 review；可执行测试是它的影子，不是反过来。
+          </p>
+          <pre><code>#### Scenario: BK-032 MOBI 与 EPUB 走同一条打开动作，书名、作者与章节都落得下来
+- **WHEN** 打开一份 MOBI（<span class="c">code/make-mobi.py</span> 造的《道德經》全本样本：扉页 + 两册 + 八十一章）
+- **THEN** 读得出书名与作者，切成 84 节，且每一节都有内容（没有空节）
+- **AND** 第三节是「第一章」，正文读得到「道，可道也」；第四节读得到「天下皆知美之為美」</code></pre>
+          <ul>
+            <li><strong>只写可观察结果</strong>：界面读得到哪句话、错误文案原文、交给外部 CLI 的命令行、落盘文件的形状。✗ <code>THEN settings 缓存命中</code>（键写错也能绿）→ ✓ <code>THEN 重启后读到的还是刚才那本的书号</code>。</li>
+            <li><strong>不写实现</strong>：不出现类名、方法名、控件名——实现变了册子不该变。唯一例外是系统边界上的契约：与 <code>ffmpeg</code> / <code>wslc</code> 的调用契约、与 runtime 的跨进程调用（能力位名、错误文案原文）。</li>
+            <li><strong>一条 Scenario ≤ 5 行，只锁一个不变量。</strong></li>
+            <li><strong>编号是稳定句柄</strong>：形如 <code>BR-001</code>，按能力前缀分组；不复用、不重排，删除是显式动作，要说清这条契约为什么不再成立。新场景先选节、再取该前缀下的下一个号，所以全局 ID 不保证递增。</li>
+            <li><strong>界面观感不进册子</strong>（宽度、圆角、对齐、真排版好不好看）——那是 <code>just shot</code> 截图走查的事，产物不入代码库。</li>
+            <li><strong>写不出可执行判据的期望别进册子</strong>，记到 <code>docs/architecture.md</code> 对应小节；只能在真机上观察的东西（单实例锁、崩溃隔离、任务栏缩略图）也一样。</li>
+            <li><strong>bug fix 必须先补 Scenario</strong>（描述现象），再补可执行用例，再改代码。</li>
+          </ul>
+          <p>
+            现有 23 本：runtime 8 本（bridge / grants / logging / proc-tools / runtime / storage / theme / tray）+ 应用区 2 本（app-model / package）+ 共享 2 本（library /
+            textdecode）+ 应用 11 本（墨读、PDF、打勾勾、生命游戏、vcp、Albedo、S3 各一本，容器台四本）。索引与前缀表见 <code>docs/specs/index.md</code>——新能力的两字母前缀要取没被占用的，索引表里查。
+          </p>
+
+          <h2 class="sub" id="tests">用例与替身</h2>
+          <p>
+            用例标题以同一个编号开头，<code>just casecov</code> 做双向差集：册里有号没用例 = 未实现，用例挂了号册里没有 = 私测（禁止）。差集只看"有没有"，不看次数；同一条契约要多条用例钉住时，编号重复出现即可。
+          </p>
+          <pre><code><span class="c">// src/runtime/specs/runtime.md 里那条叫「SH-006 关掉应用窗口，它名下的子进程跟着收掉」，</span>
+<span class="c">// 钉它的用例在 src/runtime/tests/windows.test.ts：</span>
+it('SH-006 只杀这个应用的任务，别人的任务一条都不碰', async () =&gt; { … })</code></pre>
+          <ul>
+            <li>
+              <strong>替身住 SDK，不住 runtime 的测试目录</strong>：<code>@airship/sdk/testing</code> 的 <code>FakeAirship</code> 与
+              <code>mountUi</code>。应用不许引 runtime，用例也不能——否则"包自持"在测试里是假的；而且外部作者复制范本出去后要拿到同一个替身。
+            </li>
+            <li>
+              <strong>替身只能实现真 API 面上存在的方法</strong>。两条教训：替身窗口写过 <code>setAppUserModelId</code>（BrowserWindow 上根本没有这个方法），用例绿着而真机没生效；<code>window.x?.()</code>
+              这种可选链会把"方法不存在"吞成静默空操作——缺什么要喊出来，别默默跳过。
+            </li>
+            <li>
+              <strong>挂载器按"用户看得见的话"断言</strong>，故意不引第三方测试库：<code>mountUi(&lt;App api={fake.api} /&gt;, { fake })</code> →
+              <code>m.text()</code> / <code>m.type(...)</code> / <code>m.press('添加')</code>。异步链路靠 <code>settle()</code> 把微任务与定时器跑干净再断言。
+            </li>
+            <li><strong>jsdom 没有 2D canvas</strong>：画布类判据只断言文字、状态与几何数字，"真画出来了"归 <code>just shot</code>。</li>
+            <li><strong>整面 <code>vi.mock('@airship/sdk', ...)</code> 会把 SDK 的其他导出一起抹掉</strong>（踩过：<code>useTheme</code> 凭空不见）。要部分替换就用 <code>vi.mock('@airship/sdk', async (importOriginal) =&gt; ({ ...(await importOriginal()), ... }))</code>。</li>
+            <li><strong>真素材跟着用例走</strong>，放在该区 <code>tests/fixtures/</code>；仓库根不留 <code>fixtures/</code>。</li>
+            <li><strong>需要真环境的用例门控</strong>：按环境变量跳过（<code>VCP_E2E=1</code>、<code>AIRSHIP_WSLD_INTEGRATION=1</code>），标题里照样带编号——静态扫描算它已实现，跑没跑由那档变量决定。外部服务的替身要<strong>被证明真接住了请求</strong>：S3 那条链路起一个真跑在 <code>127.0.0.1</code> 上的假 S3 服务，因为换 <code>globalThis.fetch</code> 拦不到 AWS SDK，早期版本因此把请求发到了真端点。</li>
+          </ul>
+
+          <h2 class="sub" id="verify">三档验证</h2>
+          <table>
+            <thead><tr><th>档</th><th>命令</th><th>能验到哪</th></tr></thead>
+            <tbody>
+              <tr><td>自动化</td><td><code>just check</code>（= typecheck + test + casecov）</td><td>逻辑与契约措辞、架构不变量的可执行版本（扫 import 图、扫 runtime 里不许出现具体应用 id）、册子与用例的双向差集</td></tr>
+              <tr><td>像素</td><td><code>just shot</code></td><td>逐窗口截图 + 每窗口内存与首屏耗时；同时是"包真能被 runtime 跑起来"的端到端凭据（窗口加载的是 <code>airship://&lt;id&gt;/index.html</code>）</td></tr>
+              <tr><td>真环境</td><td><code>just e2e</code> / <code>just wsld-real</code></td><td>本机 ffmpeg 真编码、本机 wslc 只读命令</td></tr>
+            </tbody>
+          </table>
+          <p>截图模式几条要记住的：</p>
+          <ul>
+            <li><strong>只有截图那一条命令会先构建</strong>。裸跑截图命令截的是上一次留在 <code>out/</code> 的构建——看着像"改动没生效"。</li>
+            <li><strong>等待要够长</strong>：冷启动的外部命令实测可以到 2.5 s，等 1.5 s 永远截成空壳，看着像应用有 bug。报"某功能坏了"之前先排除工装时序与文件系统抖动，连跑两遍全绿再下结论。</li>
+            <li><strong>截图只拍视口</strong>；折叠线下的那一栏要临时改窗口高度，看完还原并重新构建。</li>
+            <li><strong>hover 才出现的东西，截图模式驱动不了鼠标</strong>：只能临时加一句"自动展开"，看完还原、重建，并确认 <code>git status</code> 里没有补丁残留。</li>
+            <li>喂真素材走 <code>AIRSHIP_AUTOTEST='{"app":"...","path":"C:/..."}'</code>（值是 JSON，<strong>路径必须写正斜杠</strong>；反斜杠解出来是 <code>\U</code>，解析失败后只打一句"忽略"，截图看起来像功能没做）。那份档案是独立的 <code>airship-shot-profile</code>，写进正常 userData 读不到。</li>
+            <li>验证报告要说清：哪一半靠用例、哪一半靠像素、哪一半没验到。<strong>临时补丁必须还原并重建后才算交付。</strong></li>
+          </ul>
+
+          <h2 class="sub" id="release">出包与分发</h2>
+          <pre><code>just build-apps            <span class="c"># 八个包 → dist-apps/&lt;id&gt;.airship</span>
+just app-installer books   <span class="c"># 先产 books 那份包，再裹成每用户安装器</span>
+just build-runtime         <span class="c"># 清场 → 编译 → NSIS → 自检 + .sha256（纯 runtime）</span>
+just build                 <span class="c"># 两条一起跑</span></code></pre>
+          <ul>
+            <li><strong>先跑过一次 <code>just build-runtime</code></strong> 再产应用安装器：应用安装器用的 <code>makensis</code> 是 electron-builder 缓存里那份。</li>
+            <li><strong>两个分发物互不包含</strong>：安装包是纯 runtime，应用包只落在 <code>dist-apps/</code> 并由各家自己的安装器装。</li>
+            <li><strong>授权在安装期一次完成</strong>：装前念能力清单（措辞由 <code>@airship/contract</code> 供，别在界面或 NSI 里另写一份），装完双击快捷方式直接开窗口。</li>
+            <li><code>src/runtime/out/</code>、<code>dist-apps/</code>、<code>release/</code>、<code>shots/</code> 都不入库，根目录保持干净；中间产物写到系统临时目录。</li>
+            <li>没有代码签名（TD-003），也没有自动更新链路（TD-004）。</li>
+          </ul>
+
+          <h2 class="sub" id="versioning">版本号规矩</h2>
+          <p>只有两条：</p>
+          <ul>
+            <li>
+              <strong>根 <code>package.json</code> 与 <code>src/runtime/package.json</code> 保持一致</strong>——它们是同一个发布物，就该念同一个数（现 0.4.0）。产包器取<strong>根</strong>那份当包清单里的
+              <code>sdkVersion</code>，两处不一致等于清单在说谎。
+            </li>
+            <li><strong>各应用自己的 <code>package.json</code> 版本独立演化</strong>，不跟 runtime 跳：一个应用发自己的版不该惊动别的区和 runtime。</li>
+          </ul>
+          <p>runtime 的 <code>package.json</code> 里 electron 必须写<strong>固定版本</strong>（<code>45.2.3</code>，不带 <code>^</code>）——electron-builder 要按它下载对应平台的二进制，写范围会直接被拒。</p>
+
+          <h2 class="sub" id="pitfalls">踩过的坑</h2>
+          <table>
+            <thead><tr><th>症状</th><th>成因与规矩</th></tr></thead>
+            <tbody>
+              <tr><td><code>import * as x from '@airship/sdk/testing'</code> 拿到<strong>空对象</strong>而不是报错</td><td>源码包被 Node 直接加载时解不开省略扩展名的相对 import。这些包内部写 <code>./foo.ts</code> / <code>./foo.tsx</code>；vitest 那边还要 <code>server.deps.inline: [/^@airship\//]</code>。</td></tr>
+              <tr><td>包工装"静默失效"、注册表"安静地空着"</td><td><code>mkdtempSync</code> 在 <code>node:fs</code> 不在 <code>node:os</code>；从 os 引拿到 undefined。用例的包目录每次新开一个临时目录，不按 pid 复用——Windows 上 <code>rmSync(force)</code> 会把"删不掉"咽下去，旧格式残包留在原地。</td></tr>
+              <tr><td><code>useState</code> 读到 <code>null</code></td><td>workspace 软链进 <code>node_modules</code> 后，rollup 的 commonjs 互操作会把 react 各包一遍。三份构建配置都写了 <code>resolve.dedupe: ['react','react-dom','react/jsx-runtime']</code>，摘掉就崩——别按"看起来多余"删它。</td></tr>
+              <tr><td>一串 <code>TS1261 / differs only in casing</code></td><td>npm workspaces 的软链按调用进程的 cwd 拼法落盘。这台机器上真实目录是 <code>C:\Users\xyzwp\Develop\airship</code>，命令一律按这个拼法走；已经踩了就 <code>rm -rf node_modules/@airship &amp;&amp; npm install</code> 重建软链，再清 <code>node_modules/.vite</code>。npm 不清 lock 里已不存在的 workspace 孤儿条目，要手删那一块。</td></tr>
+              <tr><td>装一次 Electron 二进制要等很久 / 直接失败</td><td>Electron 与 electron-builder 的二进制走 npmmirror：<code>.npmrc</code> 里配了 <code>electron_mirror</code> 与 <code>electron_builder_binaries_mirror</code>，<code>build-runtime</code> 里也显式带上同名环境变量。</td></tr>
+              <tr><td>暗色模式下书叶还是白底</td><td>EPUB 自带 CSS 会盖过渲染器那层，只能往每节文档注入带 <code>!important</code> 的纸面样式，换主题时对已渲染页重打、新页在 <code>load</code> 里补。</td></tr>
+              <tr><td>封面画成破图</td><td>靠 <code>file:///</code> 拼地址会被应用窗口 CSP 拦掉；改成 <code>api.fs.read</code> 拿字节 → <code>blob:</code> URL。<code>airship://</code> 下 <code>blob:</code> 不被 <code>'self'</code> 覆盖，<code>style-src</code> 要写 <code>blob:</code>。</td></tr>
+              <tr><td>Python 脚本打印 <code>✓</code> 或韩文报 <code>UnicodeEncodeError</code></td><td>控制台默认 GBK：脚本里用 ASCII 或中文（GBK 能编码）；乱码输出不代表文件坏了。PowerShell 5.1 读无 BOM 的 UTF-8 <code>.ps1</code> 按 GBK 解，所以 <code>.ps1</code> 要纯 ASCII。Git Bash 的 MSYS 路径转换会破坏 NSIS 的 <code>/S</code>，静默安装走 <code>cmd //c "set VAR=...&amp;&amp; prog.exe /S"</code>。</td></tr>
+              <tr><td>Pillow 不认 SVG，无头 Chrome 截内联 SVG 出空白</td><td>要 SVG→位图用 <code>@resvg/resvg-js</code>；应用安装器把包内 SVG 经 resvg 出 256 PNG，再转多尺寸 <code>.ico</code>。</td></tr>
+              <tr><td><code>just dev</code> 里看到 <code>undefinedp</code> 这类怪值</td><td>先怀疑热更新：React Fast Refresh 会保住已挂载组件的 <code>useRef</code>，改了 state 形状后旧进程里还是老形状。截图模式每次是新进程，所以只有直跑那边会看到——重启一次，别写防御性代码。</td></tr>
+              <tr><td>界面上"设置像没存过"但画得好好的</td><td>截图模式用的是 <code>%APPDATA%/airship-shot-profile</code>，要喂真数据得灌进那份档案。</td></tr>
+              <tr><td>托盘徽标只更新了提示文字</td><td>Windows 托盘图标是位图，主进程没有画字的能力；要画出带数字的图标，应用侧用 <code>renderTrayIcon()</code> 生成 <code>iconDataUrl</code> 一起传。</td></tr>
+            </tbody>
+          </table>
+
+          <h2 class="sub" id="checklist">收尾检查单</h2>
+          <ol>
+            <li>新改动有没有对应的册子场景？bug fix 先补 Scenario，再补用例，再改代码。</li>
+            <li><code>just check</code> 全绿（类型 + 单测 + 差集双向零缺漏）。</li>
+            <li>动了界面观感？跑 <code>just shot</code> 走查截图，确认临时补丁已还原并重建，<code>git status</code> 干净。</li>
+            <li>加了新能力位或新工具？那是 runtime 的变更，不是应用侧改一条字符串就算——工具名单与共享命名空间名单都<strong>属于 runtime</strong>。</li>
+            <li>改了 SDK 导出？等于改公开面，同步 <code>docs/architecture.md</code> 对应小节。</li>
+            <li>"还没做 / 做不了 / 这期不做"记进 <code>docs/todo.md</code>（只在有人做了决定时）；架构文档里只留状态标记，不另开一章。</li>
+            <li>停在"未提交"，把改动、验证口径（哪一半用例、哪一半像素、哪一半没验到）和实测数字讲清楚，由使用者决定提交。</li>
+          </ol>
+          <a class="backtop" href="#develop">↑ 回到第二部分开头</a>
+        </article>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap cols">
+        <span>本页内容与仓库真源对齐：<code>docs/architecture.md</code>、<code>docs/specs/index.md</code>、<code>src/shared/contract/protocol.ts</code>、<code>justfile</code>、<code>README.md</code></span>
+        <span><a href="./index.html">首页</a> · <a href="./apps.html">预置应用</a></span>
+      </div>
+    </footer>
+
+    <script src="./assets/site.js"></script>
+  </body>
+</html>

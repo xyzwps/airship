@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>预置应用 · Airship</title>
+    <meta name="description" content="跑在 Airship runtime 上的八个预置应用：各自的窗口实拍、能力声明、外部工具与规格册。" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4.2' fill='%23e2e1f1'/%3E%3Crect x='3.4' y='3' width='4.6' height='4.6' rx='1.3' fill='%23f86e51'/%3E%3Crect x='8.9' y='3' width='4.6' height='4.6' rx='1.3' fill='%2380b6a8'/%3E%3Ccircle cx='5.7' cy='10.6' r='2.3' fill='%2398a5e9'/%3E%3Crect x='8.9' y='8.3' width='4.6' height='4.6' rx='2' fill='%23eba6b8'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./assets/site.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+
+    <header class="site-header">
+      <div class="wrap bar">
+        <a class="brand" href="./index.html">
+          <svg class="mark" viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="0" y="0" width="16" height="16" rx="4.2" fill="#e2e1f1" />
+            <rect x="3.4" y="3" width="4.6" height="4.6" rx="1.3" fill="#f86e51" />
+            <rect x="8.9" y="3" width="4.6" height="4.6" rx="1.3" fill="#80b6a8" />
+            <circle cx="5.7" cy="10.6" r="2.3" fill="#98a5e9" />
+            <rect x="8.9" y="8.3" width="4.6" height="4.6" rx="2" fill="#eba6b8" />
+          </svg>
+          <span class="zh">Airship</span>
+        </a>
+        <nav class="site-nav" aria-label="主导航">
+          <a href="./index.html">首页</a>
+          <a href="./docs.html">文档</a>
+          <a href="./apps.html" aria-current="page">预置应用</a>
+        </nav>
+        <button class="theme-btn" id="theme-toggle" type="button">◐</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <div class="wrap">
+        <section class="hero" style="border: 0">
+          <span class="eyebrow">八个应用 · 一个应用一个包 · 一个窗口一个渲染进程</span>
+          <h1>预置应用</h1>
+          <p class="lede">
+            这八个是仓库里天天在用的工具，每一个都是一个独立的 <code>&lt;id&gt;.airship</code> 包，跟外部写的应用走同一条路：
+            <code>just app-installer &lt;id&gt;</code> 出它自己的安装器，装进每用户目录，桌面与开始菜单各留一枚快捷方式。
+            下面每张卡是它自己窗口的实拍（<code>just shot</code> 抓的），能力位照 <code>src/apps/&lt;id&gt;/app.ts</code> 那份清单原样念——
+            <strong>没声明的一律拒绝</strong>，所以卡上看不见的东西它也真做不到。
+          </p>
+
+          <div class="cards app-cards">
+            <article class="card app-card">
+              <a class="shot" href="./assets/screens/books.png"><img src="./assets/screens/books.png" alt="墨读的窗口实拍：三本书的封面格子" loading="lazy" /></a>
+              <div class="body">
+                <h3>墨读 <span class="id">books</span></h3>
+                <p>EPUB / MOBI 电子书书架与阅读器。</p>
+                <div class="caps">
+                  <span>fs.read</span><span>fs.write</span><span>dialog</span><span>settings</span><span>shared</span><span>notify</span><span>clipboard</span><span>log</span>
+                </div>
+                <p class="app-meta">窗口 600×800 · <code>sharedNamespaces: ['library']</code>（与 PDF 同一份书库） · 册子 BK + 共享书库 LB</p>
+              </div>
+            </article>
+
+            <article class="card app-card">
+              <a class="shot" href="./assets/screens/pdf.png"><img src="./assets/screens/pdf.png" alt="PDF 的窗口实拍：渲染出来的一页与顶部翻页条" loading="lazy" /></a>
+              <div class="body">
+                <h3>PDF <span class="id">pdf</span></h3>
+                <p>PDF 阅读，与墨读共用同一个书架。</p>
+                <div class="caps">
+                  <span>fs.read</span><span>fs.write</span><span>dialog</span><span>settings</span><span>shared</span><span>notify</span><span>clipboard</span><span>log</span>
+                </div>
+                <p class="app-meta">尺寸跟 runtime 默认 · <code>sharedNamespaces: ['library']</code> · 册子 PD + 共享书库 LB</p>
+              </div>
+            </article>
+
+            <article class="card app-card">
+              <a class="shot" href="./assets/screens/dagogo.png"><img src="./assets/screens/dagogo.png" alt="打勾勾的窗口实拍：两条待办与一条今天已完成" loading="lazy" /></a>
+              <div class="body">
+                <h3>打勾勾 <span class="id">dagogo</span></h3>
+                <p>每天要做的事，勾掉就行。</p>
+                <div class="caps">
+                  <span>fs.read</span><span>fs.write</span><span>dialog</span><span>settings</span><span>tray</span><span>notify</span><span>log</span>
+                </div>
+                <p class="app-meta">窗口 600×800 · 托盘徽标由它占用 · 册子 DG</p>
+              </div>
+            </article>
+
+            <article class="card app-card">
+              <a class="shot" href="./assets/screens/life.png"><img src="./assets/screens/life.png" alt="生命游戏的窗口实拍：网格上一枚滑翔机与右侧图形面板" loading="lazy" /></a>
+              <div class="body">
+                <h3>生命游戏 <span class="id">life</span></h3>
+                <p>在 100 / 200 / 300 的网格上跑康威生命游戏，经典图形随手放，格子自己画。</p>
+                <div class="caps"><span class="none">capabilities: []　—— 一件都不声明</span></div>
+                <p class="app-meta">窗口 1000×720 · 不碰你的文件，也没有"记住上次那张图" · 册子 LF</p>
+              </div>
+            </article>
+
+            <article class="card app-card">
+              <a class="shot" href="./assets/screens/vcp.png"><img src="./assets/screens/vcp.png" alt="vcp 的窗口实拍：载入一段 4K 样片后的流选择与处理链卡片" loading="lazy" /></a>
+              <div class="body">
+                <h3>vcp <span class="id">vcp</span></h3>
+                <p>FFmpeg 编排台：选流、加处理链、看命令、跑队列。</p>
+                <div class="caps">
+                  <span>fs.read</span><span>fs.write</span><span>dialog</span><span>settings</span><span>proc</span><span>notify</span><span>clipboard</span><span>log</span>
+                </div>
+                <p class="app-meta">尺寸跟 runtime 默认 · <code>tools: ['ffmpeg']</code> · 册子 VC（真编码那几条门控 <code>VCP_E2E=1</code>）</p>
+              </div>
+            </article>
+
+            <article class="card app-card">
+              <a class="shot" href="./assets/screens/wsld.png"><img src="./assets/screens/wsld.png" alt="容器台的窗口实拍：六个 WSL 容器的列表与状态" loading="lazy" /></a>
+              <div class="body">
+                <h3>容器台 <span class="id">wsld</span></h3>
+                <p>WSL 容器与镜像的图形外壳：看列表、起停删、读日志。</p>
+                <div class="caps">
+                  <span>fs.read</span><span>fs.write</span><span>dialog</span><span>settings</span><span>proc</span><span>notify</span><span>clipboard</span><span>log</span>
+                </div>
+                <p class="app-meta">尺寸跟 runtime 默认 · <code>tools: ['wslc']</code> · <code>platforms: ['windows']</code>（别的平台上根本跑不起来） · 册子 CL / CA / WL / IM</p>
+              </div>
+            </article>
+
+            <article class="card app-card">
+              <a class="shot" href="./assets/screens/albedo.png"><img src="./assets/screens/albedo.png" alt="Albedo 的窗口实拍：画布上的圆角矩形、圆与一条贝塞尔曲线" loading="lazy" /></a>
+              <div class="body">
+                <h3>Albedo <span class="id">albedo</span></h3>
+                <p>SVG 编辑工作台：形状与路径命令栈、布尔运算、对齐吸附、桌布描图、导出 SVG/PNG。</p>
+                <div class="caps">
+                  <span>settings</span><span>dialog</span><span>fs.read</span><span>fs.write</span><span>clipboard</span>
+                </div>
+                <p class="app-meta">窗口 1440×900 · 不声明网络与 proc，东西全在本地算 · 册子 AL</p>
+              </div>
+            </article>
+
+            <article class="card app-card">
+              <a class="shot" href="./assets/screens/s3.png"><img src="./assets/screens/s3.png" alt="S3 的窗口实拍：三个桶、archive 的对象列表与右侧的图片预览" loading="lazy" /></a>
+              <div class="body">
+                <h3>S3 <span class="id">s3</span></h3>
+                <p>连着 S3 兼容的对象存储看桶与对象：浏览、上传、下载、预览、删除、复制临时链接。</p>
+                <div class="caps">
+                  <span class="bypass">net</span><span>settings</span><span>dialog</span><span>fs.read</span><span>fs.write</span><span>clipboard</span>
+                </div>
+                <p class="app-meta">窗口 1180×760 · 这一家独有的 <code>net</code>：在自己窗口里直连用户填的端点，不经 runtime 代发 · 册子 OS</p>
+              </div>
+            </article>
+          </div>
+
+          <div class="note">
+            <b>这八个不是特例</b>：<code>just new-app hello 你好</code> 从 <code>templates/app</code> 造出 <code>src/apps/hello/</code>，
+            改清单、样式、规格册三处，<code>just build-apps</code> 产包，<code>just app-installer hello</code> 产安装器——
+            runtime 侧一个文件都不用动。怎么做在<a href="./docs.html#newapp">文档 · 加一个应用</a>。
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap cols">
+        <span>Airship · MIT 许可</span>
+        <span>本页真源：<code>src/apps/&lt;id&gt;/app.ts</code>、<code>docs/specs/index.md</code>、<code>just shot</code> 的窗口实拍</span>
+        <span><a href="./index.html">首页</a> · <a href="./docs.html">文档</a></span>
+      </div>
+    </footer>
+
+    <script src="./assets/site.js"></script>
+  </body>
+</html>

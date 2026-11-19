@@ -71,6 +71,11 @@ app-installer id:
     node code/build-apps.mjs {{id}}
     node code/make-app-installer.mjs {{id}}
 
+# 本地预览官网：just site [端口]（默认 4321）。src/websites 是纯静态的，没有构建步骤，
+# 这一条只把那份目录端成 http 站点（只绑 127.0.0.1，响应一律 no-store，改完刷新就见效）。
+site port='4321':
+    node code/serve-site.mjs {{port}}
+
 # 类型检查：node 侧与 web 侧两个 tsconfig
 typecheck:
     {{bin}}/tsc --noEmit -p tsconfig.node.json
