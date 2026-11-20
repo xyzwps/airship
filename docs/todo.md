@@ -78,11 +78,7 @@
 
 ## 应用与能力：原版有、这里先没有
 
-这三块都属 wsld（容器台）。册子索引里"先不开的册子"那几本与它们一一对应，内容以这里为准。
-
-### TD-007 `run` 命令编排（`run-builder`）
-
-40 余字段的拼装、校验与反解，是原版量最大的一块。来源：`docs/specs/index.md`、`docs/architecture.md` §14。
+这三块都属 wsld。册子索引里"先不开的册子"那几本与它们一一对应，内容以这里为准。
 
 ### TD-008 registry mirror（`registry-mirror`）
 

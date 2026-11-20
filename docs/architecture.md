@@ -461,9 +461,9 @@ Electron 与 electron-builder 的二进制走 npmmirror（`.npmrc` 与 `build-ru
 用例标题以编号开头，`just casecov` 做双向差集：册里有号没用例 = 未实现，用例挂了号册里没有 = 私测（禁止）。
 界面观感不进册子，那是 `just shot` 截图走查的事。写不出可执行判据的期望别进册子，记到本文档对应小节。
 
-册子共 **23 本**：runtime 8 本（bridge / grants / logging / proc-tools / runtime / storage / theme / tray）
-+ 应用区 2 本（app-model / package）+ 共享 2 本（library / textdecode）+ 应用 11 本
-（vcp / books / pdf / dagogo / life / albedo / s3 各一，wsld 四本）。索引见 [specs/index.md](specs/index.md)。
+册子共 **24 本**：runtime 8 本（bridge / grants / logging / proc-tools / runtime / storage / theme / tray）
++ 应用区 2 本（app-model / package）+ 共享 2 本（library / textdecode）+ 应用 12 本
+（vcp / books / pdf / dagogo / life / albedo / s3 各一，wsld 五本）。索引见 [specs/index.md](specs/index.md)。
 
 **替身住 SDK**（`@airship/sdk/testing` 的 `FakeAirship` 与 `mountUi`），不住 runtime 的测试目录：
 应用不许引 runtime，用例也不能——否则"包自持"在测试里是假的，外部作者复制范本出去后拿不到同一个替身。
@@ -499,7 +499,8 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
 - TD-001 快捷方式（`.lnk`）上还没有 per-app 的 AUMID；窗口身份那一步已落（SH-010 / SH-034 / SH-035，见 §3）。
 - TD-003 没有代码签名证书；TD-004 没有自动更新链路；TD-005 想要 Inno Setup 那一档观感。
 - TD-006 多窗口的内存回收（现在没有触发这件事的症状）。
-- TD-007~010 wsld 原版有、这期先没有的四块（run 编排 / registry mirror / 拉取实时进度 / 自己的设置页）。
+- TD-008~010 wsld 原版有、这期先没有的三块（registry mirror / 拉取实时进度 / 自己的设置页）。
+  （TD-007 run 编排已于 2026-11-20 落成，册子 `wsld-run.md`，编号 RB-001~053 除显式删除的 026、053。）
 - TD-012 EPUB 翻页延迟没单独采样。
 - TD-013 SDK 独立发布与版本协商；TD-014 装包的来源信任、更新与商店链路。
 

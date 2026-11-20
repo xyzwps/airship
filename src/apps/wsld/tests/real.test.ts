@@ -4,13 +4,14 @@ import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { cleanWslcError, parseContainers, parseImages } from '../parse'
 import { imageReference, containerName } from '../model'
+import { emptyRunSpec, runArgs, runCommand, tryParseRun } from '../run'
 
 /**
  * 真机门控（对应原版的 RealWslc*IntegrationTests）。
  *
  * 默认整段跳过，只有 `AIRSHIP_WSLD_INTEGRATION=1` 才跑。
- * 它直接问本机的 wslc.exe，**只跑只读命令**：这是用户自己的机器，
- * 建容器、删容器、拉镜像那类会留下痕迹的动作一概不碰。
+ * 它直接问本机的 wslc.exe：读命令随便跑；唯一的例外是那条 `run -d --rm hello-world`
+ * ——--rm 让容器退出即消，收尾再确认一遍没留痕，用完的机器和用之前一样干净。
  *
  *   just wsld-real
  */
@@ -88,5 +89,40 @@ gated('本机 wslc 的真实输出', () => {
     const answer = await wslc(['logs', '-n', '3', target.id])
     // 实测：已退出的容器多半是退出码 0 + 空输出，界面据此说"没有输出"
     expect(answer.code, cleanWslcError(answer.stderr)).toBe(0)
+  }, 60_000)
+
+  it('RB-020 真机 run -d --rm 拿回 64 位容器 ID，退出即消不留痕', async () => {
+    // 本机多半只有镜像源前缀的 hello-world（裸名拉不动外网），先问本地清单
+    const listed0 = await wslc(['images', '--format', 'json'])
+    const local = parseImages(listed0.stdout)
+      .map(imageReference)
+      .find((ref) => ref.includes('hello-world'))
+    const spec = emptyRunSpec()
+    spec.image = local ?? 'hello-world'
+    spec.detach = true
+    spec.rm = true
+
+    const answer = await wslc(runArgs(spec))
+    expect(answer.code, cleanWslcError(answer.stderr)).toBe(0)
+    const id = answer.stdout.split('\n').map((l) => l.trim()).find((l) => l.length > 0) ?? ''
+    expect(id, `wslc 写回的容器 ID 不像 64 位十六进制：${JSON.stringify(id)}`).toMatch(/^[0-9a-f]{64}$/i)
+
+    // --rm 的账在这里对：跑完的 hello-world 不该还挂在列表里
+    const listed = await wslc(['list', '-a', '--format', 'json'])
+    expect(parseContainers(listed.stdout).some((c) => c.id === id)).toBe(false)
+
+    // 界面上那条与交给 wslc 的逐段一致，且原样读回来还是同一条（RB-003/034 的真机版）
+    const display = runCommand(spec)
+    const parsed = tryParseRun(display)
+    expect(parsed).not.toBeNull()
+    expect(runCommand(parsed!)).toBe(display)
+  }, 120_000)
+
+  it('RB-024 真机跑一个不存在的镜像，stderr 洗出来的是人话不是样板', async () => {
+    const answer = await wslc(['run', '-d', 'airship-没有这个镜像:0'])
+    expect(answer.code).not.toBe(0)
+    const shown = cleanWslcError(answer.stderr)
+    expect(shown.length).toBeGreaterThan(0)
+    expect(shown).not.toContain('如果此错误是意外错误')
   }, 60_000)
 })

@@ -121,10 +121,13 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 | CA | wsld：容器生命周期操作 | `wsld-container-actions.md` | 同左 |
 | WL | wsld：容器日志（尾部行数、时间戳、实时） | `wsld-logs.md` | 同左 |
 | IM | wsld：镜像列表、拉取、删除与强制删除 | `wsld-images.md` | 同左 |
+| RB | wsld：run 命令编排（拼装、校验、读回、就地执行与历史） | `wsld-run.md` | 同左 |
 
-移植时**先不开**的册子（原版有、这期不做）：`run-builder`、`registry-mirror`、`pull-progress`、
+移植时**先不开**的册子（原版有、这期不做）：`registry-mirror`、`pull-progress`、
 `settings`（wsld 自己的设置页）。它们为什么还没开、各要动哪一层，统一记在
-[../../todo.md](../todo.md) 的 TD-007 到 TD-010，这本索引不再抄理由。
+[../../todo.md](../todo.md) 的 TD-008 到 TD-010，这本索引不再抄理由。
+`run-builder` 已于 2026-11-20 开成上面那本 RB：编号沿用原版（RB-001~053），
+原版的 RB-026 与 RB-053 显式删除，理由写在册子末尾的注记里。
 
 `runtime.md` 与 `theme.md` 也不搬：窗口、直跑与换皮都归 airship runtime 自己（本册表里的 SH / TH）；
 界面语言同理——本项目只做中文，见 todo.md 末尾"不做，只留理由"那一节。

@@ -364,6 +364,197 @@
   padding-top: 2px;
 }
 
+/* ---------- 编排页：左边表单，右边生成命令 / 输出 / 历史 ---------- */
+
+.wsld__run-cols {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.wsld__run-form {
+  flex: 5;
+  min-width: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 2px;
+}
+
+.wsld__run-side {
+  flex: 4;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.wsld__run-h {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* 一组字段一个网格：标签共用同一列宽，按这组里最长的标签走 */
+.wsld__run-sec {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 5px 12px;
+  align-items: center;
+}
+
+.wsld__run-sec > .wsld__run-h,
+.wsld__run-sec > .wsld__run-area,
+.wsld__run-sec > .wsld__run-checks,
+.wsld__run-sec > .wsld__run-row,
+.wsld__run-sec > .wsld__run-grid,
+.wsld__run-sec > .btn {
+  grid-column: 1 / -1;
+}
+
+.wsld__run-sec > .wsld__run-field {
+  display: contents;
+}
+
+.wsld__run-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.wsld__run-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.wsld__run-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.wsld__run-area {
+  resize: vertical;
+}
+
+.wsld__run-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 5px 12px;
+}
+
+.wsld__run-grid .wsld__run-field {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.wsld__run-cmd {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+
+.wsld__run-text {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 110px;
+  overflow: auto;
+}
+
+.wsld__run-btns {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.wsld__run-issues {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  font-size: 12.5px;
+  flex: none;
+  user-select: text;
+}
+
+.wsld__run-issues-head {
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.wsld__run-issue {
+  padding-left: 10px;
+}
+
+.wsld__run-out {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* 输出框吃掉右栏剩余高度，停在最新一行 */
+.wsld__run-pre {
+  flex: 1;
+  min-height: 120px;
+  max-height: none;
+}
+
+.wsld__run-history {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: none;
+}
+
+.wsld__run-hlist {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.wsld__run-hrow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.wsld__run-hrow:hover {
+  background: var(--bg-hover);
+}
+
+.wsld__run-htime {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.wsld__run-hcmd {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: text;
+}
+
 .wsld__missing {
   max-width: 520px;
   text-align: center;
