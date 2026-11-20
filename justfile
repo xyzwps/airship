@@ -112,7 +112,7 @@ icon:
 
 # 清掉 release/ 里上一次留下的安装包（宁可没有，不可有旧的）
 clean-release:
-    node code/clean-installer.mjs
+    rm  -rf release
 
 # 打 runtime 的安装包并自检：清场 → 编译 → NSIS → 验包 + 写 .sha256。
 # 唯一的发布入口；win-unpacked/ 是这一步就地解包的产物，不用另开命令。
@@ -135,11 +135,13 @@ clean-app-installers:
 installers: build-apps clean-app-installers
     node code/make-app-installer.mjs
 
+clean: clean-apps clean-release clean-app-installers
+
 # 三样一起出：runtime 的安装包 + 各应用的包 + 各应用的安装器。
 # runtime 安装包是纯 runtime，包只落在 dist-apps/，两者互不包含。
 # 顺序有讲究：build-runtime 会把 NSIS 落进 electron-builder 的缓存，installers 用的 makensis 就是那一份——
 # 排它后面，这台机器上第一次跑也不会撞见"缓存里没有 makensis"那一嗓子。
-build: build-runtime installers
+build: clean build-runtime installers
 
 # 单独跑一次出包自检（安装包已存在时）
 verify-installer:
