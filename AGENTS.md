@@ -1,7 +1,7 @@
 # airship · 给代理的说明
 
 飞船是一个 **airship runtime**（一个 Electron 运行时，像 JVM / .NET 那样装一次大家共用），
-外面挂着八个自用应用（墨读 · PDF · 打勾勾 · 生命游戏 · vcp · 容器台 · Albedo · S3）。
+外面挂着八个自用应用（墨读 · PDF · 打勾勾 · 生命游戏 · vcp · wsld · Albedo · S3）。
 一个应用一个窗口一个渲染进程，**一个应用是一个 airship 包（zip 归档 `<id>.airship`），由命令行指给 runtime 注册**——
 runtime 的产物里没有应用代码，runtime 自己也没有界面。多个应用共用一个 runtime 进程，第二次启动转发包路径。
 这里只写"不照做就会做错"的事；架构理由见

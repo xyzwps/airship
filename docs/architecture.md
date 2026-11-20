@@ -17,7 +17,7 @@ airship runtime（一个 Electron 进程，src/runtime/，@airship/runtime）
 
 应用（八个，src/apps/<id>/，各自一个 airship 包）
   books 墨读 · pdf PDF · dagogo 打勾勾 · life 生命游戏
-  vcp · wsld 容器台 · albedo Albedo · s3 S3
+  vcp · wsld · albedo Albedo · s3 S3
   每个应用 = <id>.airship 归档 + 它自己的每用户安装器 + 一枚快捷方式
 ```
 
@@ -135,15 +135,15 @@ relaunchDisplayName })`（win32 专有；后两条必须成对，否则外壳两
 |---|---|---|
 | 打勾勾 | 86 MB | 155 ms |
 | 墨读 | 100 MB | 507 ms |
-| 容器台 | 99 MB | —（wslc 定位 535 ms） |
+| wsld | 99 MB | —（wslc 定位 535 ms） |
 | 生命游戏 | 102 MB | — |
 | Albedo | 112 MB | — |
 | PDF | 100 MB | 575 ms |
 | S3 | 102 MB | 540 ms |
 | vcp | 102 MB | 540 ms |
 
-工作集八扇都有；首屏挂载只有报了就绪标记的那几扇有数字（生命游戏 / Albedo / 容器台本轮没报挂载标记，
-容器台报的是"wslc 已定位"那条）。EPUB 翻页延迟没单独采样（TD-012）——现在只有"打开到首屏"的数字。
+工作集八扇都有；首屏挂载只有报了就绪标记的那几扇有数字（生命游戏 / Albedo / wsld 本轮没报挂载标记，
+wsld 报的是"wslc 已定位"那条）。EPUB 翻页延迟没单独采样（TD-012）——现在只有"打开到首屏"的数字。
 界面观感（真排版好不好看）靠 `just shot` 截图走查，产物不入代码库。
 
 ## 4. 分层与依赖方向
@@ -331,7 +331,7 @@ runtime 侧不再有扫包、拖装、启动器卸载的代码。
 | `dagogo` | 打勾勾 | fs.read, fs.write, dialog, settings, tray, notify, log | — | 全 | 是 | 600×800 |
 | `life` | 生命游戏 | （空） | — | 全 | 是 | 1000×720 |
 | `vcp` | vcp | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | ffmpeg | 全 | 是 | 默认 |
-| `wsld` | 容器台 | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | wslc | windows | 是 | 默认 |
+| `wsld` | wsld | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | wslc | windows | 是 | 默认 |
 | `albedo` | Albedo | settings, dialog, fs.read, fs.write, clipboard | — | 全 | 是 | 1440×900 |
 | `s3` | S3 | net, settings, dialog, fs.read, fs.write, clipboard | — | 全 | 否 | 1180×760 |
 

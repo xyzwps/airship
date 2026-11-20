@@ -144,5 +144,5 @@ just installers           # 只重出全部应用的安装器（先产全部的�
 
 - Windows 10 起（Electron 45 的下限），实际建议 Windows 11；
 - 先装 runtime，再装应用（应用安装器找不到 runtime 会中止）；
-- 只有容器台还有额外要求：本机要有 `C:\Program Files\WSL\wslc.exe`（WSL 3 自带），
-  或用 `AIRSHIP_WSLC_PATH` 显式指一个。没有也能装能跑，容器台会读得到"这台机器上没有 wslc"，其余应用不受影响。
+- 只有 wsld 还有额外要求：本机要有 `C:\Program Files\WSL\wslc.exe`（WSL 3 自带），
+  或用 `AIRSHIP_WSLC_PATH` 显式指一个。没有也能装能跑，wsld 会读得到"这台机器上没有 wslc"，其余应用不受影响。

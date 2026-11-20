@@ -2,7 +2,7 @@
   "name": "@airship/wsld",
   "version": "0.3.0",
   "private": true,
-  "description": "容器台：wslc 的只读容器与镜像视图",
+  "description": "wsld：wslc 的只读容器与镜像视图",
   "type": "module",
   "devDependencies": {
     "@airship/contract": "*",

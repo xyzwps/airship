@@ -8,7 +8,7 @@ import type { AppApi } from '@airship/contract'
 import type { ProcResult } from '@airship/contract'
 
 /**
- * 容器台用例的公共工装。
+ * wsld 用例的公共工装。
  *
  * 一切外部事实都从 FakeAirship 编排：`toolPaths.wslc` 决定"这台机器上有没有 wslc"，
  * `run` 决定一次性调用的应答，`start` + `ctl` 决定流式任务什么时候结束、吐出什么。
@@ -57,7 +57,7 @@ export function unmountAll(): void {
  * 装配成应用真正拿到的 AppApi。
  *
  * 替身的 `.api` 是把实例摊开成一个对象，原型上的方法（on / paths / theme）跟着丢了，
- * 而容器台要订阅子进程事件——所以这里把这三颗补回来，语义仍然由替身自己判。
+ * 而 wsld 要订阅子进程事件——所以这里把这三颗补回来，语义仍然由替身自己判。
  */
 export function appApiOf(fake: FakeAirship): AppApi {
   return {

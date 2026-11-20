@@ -90,7 +90,7 @@
 
 应用（八个，src/apps/&lt;id&gt;/，各自一个 airship 包）
   books 墨读 · pdf PDF · dagogo 打勾勾 · life 生命游戏
-  vcp · wsld 容器台 · albedo Albedo · s3 S3
+  vcp · wsld · albedo Albedo · s3 S3
   每个应用 = &lt;id&gt;.airship 归档 + 它自己的每用户安装器 + 一枚快捷方式</code></pre>
           </figure>
           <p>
@@ -175,7 +175,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
               <div class="dg-row win">
                 <div class="dg-cell app"><b>墨读 books</b>600×800 · 与 PDF 共用同一份书库</div>
                 <div class="dg-cell app"><b>vcp</b>要外部工具 <code>ffmpeg</code></div>
-                <div class="dg-cell app"><b>容器台 wsld</b><code>platforms: ['windows']</code> · 要 <code>wslc</code></div>
+                <div class="dg-cell app"><b>wsld</b><code>platforms: ['windows']</code> · 要 <code>wslc</code></div>
                 <div class="dg-cell app"><b>生命游戏 life</b><code>capabilities: []</code>——不碰你的文件</div>
                 <div class="dg-cell app"><b>你的应用 hello</b><code>just new-app</code> 从范本造</div>
               </div>
@@ -484,7 +484,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
             <tbody>
               <tr><td>打勾勾</td><td>88 MB</td><td>140 ms</td></tr>
               <tr><td>墨读</td><td>100 MB</td><td>132 ms</td></tr>
-              <tr><td>容器台</td><td>99 MB</td><td>—（wslc 定位 136 ms）</td></tr>
+              <tr><td>wsld</td><td>99 MB</td><td>—（wslc 定位 136 ms）</td></tr>
               <tr><td>生命游戏</td><td>101 MB</td><td>—</td></tr>
               <tr><td>Albedo</td><td>113 MB</td><td>—</td></tr>
               <tr><td>PDF</td><td>100 MB</td><td>141 ms</td></tr>
