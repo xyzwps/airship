@@ -356,6 +356,15 @@ a.card:hover { border-color: var(--accent); text-decoration: none; }
   .doc table, .app-table, .plain-table { table-layout: fixed; width: 100%; font-size: 13.4px; }
   .doc table th, .doc table td, .app-table th, .app-table td, .plain-table th, .plain-table td { padding: 9px 8px; overflow-wrap: anywhere; }
 }
+
+/* 顶栏四枚导航在 420 以下塞不进一行：让导航自己占一行，而不是把主题键挤出盒子右边
+   （320 宽实测：不换行时那颗键越出 6 px）。 */
+@media (max-width: 420px) {
+  .site-header .bar { flex-wrap: wrap; height: auto; min-height: 62px; padding: 8px 0; row-gap: 4px; }
+  .site-nav { order: 3; flex-basis: 100%; margin-left: 0; justify-content: space-between; gap: 0; }
+  .site-nav a { padding: 6px 4px; font-size: 14px; }
+  .theme-btn { margin-left: auto; }
+}
 .toc { position: sticky; top: 84px; align-self: start; max-height: calc(100vh - 110px); overflow: auto; font-size: 14px; padding-bottom: 20px; }
 .toc .part { margin: 18px 0 6px; font-size: 12.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); }
 .toc .part:first-child { margin-top: 0; }
