@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>开发教程 · 手把手做一个 Airship 应用</title>
+    <meta name="description" content="从 templates/app 范本造出一个新应用，一路走到窗口、契约、用例、airship 包与安装器：命令、输出与报错原文都是本机实走出来的。" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4.2' fill='%23e2e1f1'/%3E%3Crect x='3.4' y='3' width='4.6' height='4.6' rx='1.3' fill='%23f86e51'/%3E%3Crect x='8.9' y='3' width='4.6' height='4.6' rx='1.3' fill='%2380b6a8'/%3E%3Ccircle cx='5.7' cy='10.6' r='2.3' fill='%2398a5e9'/%3E%3Crect x='8.9' y='8.3' width='4.6' height='4.6' rx='2' fill='%23eba6b8'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./assets/site.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+
+    <header class="site-header">
+      <div class="wrap bar">
+        <a class="brand" href="./index.html">
+          <svg class="mark" viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="0" y="0" width="16" height="16" rx="4.2" fill="#e2e1f1" />
+            <rect x="3.4" y="3" width="4.6" height="4.6" rx="1.3" fill="#f86e51" />
+            <rect x="8.9" y="3" width="4.6" height="4.6" rx="1.3" fill="#80b6a8" />
+            <circle cx="5.7" cy="10.6" r="2.3" fill="#98a5e9" />
+            <rect x="8.9" y="8.3" width="4.6" height="4.6" rx="2" fill="#eba6b8" />
+          </svg>
+          <span class="zh">Airship</span>
+        </a>
+        <nav class="site-nav" aria-label="主导航">
+          <a href="./index.html">首页</a>
+          <a href="./docs.html">文档</a>
+          <a href="./apps.html">预置应用</a>
+          <a href="./develop.html" aria-current="page">开发教程</a>
+        </nav>
+        <button class="theme-btn" id="theme-toggle" type="button">◐</button>
+      </div>
+    </header>
+
+    <main id="main">
+      <div class="wrap docs-layout">
+        <nav class="toc" aria-label="本页目录">
+          <div class="part">走一遍</div>
+          <a href="#walk">这一页怎么走</a>
+          <a class="sub" href="#prep">先定三件事</a>
+          <a class="sub" href="#create">造出来</a>
+          <a class="sub" href="#run">第一次跑起来</a>
+          <a class="sub" href="#feature">写功能</a>
+          <a class="sub" href="#spec">写册子</a>
+          <a class="sub" href="#test">写用例</a>
+          <a class="sub" href="#red">第一轮 check 会红</a>
+          <a class="sub" href="#window">看真窗口</a>
+          <a class="sub" href="#package">出包与安装器</a>
+          <div class="part">留下来用</div>
+          <a href="#errors">报错对照表</a>
+          <a href="#checklist">收尾检查单</a>
+          <a href="#next">接下来读什么</a>
+        </nav>
+
+        <article class="doc">
+          <div class="part-head" id="walk">
+            <div class="part-kicker">教程</div>
+            <h2>手把手做一个应用</h2>
+            <p>
+              走完这一页你会有：一扇自己的窗口、一份契约、三条用例、一个 <code>hello.airship</code> 包、一枚每用户安装器。全程只改自己那一个目录，
+              <strong>runtime 侧一个文件都不用动</strong>。
+            </p>
+            <p>
+              下面每一条命令、每一段输出与每一句报错都是 2026-11-20 在本机（Windows，仓库 <code>953901d</code>）照着走出来的，照抄即可；走完示例已删干净，
+              所以这一页不留下第九个应用。只有 <code>just dev</code> 那一节给的是配方本身的行为（它常驻前台开着窗口，没法照抄输出），窗口那一屏用的是同一轮
+              <code>just shot</code> 的实拍判据。<a href="./docs.html">文档页</a>讲<strong>为什么这样搭、规矩是什么</strong>，这一页只讲<strong>怎么一步步做</strong>。
+            </p>
+          </div>
+
+          <h2 class="sub" id="prep">先定三件事</h2>
+          <p>动手之前把这三个数决定下来，后面改名很麻烦：</p>
+          <div class="kv">
+            <div>
+              <dt>id</dt>
+              <dd>
+                <code>hello</code>。它是目录名、包名前段、数据目录名，也是 <code>airship://hello/index.html</code> 里那一段。硬性形状：<code>^[a-z][a-z0-9-]{0,31}$</code>——小写字母开头，其后只用小写字母、数字与连字符，最长 32 位。
+              </dd>
+            </div>
+            <div>
+              <dt>显示名</dt>
+              <dd>
+                <code>你好</code>。写在清单的 <code>name</code> 里，中文、空格、标点都行；标题栏与任务栏念的都是它。
+              </dd>
+            </div>
+            <div>
+              <dt>能力</dt>
+              <dd>
+                这个应用要碰系统的哪几样。<code>capabilities</code> 是唯一授权面，没声明的一律拒绝；什么都不碰就写 <code>[]</code>（生命游戏就是这么起的）。这一页的例子要"记住上次那句话"，所以是
+                <code>['settings']</code>。
+              </dd>
+            </div>
+          </div>
+          <p>
+            环境要 Windows、Node.js <code>^20.19.0 || &gt;=22.12.0</code>、<a href="https://github.com/casey/just">just</a> 与 Git Bash，然后 <code>npm install</code>。命令一律走
+            justfile，<code>package.json</code> 里没有 <code>scripts</code>，<code>just</code> 不带参数就列出全部配方。
+          </p>
+
+          <h2 class="sub" id="create">第一步：造出来</h2>
+          <pre><code>$ just new-app hello 你好
+node code/new-app.mjs hello 你好
+已造 src/apps/hello
+  显示名：你好
+  下一步：npm install &amp;&amp; just build-apps &amp;&amp; just shot
+  要改的三处：app.ts（能力与尺寸）、hello.css（版心）、specs/hello.md（契约）
+npm install
+added 1 package in 1s
+node code/build-apps.mjs hello
+产 1 个包 → C:\Users\xyzwp\Develop\airship\dist-apps
+  <span class="k">hello       88 KB（归档内 226 KB）→ hello.airship</span></code></pre>
+          <p>
+            这条配方自己就把 <code>npm install</code>（workspaces 要重新链）和产包跑完了，输出里那句"下一步"是给你看顺序的。npm 那两行
+            <code>electron_mirror</code> 的 warn 与这一轮无关，上面省了。
+          </p>
+          <p>落下来的九份文件：</p>
+          <pre><code>src/apps/hello/
+  app.ts              纯数据清单：id / name / description / capabilities
+  helloApp.tsx        组件本体
+  hello.css           版心（配色一律用宿主给的 CSS 变量）
+  index.html          入口文档，引 ./main.tsx；里面不写 CSP
+  main.tsx            一行 createAirshipApp({ meta, component, icon })
+  icon.svg            包根那一张图标：有且只有一张，不套底板
+  package.json        @airship/hello，SDK 与 react 记在 devDependencies
+  specs/hello.md      册子（占位，要重写）
+  tests/hello.test.tsx 用例（占位，要重写）</code></pre>
+          <div class="note">
+            <b>范本没替你改的两处名字：</b>脚本只替换大写的 <code>CHANGE_ME</code> 与中文"显示名"，所以复制出来组件还叫 <code>ChangeMeApp</code>、类名还叫
+            <code>.change-me</code>、<code>main.tsx</code> 里引的也还是那个名字。不影响跑，但第九个应用顶着一个"待替换"的名字不好看，顺手改掉。
+          </div>
+
+          <h2 class="sub" id="run">第二步：第一次跑起来</h2>
+          <pre><code>just dev hello     <span class="c"># 直跑那一个应用：改一行代码即热更</span></code></pre>
+          <p>
+            开出来的窗口是范本的第一屏：标题栏念「你好」，右边那颗键是主题三档（每个应用各记各的），内容区念"现在亮的是暗色那一档"与"应用已经画出来了。"。
+          </p>
+          <p>这一条路上有一处会让人困惑，值得先记住：</p>
+          <ul>
+            <li>
+              <strong>清单与图标走包，文档走 dev server。</strong>runtime 注册的是命令行指来的 <code>dist-apps/hello.airship</code>，窗口标题、尺寸、能力那几样都从包里的
+              <code>manifest.json</code> 读。所以<strong>改了 <code>app.ts</code> 要重跑一次 <code>just build-apps</code> 才生效</strong>；只改组件源码不用。
+            </li>
+            <li>
+              想看"与装好的 runtime 最接近的一条路"用 <code>just start hello</code>——文档也从包里加载（<code>airship://hello/index.html</code>），不起 dev server。
+            </li>
+          </ul>
+
+          <h2 class="sub" id="feature">第三步：写功能</h2>
+          <p>
+            例子是一句话便签：打开时把上次记下的那句读回来，写一句新的点「记下」，输入是空的就不许顶掉存着的那句。功能定成这样，册子里要写的三条判据也就跟着出来了——先想清楚判据再动手，是这套规矩的起点。
+          </p>
+          <p>清单里把话说完（其余字段留默认：窗口 1100×740，内容区留白由 runtime 给）：</p>
+          <pre><code>// src/apps/hello/app.ts
+import type { AppMeta } from '@airship/contract'
+
+export const app: AppMeta = {
+  id: 'hello',
+  name: '你好',
+  description: '记一句话，下次打开还在',
+  capabilities: [<span class="k">'settings'</span>]
+}</code></pre>
+          <p>组件本体。<code>api</code> 由宿主作为 prop 递进来，应用侧除了 <code>main.tsx</code> 那一行不需要知道 runtime 的存在：</p>
+          <pre><code>// src/apps/hello/helloApp.tsx
+import { useEffect, useState, type JSX } from 'react'
+import type { AppApi } from '@airship/contract'
+import './hello.css'
+
+<span class="c">/** 存的那一句话用哪个键：一个应用一份设置文件，键在同一份文件里别撞车 */</span>
+const KEY = 'note'
+
+export default function HelloApp({ api }: { api: AppApi }): JSX.Element {
+  const [note, setNote] = useState('')
+  const [draft, setDraft] = useState('')
+  const [hint, setHint] = useState('')
+  const [error, setError] = useState('')
+  const [ready, setReady] = useState(false)
+
+  useEffect(() =&gt; {
+    void api.settings
+      .get&lt;string&gt;(KEY, '')
+      .then(
+        (saved) =&gt; setNote(saved),
+        <span class="c">// 没声明能力时这里收到的就是契约层那句中文，不是 Electron 的内部措辞</span>
+        (err: unknown) =&gt; setError(err instanceof Error ? err.message : String(err))
+      )
+      .then(() =&gt; setReady(true))
+  }, [api])
+
+  async function save(): Promise&lt;void&gt; {
+    const text = draft.trim()
+    if (text === '') {
+      setHint('先写点什么')
+      return
+    }
+    try {
+      await api.settings.set(KEY, text)
+      setNote(text)
+      setDraft('')
+      setHint('')
+      setError('')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  return (
+    &lt;div className="hello"&gt;
+      &lt;h2&gt;你好&lt;/h2&gt;
+      {!ready &amp;&amp; &lt;p className="hint"&gt;正在读上次记下的那句…&lt;/p&gt;}
+      {ready &amp;&amp; error === '' &amp;&amp; &lt;p className="hello-note"&gt;{note === '' ? '还没记下过什么。' : note}&lt;/p&gt;}
+      &lt;input id="hello-draft" className="input" placeholder="要记下的那句话"
+        value={draft} onChange={(e) =&gt; setDraft(e.target.value)} /&gt;
+      &lt;div className="row"&gt;
+        &lt;button className="btn btn--primary" type="button" onClick={() =&gt; void save()}&gt;记下&lt;/button&gt;
+        {hint !== '' &amp;&amp; &lt;span className="hint"&gt;{hint}&lt;/span&gt;}
+      &lt;/div&gt;
+      {error !== '' &amp;&amp; &lt;p className="error"&gt;{error}&lt;/p&gt;}
+    &lt;/div&gt;
+  )
+}</code></pre>
+          <p>
+            样式只补一处，其余交给宿主：<code>.btn</code> / <code>.btn--primary</code> / <code>.input</code> / <code>.hint</code> / <code>.error</code>
+            这些类名与 <code>var(--fg)</code>、<code>var(--bg-elev)</code>、<code>var(--border)</code> 那一族变量都是 SDK 给的（<code>src/sdk/styles/airship.css</code>），
+            自己另调一套配色就会跟标题栏那颗主题键打架。
+          </p>
+          <pre><code>/* src/apps/hello/hello.css */
+.hello { display: flex; flex-direction: column; gap: 12px; max-width: 560px; }
+.hello h2 { margin: 0; font-size: 20px; color: var(--fg); }
+.hello-note {
+  margin: 0; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-elev); color: var(--fg); font-size: 17px; min-height: 24px;
+}</code></pre>
+
+          <h2 class="sub" id="spec">第四步：写册子</h2>
+          <p>
+            功能写之前先把它落成契约。四档结构是硬的：<code>## Purpose</code> → <code>### Requirement</code> → <code>#### Scenario</code> → WHEN/THEN，一条
+            Scenario ≤ 5 行、只锁一个不变量，<strong>只写用户看得见的那件事</strong>。
+          </p>
+          <pre><code>&lt;!-- src/apps/hello/specs/hello.md --&gt;
+# hello
+
+## Purpose
+一句话便签：界面上只有"上次记下的那句"与"写一句新的"两件事。一本册子只管这一块。
+
+### Requirement: 那句话存在应用自己的设置里
+依据：设置按应用分命名空间（docs/architecture.md 的数据与存储一节），重启读得回来才算记住。
+
+#### Scenario: <span class="k">HE-001</span> 第一次打开还没有任何东西可记
+- **WHEN** 打开这个应用，设置里没有过那句话
+- **THEN** 界面上读得到「还没记下过什么。」
+
+#### Scenario: <span class="k">HE-002</span> 写下并记下之后，重开还是那一句
+- **WHEN** 在「要记下的那句话」里写「买咖啡豆」，点「记下」，再重开一次
+- **THEN** 界面上读得到「买咖啡豆」，不再念「还没记下过什么。」
+- **AND** 输入框清空，等着写下一句
+
+### Requirement: 空的那一句不该顶掉记下的那句
+依据：点了「记下」却没改动任何东西，用户要看得见为什么。
+
+#### Scenario: <span class="k">HE-003</span> 输入是空的，界面念「先写点什么」
+- **WHEN** 什么都不写，直接点「记下」
+- **THEN** 界面上读得到「先写点什么」
+- **AND** 上次记下的那句还是那句</code></pre>
+          <div class="note">
+            <b>编号必须是大写两三个字母加三位号。</b>范本里那句 <code>CHANGE_ME-001</code> 复制出来会变成 <code>hello-001</code>，而扫描器认的是
+            <code>[A-Z]{2,3}-\d{3}</code>——小写号它一条都看不见，于是这本册子被判"空的"。前缀去 <code>docs/specs/index.md</code> 的索引表里挑一个没被占用的（这一页挑了
+            <code>HE</code>），编号一旦提交不复用、不重排。
+          </div>
+
+          <h2 class="sub" id="test">第五步：写用例</h2>
+          <p>
+            用例是册子的影子：标题以同一个编号开头，判据就是册子里那句可观察的话。替身 <code>FakeAirship</code> 与挂载器 <code>mountUi</code> 住在
+            <code>@airship/sdk/testing</code>，能力闸门与拒绝措辞都取契约层真源，所以"没声明 settings 时用户看见的那句中文"在测试里和在真 runtime 里是同一句。
+          </p>
+          <pre><code>// @vitest-environment jsdom
+// src/apps/hello/tests/hello.test.tsx
+import { describe, expect, it } from 'vitest'
+import { FakeAirship, mountUi } from '@airship/sdk/testing'
+import HelloApp from '../helloApp.tsx'
+import { app } from '../app.ts'
+
+function fresh() {
+  const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities })
+  fake.settingsStore['note'] = '买咖啡豆'
+  return fake
+}
+
+describe('一句话便签', () =&gt; {
+  it('<span class="k">HE-001</span> 第一次打开还没有任何东西可记', async () =&gt; {
+    const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities })
+    const m = await mountUi(&lt;HelloApp api={fake.api} /&gt;, { fake })
+    await m.settle()
+
+    expect(m.text()).toContain('还没记下过什么。')
+    expect(m.text()).not.toContain('Error invoking remote method')
+    m.unmount()
+  })
+
+  it('<span class="k">HE-002</span> 写下并记下之后，重开还是那一句', async () =&gt; {
+    const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities })
+    const m = await mountUi(&lt;HelloApp api={fake.api} /&gt;, { fake })
+    await m.settle()
+
+    await m.type('要记下的那句话', '把船票取出来')
+    await m.press('记下')
+    expect(fake.settingsStore['note']).toBe('把船票取出来')
+    m.unmount()
+
+    <span class="c">// 同一份设置再挂一次，就是"重开"</span>
+    const again = await mountUi(&lt;HelloApp api={fake.api} /&gt;, { fake })
+    await again.settle()
+    expect(again.text()).toContain('把船票取出来')
+    expect(again.has('还没记下过什么。')).toBe(false)
+    again.unmount()
+  })
+
+  it('<span class="k">HE-003</span> 输入是空的，界面念「先写点什么」', async () =&gt; {
+    const fake = fresh()
+    const m = await mountUi(&lt;HelloApp api={fake.api} /&gt;, { fake })
+    await m.settle()
+
+    await m.press('记下')
+    expect(m.text()).toContain('先写点什么')
+    expect(m.text()).toContain('买咖啡豆')
+    expect(fake.settingsStore['note']).toBe('买咖啡豆')
+    m.unmount()
+  })
+})</code></pre>
+          <p>
+            挂载器故意不引第三方测试库：<code>m.text()</code> 拿整棵树的可见文字，<code>m.press('记下')</code> 按可见文字找按钮，<code>m.type(placeholder, 值)</code>
+            往输入框里写字，<code>settle()</code> 把读设置那条异步链跑干净。判据写成"用户看得见的话"，界面措辞一改只红那一行。
+          </p>
+
+          <h2 class="sub" id="red">第六步：第一轮 <code>just check</code> 会红，红得对</h2>
+          <p>
+            上面这些照抄下去跑 <code>just check</code>（= 类型 + 单测 + 册子差集），第一次会红三条。这三条正是这套规矩在替你把关，原文照抄：
+          </p>
+          <pre><code>× AP-011 应用用到的每个契约域，清单里都声明过
+  <span class="k">AssertionError: hello 用了 api.settings 却没声明 settings</span>
+
+× 索引表登记的册子与实际存在的册子一一对应
+  <span class="k">AssertionError: 磁盘上有但索引没登记: expected [ 'hello' ] to deeply equal []</span>
+
+× HE-001 第一次打开还没有任何东西可记
+  <span class="k">AssertionError: expected '你好记下hello 没有声明 settings 能力（要用它就在 apps…' to contain '还没记下过什么。'</span>
+  Expected: "还没记下过什么。"
+  Received: "你好记下hello 没有声明 settings 能力（要用它就在 apps/hello/app.ts 的 capabilities 里声明）"</code></pre>
+          <ul>
+            <li>
+              第一条：<code>app.ts</code> 里补 <code>capabilities: ['settings']</code>。第三条跟着一起好——界面读到的那句中文（<code>hello 没有声明 settings 能力…</code>）来自
+              <code>src/shared/contract/errors.ts</code>，措辞只有一份，产品与替身念同一句。
+            </li>
+            <li>
+              第二条：在 <code>docs/specs/index.md</code> 的应用表里加一行——前缀 <code>HE</code>、这块管什么、册子文件名 <code>hello.md</code>、验证档
+              <code>自动化</code>。索引表是册子的名单，漏登记等于这本册子没归过档。
+            </li>
+            <li>
+              补完能力还会再红一次：<code>hello 用了 api.proc 却没声明 proc</code>。<strong>这条红是范本自己的注释造成的</strong>——<code>app.ts</code>
+              的注释里原话写着 <code>api.proc.</code>，而扫描器按文本找调用点，注释也算。把那句注释改成不带尾点的写法（"用了 <code>api.settings</code> 与
+              <code>api.proc</code> 这些域"）就干净了。
+            </li>
+          </ul>
+          <pre><code>$ just check
+ Test Files  42 passed | 2 skipped (44)
+      Tests  <span class="k">565 passed</span> | 10 skipped (575)   <span class="c"># 仓库基线 562，加这一页的三条用例</span>
+ Test Files  1 passed (1)
+      Tests  6 passed (6)                      <span class="c"># 册子差集：双向零差集</span></code></pre>
+
+          <h2 class="sub" id="window">第七步：看一眼真窗口</h2>
+          <p>
+            用例绿了不等于画面对。逐窗口截图走查用 <code>just shot</code>（先编译 runtime 再产全部的包，然后逐个开窗、按下快门、关掉）：
+          </p>
+          <pre><code>$ just shot
+…
+2026-11-20T01:28:17.831Z INFO  [runtime] 命令行指来的包 {"id":"hello","archive":"…\\dist-apps\\hello.airship"}
+2026-11-20T01:28:25.348Z INFO  [hello] 应用窗口已打开
+[shot] C:\Users\xyzwp\Develop\airship\<span class="k">shots\hello.png</span>  1650x1113
+[metrics] [{"label":"打勾勾","workingSetKB":93360}, …, {"label":"<span class="k">你好</span>","workingSetKB":<span class="k">99196</span>}, …]</code></pre>
+          <p>
+            那一屏实拍到的是：标题栏「你好」与主题键、正文一格白底的「还没记下过什么。」、placeholder 为「要记下的那句话」的输入框、一颗吃到宿主强调色的「记下」按钮。工作集
+            99196 KB（约 96.9 MB），与其余八个应用同一量级——一个应用一个渲染进程，共用同一份 Electron。图片尺寸 1650×1113 是 1100×740 的逻辑窗口在本机 150%
+            缩放下的物理像素。截图产物不入代码库（<code>shots/</code> 在 <code>.gitignore</code> 里），观感判据也不进册子。
+          </p>
+
+          <h2 class="sub" id="package">第八步：出包与安装器</h2>
+          <p>
+            包已经在了：<code>dist-apps/hello.airship</code>——一个 zip 归档换了扩展名，里面是 <code>manifest.json</code> + <code>index.html</code> +
+            <code>icon.svg</code> + <code>assets/</code>，88 KB（归档内 227 KB）。给别人用的话产它自己的安装器：
+          </p>
+          <pre><code>$ just app-installer hello
+node code/build-apps.mjs hello
+产 1 个包 → C:\Users\xyzwp\Develop\airship\dist-apps
+  hello       88 KB（归档内 227 KB）→ hello.airship
+node code/make-app-installer.mjs hello
+<span class="k">已产安装器 release/apps/hello-Setup-0.1.0.exe</span>
+SHA256 &lt;64 位十六进制&gt;   <span class="c"># 同名 .sha256 落在旁边；每次构建的哈希不一样</span></code></pre>
+          <ul>
+            <li>
+              安装器是<strong>每用户</strong>的（<code>RequestExecutionLevel user</code>，不要管理员），装进 <code>%LOCALAPPDATA%\airship\apps\hello\</code>，桌面与开始菜单各留一枚快捷方式，图标由包内那张
+              SVG 经 resvg 出 PNG 再转多尺寸 <code>.ico</code>。
+            </li>
+            <li>
+              <strong>授权在安装期一次完成</strong>：装之前念一遍能力清单（这一页的例子念"存自己的设置"），点过确定之后双击快捷方式直接开窗口，运行期不再弹确认卡片。
+            </li>
+            <li>
+              版本号读 <code>src/apps/hello/package.json</code>，各应用独立演化，不跟 runtime 跳。没有代码签名，第一次运行会被 SmartScreen 拦一道。
+            </li>
+          </ul>
+
+          <h2 class="sub" id="errors">报错对照表</h2>
+          <p>这一页实走时真撞上的几条，原文照录：</p>
+          <table>
+            <thead><tr><th>念出来的话</th><th>为什么</th><th>怎么办</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><code>id "hello_x" 不合形状：只能是 1 到 32 位，小写字母开头…</code></td>
+                <td>产包期契约层拒清单。<code>code/new-app.mjs</code> 自己那道判据是从契约文件里抠正则的，抠的时候把结尾的 <code>$</code> 一起削掉了，所以带尾缀的坏 id 会先建目录、再跑 <code>npm install</code>，到产包才喊。</td>
+                <td>删掉 <code>src/apps/&lt;坏 id&gt;</code> 目录，用合规 id 重来；见下一条为什么必须删干净。</td>
+              </tr>
+              <tr>
+                <td><code>工装包注册失败 hello_x.airship：… id "hello_x" 不合形状…</code>，而且 <code>Test Files 45 failed</code>、每个文件 <code>(0 test)</code></td>
+                <td>用例开局要把仓库里每份真清单铺进活动包表，一份不合格的清单把整套测试拖死——症状是全红而不是红一条。</td>
+                <td>看见 <code>(0 test)</code> 先怀疑 <code>src/apps/</code> 下多了一个目录，删掉再跑 <code>just check</code>。</td>
+              </tr>
+              <tr>
+                <td><code>这些应用不存在或不完整：hello（在 src/apps 里有的：albedo, books, …）</code></td>
+                <td>名单判据是"四件齐全"：<code>app.ts</code> + <code>index.html</code> + <code>main.tsx</code> + 一张 <code>icon.{svg,png,jpg,jpeg,webp}</code>。少一张图标，目录就从名单上消失了，措辞不会指名缺哪件。</td>
+                <td>补齐缺的那件（图标有且只有一张）。名字里出现"或不完整"就是这个意思。</td>
+              </tr>
+              <tr>
+                <td><code>src/apps/hello/specs/hello.md：一条 Scenario 都没有，这本册子是空的</code></td>
+                <td>编号形状不对（<code>hello-001</code> 小写），扫描器看不见任何一条。</td>
+                <td>换成 <code>HE-001</code> 这种大写前缀 + 三位号，用例标题跟着改。</td>
+              </tr>
+              <tr>
+                <td><code>磁盘上有但索引没登记: expected [ 'hello' ] …</code></td>
+                <td>新册子没进 <code>docs/specs/index.md</code> 的表。</td>
+                <td>加一行：前缀、这块管什么、册子文件名、验证档。</td>
+              </tr>
+              <tr>
+                <td><code>hello 用了 api.proc 却没声明 proc</code>（你根本没调用它）</td>
+                <td>AP-011 按文本找 <code>api.&lt;域&gt;.</code> 的调用点，注释与字符串里的字样也算——范本 <code>app.ts</code> 的注释就带着 <code>api.proc.</code>。</td>
+                <td>把注释里那两个字样写成不带尾点的形式；别为了消红去声明用不到的能力，能力清单是要念给用户听的。</td>
+              </tr>
+              <tr>
+                <td><code>src/apps/hello 已经存在——换 id 或先把它删掉</code></td>
+                <td>复制前先判目录存在。<em>注意 Windows 文件系统不分大小写</em>：<code>just new-app Hello</code> 也会被这一条挡掉，而不是报"id 不合形状"。</td>
+                <td>换 id。</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h2 class="sub" id="checklist">收尾检查单</h2>
+          <ol class="steps">
+            <li>
+              <h4>能观察的三条都齐</h4>
+              <p><code>just check</code> 绿（类型 + 单测 + 双向差集）；<code>just shot</code> 里你自己那一屏观感过眼；要真环境的那条另跑 <code>just e2e</code> / <code>just wsld-real</code>。</p>
+            </li>
+            <li>
+              <h4>包与安装器产得出来</h4>
+              <p><code>just app-installer hello</code> 出 <code>release/apps/hello-Setup-&lt;版本&gt;.exe</code> 与同名 <code>.sha256</code>。</p>
+            </li>
+            <li>
+              <h4>没越界</h4>
+              <p>没有 <code>import</code> 指向 <code>src/runtime/**</code> 或 <code>@airship/runtime</code>（AP-013）；入口 html 里 <code>src</code>/<code>href</code>
+              全是相对路径，引用不越出包；CSP 不在自己 html 里写（AP-014）；说明符写包名而不是手写别名。</p>
+            </li>
+            <li>
+              <h4>清单只写自己的事实</h4>
+              <p><code>id / name / description / capabilities / platforms / tools / sharedNamespaces / flush / defaultWidth / defaultHeight</code>。被驳回过的字段别加回来：<code>iconPath</code>、<code>order</code>、窗口状态的记忆。</p>
+            </li>
+            <li>
+              <h4>没顺手改别人的区</h4>
+              <p>runtime 侧、SDK 侧、别的应用一个文件都没动。改了 SDK 导出等于改了公开面，要在架构文档那节说清理由。</p>
+            </li>
+          </ol>
+
+          <h2 class="sub" id="next">接下来读什么</h2>
+          <div class="cards">
+            <a class="card i1" href="./docs.html">
+              <div class="tag">文档</div>
+              <h3>为什么这样搭，规矩是什么</h3>
+              <p>系统组成、五个区与依赖方向、七条不变量、能力与边界图，以及规格册与用例互相钉住的那套做法。</p>
+              <span class="more">读文档 →</span>
+            </a>
+            <a class="card i2" href="./apps.html">
+              <div class="tag">预置应用</div>
+              <h3>看八个真应用怎么写</h3>
+              <p>各自的窗口实拍与能力声明。想知道"什么都不碰"起步长什么样，看 life；想知道外部工具怎么声明，看 vcp 与 wsld。</p>
+              <span class="more">看应用 →</span>
+            </a>
+          </div>
+          <a class="backtop" href="#walk">↑ 回到这一页开头</a>
+        </article>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap cols">
+        <span>这一页的命令、输出与报错原文来自 2026-11-20 本机实走一轮 <code>just new-app</code> → <code>just check</code> → <code>just shot</code> → <code>just app-installer</code> 的记录；示例应用走完后已删除。</span>
+        <span><a href="./index.html">首页</a> · <a href="./docs.html">文档</a> · <a href="./apps.html">预置应用</a></span>
+      </div>
+    </footer>
+
+    <script src="./assets/site.js"></script>
+  </body>
+</html>

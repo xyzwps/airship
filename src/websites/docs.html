@@ -27,6 +27,7 @@
           <a href="./index.html">首页</a>
           <a href="./docs.html" aria-current="page">文档</a>
           <a href="./apps.html">预置应用</a>
+          <a href="./develop.html">开发教程</a>
         </nav>
         <button class="theme-btn" id="theme-toggle" type="button">◐</button>
       </div>
@@ -553,7 +554,7 @@ just check             <span class="c"># 类型 + 单测 + 册子差集</span></
           </p>
 
           <h2 class="sub" id="newapp">加一个应用</h2>
-          <p>别手抄，用范本。<strong>runtime 侧任何文件都不用改。</strong></p>
+          <p>别手抄，用范本。<strong>runtime 侧任何文件都不用改。</strong>想照着一步一步走（含真实输出与报错原文），看<a href="./develop.html">开发教程</a>。</p>
           <pre><code>just new-app hello 你好     <span class="c"># 复制 templates/app → src/apps/hello，换名、链 workspace、只产它的包</span>
 <span class="c"># 改三处：app.ts（清单）、hello.css（样式）、specs/hello.md（册子）</span>
 just build-apps            <span class="c"># 产 dist-apps/hello.airship</span>
@@ -754,7 +755,7 @@ just build                 <span class="c"># 两条一起跑</span></code></pre>
     <footer class="site-footer">
       <div class="wrap cols">
         <span>本页内容与仓库真源对齐：<code>docs/architecture.md</code>、<code>docs/specs/index.md</code>、<code>src/shared/contract/protocol.ts</code>、<code>justfile</code>、<code>README.md</code></span>
-        <span><a href="./index.html">首页</a> · <a href="./apps.html">预置应用</a></span>
+        <span><a href="./index.html">首页</a> · <a href="./apps.html">预置应用</a> · <a href="./develop.html">开发教程</a></span>
       </div>
     </footer>
 

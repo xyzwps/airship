@@ -64,7 +64,7 @@ const server = createServer((req, res) => {
       '<!doctype html><meta charset="utf-8"><title>没有这个页面</title>' +
         '<p style="font:16px/1.7 system-ui;padding:40px">预览里没有这个页面：<code>' +
         String(req.url ?? '/').replace(/[<>&]/g, '') +
-        '</code><br><a href="/">回首页</a> · <a href="/docs.html">文档</a></p>'
+        '</code><br><a href="/">回首页</a> · <a href="/docs.html">文档</a> · <a href="/develop.html">开发教程</a></p>'
     )
     console.log(`404  ${req.url}`)
     return
@@ -91,6 +91,7 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`官网预览：http://127.0.0.1:${PORT}/`)
   console.log(`  首页    http://127.0.0.1:${PORT}/`)
   console.log(`  文档    http://127.0.0.1:${PORT}/docs.html`)
+  console.log(`  教程    http://127.0.0.1:${PORT}/develop.html`)
   console.log(`目录      ${SITE}`)
   console.log('Ctrl+C 停')
 })
