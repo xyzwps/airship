@@ -1,4 +1,5 @@
 import {
+  CopyObjectCommand,
   CreateBucketCommand,
   DeleteObjectCommand,
   GetObjectCommand,
@@ -131,6 +132,32 @@ export async function headObject(client: S3Client, bucket: string, key: string):
   }
 }
 
+/**
+ * 目录标记：一个以 `/` 结尾的零字节对象。
+ *
+ * 端点本来没有目录，`logs/` 这一行之所以看得见，是因为里面有对象被分隔符卷到了一起。
+ * 空目录要能存在，就得多存这一个键——各家控制台建"文件夹"存的都是它。
+ */
+export async function putDirMarker(client: S3Client, bucket: string, key: string): Promise<void> {
+  await client.send(new PutObjectCommand({ Bucket: bucket, Key: key }))
+}
+
+/**
+ * 端点上有没有这个目录标记（`logs/` 那樣的键）。
+ *
+ * 只有 404 才算"没有标记"——那是从里面的对象读出来的合成目录。
+ * 403 与连不上一句都不能吞：吞了就把"密钥被拒"念成"没有单独的标记可删"。
+ */
+export async function dirMarkerExists(client: S3Client, bucket: string, key: string): Promise<boolean> {
+  try {
+    await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }))
+    return true
+  } catch (e) {
+    if ((e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404) return false
+    throw e
+  }
+}
+
 /** 取回整个对象。预览与下载都走这一条，字节留在渲染进程里，不落在磁盘上 */
 export async function getObjectBytes(client: S3Client, bucket: string, key: string): Promise<Uint8Array> {
   const out = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
@@ -150,6 +177,36 @@ export async function putObject(
 
 export async function deleteObject(client: S3Client, bucket: string, key: string): Promise<void> {
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+}
+
+/**
+ * 服务端把对象复制成一个新键——重命名用的就是它。
+ *
+ * S3 没有"重命名"这个操作；`CopyObject` + 删源是所有兼容端点都实现的组合，
+ * AWS 自家控制台念的"rename"也是这条。上限是**服务端一次复制 5 GB**——
+ * 更大的对象要做就得走分段复制那一整套，界面上不接这活，当场把两个数念出来。
+ */
+export async function copyObject(client: S3Client, bucket: string, sourceKey: string, destKey: string): Promise<void> {
+  await client.send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      CopySource: encodeCopySource(`${bucket}/${sourceKey}`),
+      Key: destKey
+    })
+  )
+}
+
+/** 服务端一次复制的上限：5 GB（S3 的 CopyObject 契约，兼容端点照抄） */
+export const COPY_SOURCE_LIMIT = 5 * 1024 * 1024 * 1024
+
+/** 桶段照原样，键按段转义：中文与空格的键在头里必须是百分号形式 */
+function encodeCopySource(source: string): string {
+  return source.split('/').map(encodeURIComponent).join('/')
+}
+
+/** 超过一次复制上限时界面念的那句：两个数都要在场（判据见 OS-049） */
+export function copyTooBigText(bytes: number): string {
+  return `这个对象有 ${formatSize(bytes)}，超过服务端一次复制的 5 GB，改不了`
 }
 
 export async function createBucket(client: S3Client, bucket: string): Promise<void> {
@@ -179,6 +236,38 @@ export function validateBucketName(name: string): string {
   if (name.length < 3 || name.length > 63) return `桶名要 3 到 63 个字符，现在 ${name.length} 个`
   if (!/^[a-z0-9-]+$/.test(name)) return '桶名只能用小写字母、数字与连字符'
   if (!/^[a-z0-9]/.test(name) || !/[a-z0-9]$/.test(name)) return '桶名首尾要是字母或数字'
+  return ''
+}
+
+/**
+ * 新建目录时先在本地判这几条。
+ *
+ * 目录名就是键里的一段，所以只判"这一段自己"的规矩：带斜杠等于一次建好几层，
+ * 那不是这颗键该做的事。同名那一档比的是**当前这一层里已经列出来的目录行**，
+ * 端点侧没有"目录已存在"这种拒绝——它只会把那个零字节标记再存一遍。
+ * 返回空串就是合格。
+ */
+export function validateDirName(name: string, siblings: string[]): string {
+  if (name === '') return '目录名是空的'
+  if (name.includes('/')) return '目录名里不要带斜杠，一次建一层'
+  if (siblings.includes(name)) return `这一层里已经有叫 ${name} 的目录`
+  return ''
+}
+
+/**
+ * 重命名对象时先在本地判这几条。
+ *
+ * 新名字就是键在当前这一层里的那一段，所以斜杠那一档与建目录同规矩。
+ * 同名那一档比的是**当前这一层里已经列出来的对象行**（不含自己）——
+ * 端点对 CopyObject 没有"目标已存在就拒"这一说，它会直接盖上去，所以只能在动手之前拦。
+ * 名字没改也拦下来：转一圈复制再删掉、端点上什么都没变，那一趟不值得走。
+ * 返回空串就是合格。
+ */
+export function validateRename(name: string, currentName: string, siblings: string[]): string {
+  if (name === '') return '新名字是空的'
+  if (name.includes('/')) return '新名字里不要带斜杠，一次只改这一层的名字'
+  if (name === currentName) return '名字没变，什么都没动'
+  if (siblings.includes(name)) return `这一层里已经有叫 ${name} 的对象`
   return ''
 }
 

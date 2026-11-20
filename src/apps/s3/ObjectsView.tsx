@@ -4,11 +4,12 @@ import { formatSize, formatTime, type ObjectRow } from './client.ts'
 /**
  * 右边这一栏：面包屑 + 当前这一层的对象表。
  *
- * 行里只留认得出这个对象的东西（名字、大小、时间），三个动作挂在行尾的图标键上——
- * 文字按钮会把列撑满，一列几十行各挂三颗键，表就只剩键了。
+ * 行里只留认得出这个对象的东西（名字、大小、时间），动作挂在行尾的图标键上——
+ * 文字按钮会把列撑满，一列几十行各挂四颗键，表就只剩键了。
  * 图标键必须带悬停说明与无障碍名称，这是这个仓库的硬规矩。
  *
- * 单击一行 = 选中它（右侧出详情与预览）；目录行单击是进去。
+ * 单击一行 = 选中它（右侧出详情与预览）；目录行单击是进去，它那一列只有一颗删键——
+ * 目录与桶在端点上没有改名的接口，重命名这一颗只挂在对象行上（判据见册子 OS-050）。
  */
 export function ObjectsView({
   bucket,
@@ -25,7 +26,9 @@ export function ObjectsView({
   onSelect,
   onDownload,
   onCopyLink,
-  onDelete
+  onRename,
+  onDelete,
+  onDeleteDir
 }: {
   bucket: string
   prefix: string
@@ -41,7 +44,9 @@ export function ObjectsView({
   onSelect: (row: ObjectRow) => void
   onDownload: (row: ObjectRow) => void
   onCopyLink: (row: ObjectRow) => void
+  onRename: (row: ObjectRow) => void
   onDelete: (row: ObjectRow) => void
+  onDeleteDir: (row: ObjectRow) => void
 }): JSX.Element {
   return (
     <section className="s3__objects">
@@ -114,11 +119,19 @@ export function ObjectsView({
                     <RowIcon label="复制临时链接" test={`link:${r.key}`} onClick={() => onCopyLink(r)}>
                       <path d="M6.6 9.4 9.4 6.6" /><path d="M7.2 4.2l1-1a2.4 2.4 0 0 1 3.4 3.4l-1 1" /><path d="M8.8 11.8l-1 1a2.4 2.4 0 0 1-3.4-3.4l1-1" />
                     </RowIcon>
+                    <RowIcon label="重命名" test={`ren:${r.key}`} onClick={() => onRename(r)}>
+                      <path d="M2.6 13.4l.5-2.1 7.5-7.4 1.6 1.6-7.5 7.4-2.1.5z" /><path d="M10.6 3.9l1.6 1.6" />
+                    </RowIcon>
                     <RowIcon label="删掉" test={`del:${r.key}`} onClick={() => onDelete(r)}>
                       <path d="M2.8 4.3h10.4M6.4 4.3V2.8h3.2v1.5" /><path d="M4.2 4.3l.7 8.4h6.2l.7-8.4" />
                     </RowIcon>
                   </>
-                ) : null}
+                ) : (
+                  /* 目录行只有一颗：删掉的是那个零字节标记，不是里面的对象（话在确认句里说） */
+                  <RowIcon label="删掉目录" test={`rmdir:${r.key}`} onClick={() => onDeleteDir(r)}>
+                    <path d="M2.8 4.3h10.4M6.4 4.3V2.8h3.2v1.5" /><path d="M4.2 4.3l.7 8.4h6.2l.7-8.4" />
+                  </RowIcon>
+                )}
               </td>
             </tr>
           ))}

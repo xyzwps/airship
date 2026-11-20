@@ -136,6 +136,7 @@ export class FakeS3 {
 
     if (method === 'HEAD') return this.head(bucket, key)
     if (method === 'GET') return this.getObject(bucket, key)
+    if (method === 'PUT' && headers['x-amz-copy-source'] !== undefined) return this.copyObject(bucket, key, headers['x-amz-copy-source'])
     if (method === 'PUT') return this.putObject(bucket, key, body, headers)
     if (method === 'DELETE') return this.deleteObject(bucket, key)
 
@@ -245,6 +246,30 @@ export class FakeS3 {
   private deleteObject(bucket: string, key: string): Reply {
     this.buckets.get(bucket)?.delete(key)
     return { status: 204, headers: {}, body: null }
+  }
+
+  /**
+   * 服务端复制：`x-amz-copy-source` 给的是 `桶/键`，键按段百分号转义。
+   * 重命名那条路（复制 + 删源）要靠它，所以这里按真端点的样子回 CopyObjectResult。
+   */
+  private copyObject(bucket: string, key: string, copySource: string): Reply {
+    const dir = this.buckets.get(bucket)
+    if (!dir) return xml(404, '<Error><Code>NoSuchBucket</Code><Message>没有这个桶</Message></Error>')
+    const seg = decodeURIComponent(copySource).replace(/^\/+/, '').split('/')
+    const fromBucket = seg[0] ?? ''
+    const fromKey = seg.slice(1).join('/')
+    const found = this.buckets.get(fromBucket)?.get(fromKey)
+    if (!found) return xml(404, '<Error><Code>NoSuchKey</Code><Message>源对象没有</Message></Error>')
+    dir.set(key, {
+      bytes: found.bytes,
+      type: found.type,
+      mtime: Date.parse('2026-11-08T10:00:00.000Z'),
+      ...(found.sizeHint === undefined ? {} : { sizeHint: found.sizeHint })
+    })
+    return xml(
+      200,
+      `<CopyObjectResult><ETag>&quot;one&quot;</ETag><LastModified>2026-11-08T10:00:00.000Z</LastModified></CopyObjectResult>`
+    )
   }
 
   private startUpload(bucket: string, key: string, headers: Record<string, string>): Reply {

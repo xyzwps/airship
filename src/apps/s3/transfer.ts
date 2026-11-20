@@ -11,14 +11,51 @@ import { getObjectBytes, headObject, putObject } from './client.ts'
 /**
  * 上传与下载：本地文件与对象之间那一段路。
  *
- * 字节只能经 `api.fs.*` 进出（渲染进程没有文件系统），所以这两件事都有上限，
- * 上限是**这层的设计决定**，不是端点的：
+ * 本地的字节有两个来路，都收成同一个形状（`ByteSource`）再走同一条上传路：
  *
- *   - 上传：超过 `MULTIPART_FROM` 的文件走分段，每次只把 8 MiB 读进内存（`fs.readRange`），
- *     所以大文件不吃内存，只花时间；
+ *   - 「上传」那颗键选来的路径——只能经 `api.fs.*` 读（渲染进程没有文件系统），所以它占 `fs.read`；
+ *   - 拖进来松手的那一颗文件——字节从文件自己身上分段读，不经本机路径，也就用不到 `fs`。
+ *
+ * 两条都有上限，上限是**这层的设计决定**，不是端点的：
+ *
+ *   - 上传：超过 `MULTIPART_FROM` 的文件走分段，每次只把 8 MiB 读进内存，
+ *     所以大文件不吃内存，只花时间（来路是拖进来的那颗文件时也一样，一次只切一段）；
  *   - 下载：一次接一整份再落盘，没有"边接边写"的通道，所以超过 `DOWNLOAD_MAX` 的直接拒，
- *     拒的话要说清是多大、上限是多少（册子 OS-010 钉这句）。
+ *     拒的话要说清是多大、上限是多少（册子 OS-015 钉这句）。
  */
+
+/** 一份本地字节：报得出总长，按区间取——上面那条分段路只认这个形状 */
+export interface ByteSource {
+  size: number
+  read(start: number, length: number): Promise<Uint8Array>
+}
+
+/** 本地路径那一侧的来源：先问一次大小，读不出来当场说，不动端点 */
+export async function sourceFromPath(api: AppApi, filePath: string): Promise<ByteSource> {
+  const stat = await api.fs.stat(filePath)
+  if (!stat) throw new Error('读不到这个文件')
+  return { size: stat.size, read: (start, length) => api.fs.readRange(filePath, start, length) }
+}
+
+/**
+ * 拖进来那一侧的来源。
+ *
+ * 浏览器给的那颗文件本身就能按区间读，所以这里不需要本机路径，也不需要 `fs` 能力。
+ * 读不出来（拖到的是文件夹那一类）要说一句人话：那边抛回来的原文是英文的一句系统错，
+ * 用户对着它不知道该做什么下一步（判据见册子 OS-045）。
+ */
+export function sourceFromFile(file: File): ByteSource {
+  return {
+    size: file.size,
+    read: async (start, length) => {
+      try {
+        return new Uint8Array(await file.slice(start, start + length).arrayBuffer())
+      } catch {
+        throw new Error('拖进来的那一样读不出来，没上传')
+      }
+    }
+  }
+}
 
 /** 到这个数以上就分段（S3 的分段最小 5 MiB，最后一块除外） */
 export const MULTIPART_FROM = 32 * 1024 * 1024
@@ -27,23 +64,20 @@ export const PART_SIZE = 8 * 1024 * 1024
 /** 一次下载的上限 */
 export const DOWNLOAD_MAX = 256 * 1024 * 1024
 
-/** 上传一颗本地文件；`onPart` 用来把"第几段"念到界面上 */
-export async function uploadFile(
-  api: AppApi,
+/** 上传一份本地字节；`onPart` 用来把"第几段"念到界面上 */
+export async function uploadLocal(
   client: S3Client,
   bucket: string,
   key: string,
-  filePath: string,
+  source: ByteSource,
   contentType: string,
   onPart?: (done: number, total: number) => void
 ): Promise<number> {
-  const stat = await api.fs.stat(filePath)
-  if (!stat) throw new Error('读不到这个文件')
-  const size = stat.size
+  const size = source.size
 
   if (size < MULTIPART_FROM) {
     onPart?.(1, 1)
-    const bytes = await api.fs.read(filePath)
+    const bytes = await source.read(0, size)
     await putObject(client, bucket, key, bytes, contentType)
     return size
   }
@@ -57,7 +91,7 @@ export async function uploadFile(
   try {
     for (let i = 0; i < total; i += 1) {
       const start = i * PART_SIZE
-      const bytes = await api.fs.readRange(filePath, start, Math.min(PART_SIZE, size - start))
+      const bytes = await source.read(start, Math.min(PART_SIZE, size - start))
       const out = await client.send(
         new UploadPartCommand({ Bucket: bucket, Key: key, UploadId: uploadId, PartNumber: i + 1, Body: bytes })
       )

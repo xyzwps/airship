@@ -145,6 +145,31 @@ function textOf(s3: FakeS3, bucket: string, key: string): string {
   return stored === undefined ? '' : new TextDecoder().decode(stored.bytes)
 }
 
+/** 那五个格子在不在界面上（模态收起就是把它们从树上摘掉） */
+function cardIsOpen(m: Mount): boolean {
+  return m.container.querySelector('#s3-sk') !== null
+}
+
+/** 拖进来那一族用的那颗文件：界面拿到的就是名字与内容，本机路径从头到尾没有出现过 */
+function droppedFile(name: string, body: string): File {
+  return new File([body], name, { type: 'text/plain' })
+}
+
+/**
+ * 拖着一份文件悬在窗口里、还没松手。
+ *
+ * SDK 那个 `dragOver` 不带 dataTransfer（它是给"悬停"这一档用的），而这一族要的就是
+ * "拖的是文件"那一个判断，所以这里自己挂一个只带 types 的——浏览器怎么递这个事件不在判据之内。
+ */
+async function dragFilesOver(m: Mount): Promise<void> {
+  await act(async () => {
+    const ev = new Event('dragover', { bubbles: true, cancelable: true })
+    Object.defineProperty(ev, 'dataTransfer', { value: { types: ['Files'], dropEffect: '' } })
+    m.container.dispatchEvent(ev)
+  })
+  await m.settle(2)
+}
+
 describe('连接：五个格子与它的记忆', () => {
   it('OS-001 第一次打开摊出那五个格子', async () => {
     const { m } = await openFresh()
@@ -152,7 +177,6 @@ describe('连接：五个格子与它的记忆', () => {
     for (const id of ['s3-name', 's3-endpoint', 's3-region', 's3-ak', 's3-sk']) {
       expect(m.container.querySelector(`#${id}`), `缺输入框 #${id}`).not.toBeNull()
     }
-    expect(m.text()).toContain('五个格子都存进本机设置，Secret Key 是明文。')
   })
 
   it('OS-002 端点不成形状就在原地念原因，一条请求都不发', async () => {
@@ -213,6 +237,38 @@ describe('连接：五个格子与它的记忆', () => {
     const again = await open({ name: '家里的' })
     expect(again.m.has('连上')).toBe(false)
     expect(again.m.has('demo')).toBe(true)
+
+    // 再摊开卡片，五格里念的还是上次那五样值
+    await tapText(again.m, '连接设置')
+    const values = ['s3-name', 's3-endpoint', 's3-region', 's3-ak', 's3-sk'].map(
+      (id) => (again.m.container.querySelector(`#${id}`) as HTMLInputElement).value
+    )
+    expect(values).toEqual(['家里的', again.endpoint, 'us-east-1', 'rustfsadmin', 'rustfsadmin'])
+  })
+
+  it('OS-039 卡片按 Esc 或点它外面那层就收起', async () => {
+    const { m } = await open()
+    await tapText(m, '连接设置')
+    expect(cardIsOpen(m)).toBe(true)
+    await m.key('Escape')
+    expect(cardIsOpen(m)).toBe(false)
+    expect(m.field('sources-toggle')?.textContent).toContain('本机')
+    expect(m.has('demo')).toBe(true)
+
+    await tapText(m, '连接设置')
+    await tap(m, '[data-test="modal-backdrop"]')
+    expect(cardIsOpen(m)).toBe(false)
+  })
+
+  it('OS-040 一个源都没有时那五个格子收不掉', async () => {
+    const { m } = await openFresh()
+    expect(cardIsOpen(m)).toBe(true)
+    await m.key('Escape')
+    expect(cardIsOpen(m)).toBe(true)
+    await tap(m, '[data-test="modal-backdrop"]')
+    expect(cardIsOpen(m)).toBe(true)
+    // 收不掉不等于走不通：那五个格子还摊着，可以直接填下一个
+    expect(m.has('连上')).toBe(true)
   })
 })
 
@@ -305,6 +361,89 @@ describe('一层的对象：目录在前，翻得完', () => {
     expect(objectRows(m)).toBe(501)
     expect(m.has('k001.txt')).toBe(true)
   })
+
+  it('OS-033 新建的目录也占一行，进去是空的', async () => {
+    const { m, s3 } = await open({ seed })
+    await enter(m, 'demo')
+    await tapText(m, '新建目录')
+    await fill(m, 's3-newdir', 'pic')
+    await tapText(m, '建')
+
+    const marker = s3.object('demo', 'pic/')
+    expect(marker, '端点上没有那个以斜杠结尾的零字节标记').toBeDefined()
+    expect(marker!.bytes.byteLength).toBe(0)
+    expect(m.field('dir:pic/')?.textContent).toBe('pic/')
+
+    await tap(m, '[data-test="dir:pic/"]')
+    expect(m.text()).toContain('这一格里没有东西')
+  })
+
+  it('OS-034 目录名带斜杠或空着就在原地念原因', async () => {
+    const { m, s3 } = await open({ seed })
+    await enter(m, 'demo')
+    const keys = (): number => [...s3.buckets.values()].reduce((n, dir) => n + dir.size, 0)
+    const before = keys()
+
+    await tapText(m, '新建目录')
+    await fill(m, 's3-newdir', 'a/b')
+    await tapText(m, '建')
+    expect(m.text()).toContain('目录名里不要带斜杠，一次建一层')
+
+    await fill(m, 's3-newdir', '')
+    await tapText(m, '建')
+    expect(m.text()).toContain('目录名是空的')
+    expect(keys()).toBe(before)
+  })
+
+  it('OS-035 这一层里已经有同名目录就别再建一个', async () => {
+    const { m, s3 } = await open({ seed })
+    await enter(m, 'demo')
+    expect(m.has('logs/')).toBe(true)
+
+    await tapText(m, '新建目录')
+    await fill(m, 's3-newdir', 'logs')
+    await tapText(m, '建')
+
+    expect(m.text()).toContain('这一层里已经有叫 logs 的目录')
+    expect(s3.requests.some((r) => r.method === 'PUT')).toBe(false)
+  })
+
+  it('OS-036 删掉空目录，那一行退掉', async () => {
+    const { m, s3 } = await open({ seed: { demo: { 'pic/': { body: '' } }, archive: {} }, confirm: true })
+    await enter(m, 'demo')
+    expect(m.has('pic/')).toBe(true)
+    await tap(m, '[data-test="rmdir:pic/"]')
+
+    expect(s3.object('demo', 'pic/')).toBeUndefined()
+    expect(m.container.querySelectorAll('[data-test="dir:pic/"]').length).toBe(0)
+    expect(m.text()).toContain('已删掉目录 pic')
+  })
+
+  it('OS-037 里面还有对象时删掉的只是标记', async () => {
+    const { m, s3 } = await open({
+      seed: { demo: { 'logs/': { body: '' }, 'logs/run.txt': { body: '一份日志\n', type: 'text/plain' } }, archive: {} },
+      confirm: true
+    })
+    await enter(m, 'demo')
+    await tap(m, '[data-test="rmdir:logs/"]')
+
+    expect(s3.object('demo', 'logs/')).toBeUndefined()
+    expect(textOf(s3, 'demo', 'logs/run.txt')).toBe('一份日志\n')
+    // 标记没了，行还在——那是里面的对象聚合出来的那一格
+    expect(m.container.querySelectorAll('[data-test="dir:logs/"]').length).toBe(1)
+    expect(m.text()).toContain('已去掉 logs 的目录标记，里面还有对象，这一行还在')
+  })
+
+  it('OS-038 从对象读出来的目录没有标记可删', async () => {
+    const { m, s3 } = await open({ seed: { demo: { 'logs/run.txt': { body: '一份日志\n', type: 'text/plain' } }, archive: {} }, confirm: true })
+    await enter(m, 'demo')
+    await tap(m, '[data-test="rmdir:logs/"]')
+
+    expect(m.text()).toContain('logs 是从里面的对象读出来的目录，没有单独的标记可删')
+    // 弹问句之前先问过有没有标记：没有就一条删都不该发
+    expect(s3.requests.some((r) => r.method === 'DELETE')).toBe(false)
+    expect(s3.object('demo', 'logs/run.txt')).toBeDefined()
+  })
 })
 
 describe('上传与下载：字节要一样多', () => {
@@ -371,6 +510,73 @@ describe('上传与下载：字节要一样多', () => {
 
     expect(m.text()).toContain('这个对象有 300 MB，超过一次能接的 256 MB')
     expect(fake.vol.has('/fake/out/huge.bin')).toBe(false)
+  })
+
+  it('OS-041 拖着一份文件悬在窗口上、还没松手，念得出落点', async () => {
+    const { m, s3 } = await open({
+      seed: { demo: { 'logs/keep.txt': { body: '已有\n', type: 'text/plain' } }, archive: {} }
+    })
+    await enter(m, 'demo')
+    await dragFilesOver(m)
+    expect(m.text()).toContain('松手就传到 demo 根下')
+
+    await tap(m, '[data-test="dir:logs/"]')
+    await dragFilesOver(m)
+    expect(m.text()).toContain('松手就传到 demo/logs/')
+    // 还没松手就一个字节都不该动
+    expect(s3.requests.filter((r) => r.method === 'PUT').length).toBe(0)
+  })
+
+  it('OS-042 拖进来松手就传到当前那一层', async () => {
+    const { m, s3 } = await open({
+      seed: { demo: { 'logs/keep.txt': { body: '已有\n', type: 'text/plain' } }, archive: {} }
+    })
+    await enter(m, 'demo')
+    await tap(m, '[data-test="dir:logs/"]')
+    await m.dropFiles('.s3', [droppedFile('甲.txt', '甲的内容\n'), droppedFile('乙.txt', '乙的内容\n')])
+    await until(m, () => m.text().includes('已上传 2 个对象'))
+
+    expect(textOf(s3, 'demo', 'logs/甲.txt')).toBe('甲的内容\n')
+    expect(textOf(s3, 'demo', 'logs/乙.txt')).toBe('乙的内容\n')
+    expect(m.has('甲.txt')).toBe(true)
+    expect(m.has('乙.txt')).toBe(true)
+    // 松手之后那句落点就退场了
+    expect(m.text()).not.toContain('松手就传到')
+  })
+
+  it('OS-043 还没选桶时松手，说清楚缺的是哪一步', async () => {
+    const { m, s3 } = await open()
+    await m.dropFiles('.s3', [droppedFile('甲.txt', '甲的内容\n')])
+    await quiet(m)
+
+    expect(m.text()).toContain('左边先选一个桶，拖进来的文件才有落点')
+    expect(s3.requests.filter((r) => r.method === 'PUT').length).toBe(0)
+  })
+
+  it('OS-044 连接卡摊着时拖进来的东西不动', async () => {
+    const { m, s3 } = await openFresh()
+    await m.dropFiles('.s3', [droppedFile('甲.txt', '甲的内容\n')])
+    await quiet(m)
+
+    expect(cardIsOpen(m)).toBe(true)
+    expect(s3.requests.length).toBe(0)
+  })
+
+  it('OS-045 拖进来的那一样读不出来就念这一句', async () => {
+    const { m, s3 } = await open()
+    await enter(m, 'demo')
+    // 文件夹在拖放里也是一颗"文件"，读它区间时浏览器抛回来的是它自己那句英文错
+    const dir = droppedFile('logs', '')
+    dir.slice = (() => ({
+      arrayBuffer: async () => {
+        throw new Error('NotFoundError')
+      }
+    })) as unknown as typeof dir.slice
+    await m.dropFiles('.s3', [dir])
+    await until(m, () => m.text().includes('拖进来的那一样读不出来，没上传'))
+
+    expect(s3.requests.filter((r) => r.method === 'PUT').length).toBe(0)
+    expect(s3.object('demo', 'logs')).toBeUndefined()
   })
 })
 
@@ -506,6 +712,128 @@ describe('破坏性动作先问一句，建桶与链接各说一句人话', () =
 
     expect(first.m.has('only-two')).toBe(true)
     expect(first.m.has('only-one')).toBe(false)
+  })
+})
+
+describe('重命名：只有对象行有这一颗', () => {
+  const seed: Record<string, Record<string, SeedObject>> = {
+    demo: {
+      '说明.txt': { body: '要改名的那一份\n', type: 'text/plain; charset=utf-8' },
+      'pic.png': { body: new Uint8Array([137, 80, 78, 71]), type: 'image/png' },
+      'logs/run.txt': { body: '一份日志\n', type: 'text/plain' },
+      'huge.bin': { body: '', type: 'application/octet-stream', sizeHint: 6 * 1024 * MB }
+    },
+    archive: {}
+  }
+
+  /** 假端点收到过的写请求（复制是带 copy-source 头的 PUT，删除是 DELETE） */
+  function writeRequests(s3: FakeS3): number {
+    return s3.requests.filter((r) => r.method === 'PUT' || r.method === 'DELETE' || r.method === 'POST').length
+  }
+
+  it('OS-046 重命名一个对象，端点上换了键、字节没动', async () => {
+    const { m, s3 } = await open({ seed })
+    await enter(m, 'demo')
+    await tap(m, '[data-test="ren:说明.txt"]')
+
+    // 居中模态：念得出改的是哪一个键，格子里预填的就是当前名字
+    expect(m.text()).toContain('把 demo/说明.txt 改成：')
+    expect((m.container.querySelector('#s3-rename') as HTMLInputElement).value).toBe('说明.txt')
+    await fill(m, 's3-rename', '备注.txt')
+    await tapText(m, '改')
+
+    expect(textOf(s3, 'demo', '备注.txt')).toBe('要改名的那一份\n')
+    expect(s3.object('demo', '说明.txt')).toBeUndefined()
+    expect(m.has('备注.txt')).toBe(true)
+    expect(m.container.querySelectorAll('[data-test="row:说明.txt"]').length).toBe(0)
+    expect(m.text()).toContain('已重命名 说明.txt → 备注.txt')
+  })
+
+  it('OS-047 新名字空着、带斜杠或没变，就在原地念原因', async () => {
+    const { m, s3 } = await open({ seed })
+    await enter(m, 'demo')
+    await tap(m, '[data-test="ren:说明.txt"]')
+    const before = writeRequests(s3)
+
+    await fill(m, 's3-rename', 'a/b')
+    await tapText(m, '改')
+    expect(m.text()).toContain('新名字里不要带斜杠，一次只改这一层的名字')
+
+    await fill(m, 's3-rename', '')
+    await tapText(m, '改')
+    expect(m.text()).toContain('新名字是空的')
+
+    await fill(m, 's3-rename', '说明.txt')
+    await tapText(m, '改')
+    expect(m.text()).toContain('名字没变，什么都没动')
+    expect(writeRequests(s3)).toBe(before)
+  })
+
+  it('OS-048 这一层里已经有同名对象就别盖上去', async () => {
+    const { m, s3 } = await open({ seed })
+    await enter(m, 'demo')
+    await tap(m, '[data-test="ren:说明.txt"]')
+    const png = s3.object('demo', 'pic.png')
+    const before = writeRequests(s3)
+
+    await fill(m, 's3-rename', 'pic.png')
+    await tapText(m, '改')
+
+    expect(m.text()).toContain('这一层里已经有叫 pic.png 的对象')
+    expect(s3.object('demo', '说明.txt')).toBeDefined()
+    expect(s3.object('demo', 'pic.png')).toBe(png)
+    expect(writeRequests(s3)).toBe(before)
+  })
+
+  it('OS-049 超过服务端一次复制上限的，动手之前就拒并报两个数', async () => {
+    const { m, s3 } = await open({ seed })
+    await enter(m, 'demo')
+    await tap(m, '[data-test="ren:huge.bin"]')
+
+    expect(m.text()).toContain('这个对象有 6.0 GB，超过服务端一次复制的 5 GB，改不了')
+    // 拒在摊模态之前：模态根本不出现，端点也没收到写请求
+    expect(m.container.querySelector('#s3-rename')).toBeNull()
+    expect(writeRequests(s3)).toBe(0)
+  })
+
+  it('OS-050 目录行与桶行没有重命名这一颗', async () => {
+    const { m } = await open({ seed })
+    await enter(m, 'demo')
+    expect(m.has('logs/')).toBe(true)
+
+    const dirRow = m.field('dir:logs/')?.closest('tr')
+    expect(dirRow?.querySelectorAll('[data-test^="ren:"]').length).toBe(0)
+    // 左栏的桶行里读不到这句话
+    expect(m.container.querySelector('nav')?.textContent).not.toContain('重命名')
+    // 每一颗重命名键都挂在对象行上（这一层里对象共三行，logs/ 是目录行）
+    const renKeys = [...m.container.querySelectorAll('[data-test^="ren:"]')].map((e) => e.getAttribute('data-test')!.slice(4))
+    expect(renKeys.length).toBe(3)
+    for (const key of renKeys) {
+      expect(m.container.querySelector(`[data-test="row:${key}"]`), `ren:${key} 不在对象行上`).not.toBeNull()
+    }
+  })
+
+  it('OS-051 改名模态按取消、Esc 或点它外面那层就收起，端点什么都没动', async () => {
+    const { m, s3 } = await open({ seed })
+    await enter(m, 'demo')
+
+    await tap(m, '[data-test="ren:说明.txt"]')
+    await fill(m, 's3-rename', '改成谁都不算')
+    await tapText(m, '取消')
+    expect(m.container.querySelector('#s3-rename')).toBeNull()
+
+    await tap(m, '[data-test="ren:pic.png"]')
+    await m.key('Escape')
+    expect(m.container.querySelector('#s3-rename')).toBeNull()
+
+    await tap(m, '[data-test="ren:说明.txt"]')
+    await tap(m, '[data-test="rename-backdrop"]')
+    expect(m.container.querySelector('#s3-rename')).toBeNull()
+
+    expect(s3.object('demo', '说明.txt')).toBeDefined()
+    expect(s3.object('demo', 'pic.png')).toBeDefined()
+    expect(s3.object('demo', 'logs/run.txt')).toBeDefined()
+    expect(writeRequests(s3)).toBe(0)
   })
 })
 

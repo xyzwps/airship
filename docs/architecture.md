@@ -333,7 +333,7 @@ runtime 侧不再有扫包、拖装、启动器卸载的代码。
 | `vcp` | vcp | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | ffmpeg | 全 | 是 | 默认 |
 | `wsld` | wsld | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | wslc | windows | 是 | 默认 |
 | `albedo` | Albedo | settings, dialog, fs.read, fs.write, clipboard | — | 全 | 是 | 1440×900 |
-| `s3` | S3 | net, settings, dialog, fs.read, fs.write, clipboard | — | 全 | 否 | 1180×760 |
+| `s3` | S3 | net, settings, dialog, fs.read, fs.write, clipboard | — | 全 | 是 | 1180×760 |
 
 books 与 pdf 都声明 `sharedNamespaces: ['library']`，共用同一份书库。
 "默认"尺寸 = runtime 的 1100×740。`flush` 是 SDK 宿主给不留白（应用自己铺满整窗）。
