@@ -119,8 +119,10 @@ sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `iconPath`
   `code/app-dirs.mjs`）。应用安装器用的 makensis 是 electron-builder 缓存里那份，所以**这台机器上第一次要先跑过
   `just build-runtime`**——`just build` 把它排在 build-runtime 之后，一条命令里就顺了。
 
-出包入口必须先删旧包：**宁可响亮报错没有，不许旧包冒充新包**（`code/clean-installer.mjs` 两档：默认删
-`airship-runtime-Setup-*` 那一族，`apps` 那一档删 `release/apps/*-Setup-*` 那一族，由 `just installers` 走）。
+出包入口必须先删旧包：**宁可响亮报错没有，不许旧包冒充新包**。`clean-release` 整目录删 `release/`（runtime
+安装包与 `release/apps/` 那一族一起归零，所以单独打完 runtime 包之后应用安装器是空的，要重跑 `just installers`），
+`clean-app-installers` 走 `code/clean-installer.mjs apps` 那一档删 `release/apps/*-Setup-*`，由 `just installers` 走。
+删不动（还活着的实例或索引占用）时 `rm -rf` 非零退出，出包在第一步就断——照样是响亮失败，只是不再有重试。
 没有代码签名，第一次运行会被 SmartScreen 拦一道。
 
 **装包只有一条路：跑应用自己的安装器**（契约 PK-031~035）。从前"把归档拖到启动器上"那一族随启动器退场了

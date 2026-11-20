@@ -46,14 +46,16 @@ just installers           # 只重出全部应用的安装器（先产全部的�
 > 缓存里没有 makensis 时生成器会响亮报错并指回这条。
 > `just build` 里 `installers` 就排在 `build-runtime` 之后，一条命令自己把这条顺序满足了。
 
-> 清场（`code/clean-installer.mjs`）为什么算必要步骤：runtime 安装包的名字只由
+> 清场为什么算必要步骤：runtime 安装包的名字只由
 > `src/runtime/package.json` 的 version 决定，不 bump 版本号就永远是同一个文件名；一次没写成安装包的运行
 > （`dist` 半路失败，或只跑了解包）会让上一次那颗原地留着冒充刚出的那版。`verify-installer` 按名字匹配、
 > 只验 PE 头与 NSIS 签名，对旧包照样全绿，还会把 `.sha256` 一起改成旧包的。规矩：**release/ 里的安装包
-> 永远等于最后一次构建，宁可没有，不可有旧的**。清场有两档：默认删 `airship-runtime-Setup-*` 那一族
-> （exe / .blockmap / .sha256，由 `just build-runtime` 走）；`apps` 那一档删 `release/apps/*-Setup-*` 那一族
-> （exe / .sha256，由 `just installers` 走）——应用名单是会变的，删掉的那个应用留下的旧安装器同样会冒充最后一次构建。
-> `win-unpacked` 不在删除范围内（每次由 electron-builder 整体重写）。
+> 永远等于最后一次构建，宁可没有，不可有旧的**。清场有两档：`clean-release` 整目录 `rm -rf release`，由
+> `just build-runtime` 开头走（runtime 那一族与 `release/apps/` 一起归零，所以单独打完 runtime 包之后要重跑
+> `just installers` 才有应用安装器）；`clean-app-installers` 走 `code/clean-installer.mjs apps` 那一档，删
+> `release/apps/*-Setup-*` 那一族（exe / .sha256），由 `just installers` 走——应用名单是会变的，删掉的那个应用
+> 留下的旧安装器同样会冒充最后一次构建。`win-unpacked` 会被整目录一起删掉，它每次由 electron-builder 整体重写。
+> 删不动（实例还活着或被索引占用）时 `rm -rf` 非零退出，出包在第一步就断。
 > 单独跑 `just app-installer <id>` 不经过 `apps` 那一档：它只删自己那一枚同名旧包（生成器里那条，同一条规矩）。
 
 ## 里面装了什么

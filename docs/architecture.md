@@ -432,12 +432,14 @@ runtime 自己没有界面：`createDesktopShortcut` / `createStartMenuShortcut`
 不跟 runtime 跳。runtime 的 `package.json` 里 electron 写**固定版本**（`45.2.3`，不带 `^`）——
 electron-builder 要按它取二进制，写范围会被拒。
 
-**清场**（`code/clean-installer.mjs`）两档：默认那档由 `build-runtime` 开头走，删 `release/` 里上一次留下的
-`airship-runtime-Setup-*` 那一族（exe / .blockmap / .sha256）；`apps` 那档由 `installers` 在出全部安装器之前走，
-删 `release/apps/*-Setup-*` 那一族（exe / .sha256）。安装包名字只由 version 决定，
+**清场**两档由 justfile 钉：`clean-release` 整目录 `rm -rf release`，由 `build-runtime` 开头走——runtime 安装包与
+`release/apps/` 那一族一起归零，所以单独打完 runtime 包之后应用安装器是空的，得重跑 `just installers`；
+`clean-app-installers` 走 `code/clean-installer.mjs apps` 那一档，删 `release/apps/*-Setup-*` 那一族（exe / .sha256），
+由 `installers` 在出全部安装器之前走。安装包名字只由 version 决定，
 不 bump 就永远是同一个文件名；一次没写成安装包的运行会让上一次那颗原地留着冒充刚出的那版，
 而应用名单是会变的——删掉的那个应用留下的旧安装器同样在冒充最后一次构建。
-规矩：**宁可响亮报错没有，不许旧包冒充新包**。`win-unpacked` 不在删除范围内（每次由 electron-builder 整体重写）；
+规矩：**宁可响亮报错没有，不许旧包冒充新包**。`rm -rf` 删不动时非零退出，出包第一步就断（脚本那一档的
+5 次 250ms 重试不在这条路上）；`win-unpacked` 也一起删掉，它每次由 electron-builder 整体重写，删了不多花钱。
 单独跑 `app-installer <id>` 不经过 `apps` 那档，只由生成器删自己那一枚同名旧包。
 
 **自检**（`code/verify-installer.mjs`，`build-runtime` 以它收尾）看六件事：
