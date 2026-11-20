@@ -1,5 +1,5 @@
-/* 容器台 —— 两页：容器（左列表 + 右详情/日志）、镜像（一列镜像 + 拉取）。
-   颜色与圆角全部复用宿主的 CSS 变量与通用类，这里只补布局。 */
+/* wsld —— 两页：容器（左列表 + 右详情/日志）、镜像（一列镜像 + 拉取）。
+   颜色与圆角复用宿主的 CSS 变量与通用类，这里只补布局；唯一例外是容器状态点的三档颜色。 */
 
 .wsld {
   display: flex;
@@ -146,16 +146,22 @@
   border-color: var(--border-strong);
 }
 
+/* 状态点：三档一眼分得出，宿主的 --ok / --danger 太灰，这里单独钉一组鲜艳值。
+   深色底上 silver 依旧读得到，两档主题共用同一组。 */
 .wsld__dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--fg-faint);
+  background: silver;
   flex: none;
 }
 
-.wsld__dot--on {
-  background: var(--ok);
+.wsld__dot--running {
+  background: #22c55e;
+}
+
+.wsld__dot--error {
+  background: #ef4444;
 }
 
 .wsld__row-name {
@@ -166,20 +172,10 @@
   max-width: 120px;
 }
 
-.wsld__row-state {
-  font-size: 11.5px;
-  color: var(--fg-dim);
-  flex: none;
-}
-
-.wsld__row-state--on {
-  color: var(--ok);
-}
-
-.wsld__row-image {
+.wsld__row-ports {
   flex: 1;
   min-width: 0;
-  color: var(--fg-faint);
+  color: var(--fg-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

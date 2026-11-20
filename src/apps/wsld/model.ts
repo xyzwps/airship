@@ -1,4 +1,4 @@
-import type { RawContainer, RawImage } from './parse'
+import { parseLabels, type RawContainer, type RawImage } from './parse'
 
 /**
  * 状态映射与展示文案。
@@ -33,6 +33,82 @@ export const containerLabel = (container: RawContainer): string =>
 
 export const stateLabel = (container: RawContainer): string =>
   isRunning(container.state) ? '运行中' : '已停止'
+
+/** 行首那颗状态点的三档颜色，判据只有状态与健康检查这两个字段 */
+export type ContainerTone = 'running' | 'error' | 'stopped'
+
+/** 明确报出来的坏状态；认不出的状态一律按"没在跑"算，不猜成错误 */
+const ERROR_STATES = ['error', 'dead']
+
+export function containerTone(container: RawContainer): ContainerTone {
+  const state = container.state.trim().toLowerCase()
+  if (state === 'running') return 'running'
+  if (ERROR_STATES.includes(state) || container.health.trim().toLowerCase() === 'unhealthy') return 'error'
+  return 'stopped'
+}
+
+/** 标签里那份容器元数据记着创建时的端口映射，容器停了之后 `Ports` 就空了，只剩它 */
+const METADATA_LABEL = 'com.microsoft.wsl.container.metadata'
+
+/** `127.0.0.1:9000->9000/tcp` 这种写法里，冒号与箭头之间那个号是本机的 */
+const HOST_PORT_RE = /(?::|^)\s*(\d{1,5})\s*->/
+
+function toPort(value: unknown): number | null {
+  const n = typeof value === 'string' ? Number(value) : value
+  return typeof n === 'number' && Number.isInteger(n) && n > 0 && n < 65_536 ? n : null
+}
+
+function portsFromText(text: string): number[] {
+  const out: number[] = []
+  for (const part of text.split(',')) {
+    const hit = HOST_PORT_RE.exec(part.trim())
+    if (!hit) continue
+    const port = toPort(hit[1])
+    if (port !== null) out.push(port)
+  }
+  return out
+}
+
+function portsFromMetadata(labels: string): number[] {
+  for (const entry of parseLabels(labels)) {
+    if (entry.key !== METADATA_LABEL) continue
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(entry.value)
+    } catch {
+      return []
+    }
+    const list = (parsed as { V1?: { Ports?: unknown } } | null)?.V1?.Ports
+    if (!Array.isArray(list)) return []
+    return list
+      .map((item) => toPort((item as { HostPort?: unknown } | null)?.HostPort))
+      .filter((port): port is number => port !== null)
+  }
+  return []
+}
+
+/**
+ * 映射到本机的端口号，升序去重。
+ *
+ * 实测（wslc 3.0.1）：运行中的 `Ports` 写成 `127.0.0.1:9000->9000/tcp, 127.0.0.1:9001->9001/tcp`，
+ * 一停下来 `Ports` 就是空串，映射只剩在标签元数据的 `V1.Ports[].HostPort` 里——两处都读，
+ * 行上要报的是"这台机器上哪个端口能连到它"，跟容器此刻在不在跑无关。
+ */
+export function hostPorts(container: RawContainer): number[] {
+  const ports = new Set(hostPortsIn(container))
+  return [...ports].sort((a, b) => a - b)
+}
+
+function hostPortsIn(container: RawContainer): number[] {
+  const live = portsFromText(container.ports)
+  return live.length > 0 ? live : portsFromMetadata(container.labels)
+}
+
+/** 一个映射都没有时给横杠，别留一格空白让人以为渲染坏了 */
+export const hostPortsText = (container: RawContainer): string => {
+  const ports = hostPorts(container)
+  return ports.length === 0 ? DASH : ports.join(', ')
+}
 
 /** 运行中的在前，同档内按名称排（不区分大小写） */
 export function sortContainers(list: readonly RawContainer[]): RawContainer[] {

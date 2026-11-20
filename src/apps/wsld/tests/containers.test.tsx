@@ -5,6 +5,7 @@ import {
   commands,
   listEmpty,
   listExited,
+  listPorts,
   listRunning,
   logsNotFound,
   makeFake,
@@ -18,7 +19,7 @@ import {
 import type { Mount } from '@airship/sdk/testing'
 
 /**
- * CL-001 ~ CL-027：容器页那一列容器，与点一行之后右边那块详情。
+ * CL-001 ~ CL-029：容器页那一列容器，与点一行之后右边那块详情。
  *
  * 每一条都真渲染、真点：命令行看 `fake.procCalls`，话看界面文字。
  * 容器与镜像数据一律从 wslc 3.0.1 的真样本改出来（见 tests/fixtures/）。
@@ -71,14 +72,18 @@ describe('打开就把本机容器摆出来', () => {
     m.unmount()
   })
 
-  it('CL-002 一行只报名称、状态、镜像', async () => {
+  it('CL-002 一行只报名称与映射到本机的端口号', async () => {
     const m = await mountList(twoContainers())
     const line = rowOf(m, 'zeta').textContent ?? ''
 
     expect(line).toContain('zeta')
-    expect(line).toContain('运行中')
-    expect(line).toContain('docker.1ms.run/library/busybox:latest')
-    // 命令、端口、网络、创建时间、ID 一概不进这一行
+    // 两台都没有端口映射，那一格给横杠
+    expect(line).toContain('—')
+    // 状态由行首那颗点说，行里不再念一遍
+    expect(line).not.toContain('运行中')
+    expect(line).not.toContain('已停止')
+    // 镜像、命令、网络、创建时间、ID 一概不进这一行
+    expect(line).not.toContain('docker.1ms.run/library/busybox:latest')
     expect(line).not.toContain('sleep 3600')
     expect(line).not.toContain('bridge')
     expect(line).not.toContain('2026-10-11')
@@ -118,6 +123,17 @@ describe('打开就把本机容器摆出来', () => {
     const failed = await mountList('', { code: 1, stderr: logsNotFound() })
     expect(failed.text()).toContain('尚未刷新')
     failed.unmount()
+  })
+
+  it('CL-029 端口那格报本机那侧的号，停止的也从标签元数据里读得出', async () => {
+    const m = await mountList(listPorts())
+
+    expect(rowOf(m, 'rustfs').textContent ?? '').toContain('9000, 9001')
+    // openssh-server 已停止，wslc 的 Ports 报空，映射只剩在标签元数据里
+    expect(rowOf(m, 'openssh-server').textContent ?? '').toContain('22222')
+    // 报的是本机的号，容器那侧的号与协议不进来
+    expect(rowOf(m, 'rustfs').textContent ?? '').not.toContain('/tcp')
+    m.unmount()
   })
 })
 

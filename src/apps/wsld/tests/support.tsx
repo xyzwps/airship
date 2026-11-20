@@ -112,6 +112,7 @@ export const sample = (name: string): string => readFileSync(join(__dirname, 'fi
 export const listRunning = (): string => sample('wslc-list-running.ndjson')
 export const listExited = (): string => sample('wslc-list-exited.ndjson')
 export const listEmpty = (): string => sample('wslc-list-empty.ndjson')
+export const listPorts = (): string => sample('wslc-list-ports.ndjson')
 export const imagesNdjson = (): string => sample('wslc-images.ndjson')
 export const imagesUntagged = (): string => sample('wslc-images-untagged.ndjson')
 export const logsPlain = (): string => sample('wslc-logs.txt')

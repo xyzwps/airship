@@ -15,8 +15,9 @@ import {
   containerLabel,
   containerMatches,
   containerSections,
+  containerTone,
   containersSummary,
-  dash,
+  hostPortsText,
   isRunning,
   sortContainers,
   stateLabel
@@ -27,7 +28,7 @@ import { useShellEvents } from './hooks'
 /**
  * 容器页：左边一列容器，右边选中那个的详情与日志。
  *
- * 一行只报识别信息（名称、状态、镜像），其余字段全在详情里；
+ * 一行只报识别信息（名称、状态点、映射到本机的端口号），其余字段全在详情里；
  * 页上同一时刻只让一个动作在飞，动作进行中不读列表。
  */
 
@@ -174,12 +175,9 @@ export function ContainersView({ runner }: { runner: WslcRunner }): JSX.Element 
                   if (e.key === 'Enter' || e.key === ' ') setSelectedId(container.id)
                 }}
               >
-                <span className={`wsld__dot${running ? ' wsld__dot--on' : ''}`} />
+                <span className={`wsld__dot wsld__dot--${containerTone(container)}`} />
                 <span className="wsld__row-name">{containerLabel(container)}</span>
-                <span className={`wsld__row-state${running ? ' wsld__row-state--on' : ''}`}>
-                  {stateLabel(container)}
-                </span>
-                <span className="wsld__row-image mono">{dash(container.image)}</span>
+                <span className="wsld__row-ports mono">{hostPortsText(container)}</span>
                 {rowBusy && <span className="spinner" />}
                 <IconButton
                   icon="start"
