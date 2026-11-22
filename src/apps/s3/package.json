@@ -10,6 +10,8 @@
     "@airship/textdecode": "*",
     "@aws-sdk/client-s3": "^3.1164.0",
     "@aws-sdk/s3-request-presigner": "^3.1164.0",
+    "@iconify-json/lucide": "^1.2.158",
+    "@iconify/react": "^6.0.4",
     "@vitejs/plugin-react": "^6.2.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

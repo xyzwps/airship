@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'rea
 import type { S3Client } from '@aws-sdk/client-s3'
 import type { AppApi } from '@airship/contract'
 import { useAppAutotest, useTheme } from '@airship/sdk'
+import { Icon } from '@iconify/react'
+import './icons.ts'
 import { ConnectionCard } from './ConnectionCard.tsx'
 import { ObjectsView } from './ObjectsView.tsx'
 import { PreviewPane } from './PreviewPane.tsx'
@@ -68,6 +70,9 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
   const [prefix, setPrefix] = useState('')
   const [rows, setRows] = useState<ObjectRow[]>([])
   const [token, setToken] = useState<string | null>(null)
+  /** 当前是这一层的第几段（0 起，只为「上一页」按不按得动）；往后翻的 token 沿途都攒在这里 */
+  const [pageIndex, setPageIndex] = useState(0)
+  const tokens = useRef<string[]>([])
   const [selected, setSelected] = useState<ObjectRow | null>(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
@@ -107,26 +112,44 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     }
   }, [])
 
-  /** 列当前这一层；`after` 给了就是"还有更多"往后接一页。把这一页交回去，自动凭据那侧要用 */
+  /** 列层在跑的那一段时刻；盖在表上的转圈晚 200ms 才出现——快网下数据回来得早，一闪都不闪 */
+  const [listing, setListing] = useState(false)
+  const showLoading = useDelayedActive(listing, 200)
+
+  /** 列一层里的第 index 段：端点回多少行就画多少行，不拼页（判据 OS-059~061）。
+   * 端点的 token 只往后可翻，沿途的 NextContinuationToken 都攒在 `tokens` 里，
+   * 上一页就是拿存过的那一枚重发。换层、重开都从第 0 段起，`tokens` 随之清空。
+   * 把这一段交回去，自动凭据与删目录那两条路要用 */
   const openObjects = useCallback(
-    async (target: string, at: string, after?: string): Promise<ObjectPage | null> => {
+    async (target: string, at: string, index: number): Promise<ObjectPage | null> => {
       if (!client) return null
       setBusy('正在列对象…')
+      setListing(true)
       setError('')
       try {
-        const page = await listObjects(client, target, at, after)
-        setRows((prev) => (after ? [...prev, ...page.rows] : page.rows))
+        const page = await listObjects(client, target, at, index === 0 ? undefined : tokens.current[index - 1])
+        tokens.current = tokens.current.slice(0, index)
+        if (page.nextToken !== null) tokens.current[index] = page.nextToken
+        setRows(page.rows)
         setToken(page.nextToken)
+        setPageIndex(index)
         return page
       } catch (e) {
         setError(errorText(e))
-        if (!after) setRows([])
+        setRows([])
         return null
       } finally {
         setBusy('')
+        setListing(false)
       }
     },
     [client]
+  )
+
+  /** 刷新停在当前段：删掉一个、传完一批之后人不该被弹回第一段 */
+  const reloadPage = useCallback(
+    () => (bucket === null ? Promise.resolve(null) : openObjects(bucket, prefix, pageIndex)),
+    [bucket, prefix, pageIndex, openObjects]
   )
 
   // 启动：设置里有源就直接连上次用的那一个，一个都没有就把连接卡摊开
@@ -156,8 +179,8 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
    * `useAppAutotest` 只在挂载时注册一次 handler，闭包里的状态会停在首帧——
    * 首帧还没有源、也没有 client，所以这里每次都从 `live` 里取当下那一份。
    */
-  const live = useRef({ client, bucket, buckets, prefix, editing, renaming, openObjects })
-  live.current = { client, bucket, buckets, prefix, editing, renaming, openObjects }
+  const live = useRef({ client, bucket, buckets, prefix, editing, renaming, openObjects, reloadPage })
+  live.current = { client, bucket, buckets, prefix, editing, renaming, openObjects, reloadPage }
   useAppAutotest(
     's3',
     async (path) => {
@@ -180,7 +203,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
         await sourceFromPath(api, path),
         contentTypeOf(name)
       )
-      const page = await now.openObjects(target, '')
+      const page = await now.openObjects(target, '', 0)
       const hit = page?.rows.find((r) => r.kind === 'object' && r.key === name)
       if (hit) setSelected(hit)
       setNote(`已上传 ${name}`)
@@ -318,13 +341,13 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     setBucket(name)
     setPrefix('')
     setSelected(null)
-    void openObjects(name, '')
+    void openObjects(name, '', 0)
   }
 
   function enterPrefix(key: string): void {
     setPrefix(key)
     setSelected(null)
-    void openObjects(bucket ?? '', key)
+    void openObjects(bucket ?? '', key, 0)
   }
 
   /** 面包屑：index 为 -1 是回到桶根，其余回到那一段 */
@@ -332,7 +355,13 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     const at = index < 0 ? '' : trail.slice(0, index + 1).map((s) => `${s}/`).join('')
     setPrefix(at)
     setSelected(null)
-    void openObjects(bucket ?? '', at)
+    void openObjects(bucket ?? '', at, 0)
+  }
+
+  /** 换段：整段替换，端点只给往后翻的 token，往回走吃的是沿途存下的那一份 */
+  function gotoPage(index: number): void {
+    if (bucket === null) return
+    void openObjects(bucket, prefix, index)
   }
 
   /**
@@ -363,8 +392,8 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
       }
       setNote(`已上传 ${items.length} 个对象`)
       // 从窗口监听里进来时，这一条链上的闭包停在首帧——那一刻还没有 client，
-      // 首帧那份 openObjects 会直接返回 null，列表就永远停在拖进来之前的样子。取当下的那一份。
-      await live.current.openObjects(target.bucket, target.at)
+      // 首帧那几份会直接返回 null，列表就永远停在拖进来之前的样子。取当下的那一份。
+      await live.current.reloadPage()
     } catch (e) {
       setError(errorText(e))
     } finally {
@@ -437,7 +466,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
       await deleteObject(client, bucket, row.key)
       if (selected?.key === row.key) setSelected(null)
       setNote(`已删掉 ${row.label}`)
-      await openObjects(bucket, prefix)
+      await reloadPage()
     } catch (e) {
       setError(errorText(e))
     }
@@ -493,7 +522,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
       await deleteObject(client, bucket, row.key)
       if (selected?.key === row.key) setSelected(null)
       setNote(`已重命名 ${oldLabel} → ${name}`)
-      await openObjects(bucket, prefix)
+      await reloadPage()
     } catch (e) {
       setError(errorText(e))
     } finally {
@@ -537,7 +566,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
       await putDirMarker(client, bucket, joinKey(prefix, `${name}/`))
       setNewName('')
       setNote(`已建好目录 ${name}`)
-      await openObjects(bucket, prefix)
+      await reloadPage()
     } catch (e) {
       setError(errorText(e))
     }
@@ -561,7 +590,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
       }
       if (!window.confirm(`删掉目录 ${name}？只去掉这个目录标记，里面已有的对象不动。`)) return
       await deleteObject(client, bucket, row.key)
-      const page = await openObjects(bucket, prefix)
+      const page = await reloadPage()
       const stillThere = (page?.rows ?? []).some((r) => r.kind === 'prefix' && r.key === row.key)
       setNote(
         stillThere
@@ -610,7 +639,9 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
         />
         <button
           type="button"
-          className="btn btn--ghost"
+          className="icon-btn"
+          title="连接设置"
+          aria-label="连接设置"
           onClick={() => {
             setMenu(false)
             setEditTarget(current)
@@ -619,24 +650,13 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
           }}
           disabled={current === null}
         >
-          连接设置
+          <Icon icon="lucide:settings" width="16" height="16" aria-hidden="true" />
         </button>
-        <button type="button" className="btn btn--ghost" onClick={() => void refreshBuckets(client)} disabled={client === null || busy !== ''}>
-          刷新
+        <button type="button" className="icon-btn" title="刷新" aria-label="刷新" onClick={() => void refreshBuckets(client)} disabled={client === null || busy !== ''}>
+          <Icon icon="lucide:refresh-cw" width="16" height="16" aria-hidden="true" />
         </button>
-        <button type="button" className="btn btn--ghost" onClick={() => void upload()} disabled={client === null || bucket === null || busy !== ''}>
-          上传
-        </button>
-        <button type="button" className="btn btn--ghost" onClick={() => openBar('bucket')} disabled={client === null || creating}>
-          新建桶
-        </button>
-        <button
-          type="button"
-          className="btn btn--ghost"
-          onClick={() => openBar('dir')}
-          disabled={client === null || bucket === null || creating}
-        >
-          新建目录
+        <button type="button" className="icon-btn" title="新建桶" aria-label="新建桶" onClick={() => openBar('bucket')} disabled={client === null || creating}>
+          <Icon icon="lucide:archive" width="16" height="16" aria-hidden="true" />
         </button>
         <span className="s3__busy">{busy !== '' ? busy : note}</span>
       </header>
@@ -657,13 +677,15 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
           />
           <button
             type="button"
-            className="btn btn--primary"
+            className="icon-btn s3__ibtn--go"
+            title="建"
+            aria-label="建"
             onClick={() => void (newKind === 'bucket' ? submitNewBucket() : submitNewDir())}
           >
-            建
+            <Icon icon="lucide:check" width="16" height="16" aria-hidden="true" />
           </button>
-          <button type="button" className="btn btn--ghost" onClick={() => setCreating(false)}>
-            取消
+          <button type="button" className="icon-btn" title="取消" aria-label="取消" onClick={() => setCreating(false)}>
+            <Icon icon="lucide:x" width="16" height="16" aria-hidden="true" />
           </button>
         </div>
       ) : null}
@@ -724,11 +746,11 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
               </div>
               {error !== '' ? <p className="s3__error">{error}</p> : null}
               <div className="s3__card-foot">
-                <button type="button" className="btn btn--primary" disabled={busy !== ''} onClick={() => void submitRename()}>
-                  改
+                <button type="button" className="icon-btn s3__ibtn--go" title="改" aria-label="改" disabled={busy !== ''} onClick={() => void submitRename()}>
+                  <Icon icon="lucide:check" width="16" height="16" aria-hidden="true" />
                 </button>
-                <button type="button" className="btn btn--ghost" onClick={closeRename}>
-                  取消
+                <button type="button" className="icon-btn" title="取消" aria-label="取消" onClick={closeRename}>
+                  <Icon icon="lucide:x" width="16" height="16" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -765,19 +787,24 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
             prefix={prefix}
             trail={trail}
             rows={rows}
-            hasMore={token !== null}
+            pageIndex={pageIndex}
+            hasNext={token !== null}
             busy={busy !== ''}
+            loading={showLoading}
             selectedKey={selected?.key ?? null}
+            creating={creating}
             onEnterPrefix={enterPrefix}
             onCrumb={goCrumb}
-            onUp={() => goCrumb(trail.length - 2)}
-            onMore={() => void openObjects(bucket, prefix, token ?? undefined)}
+            onPrev={() => gotoPage(pageIndex - 1)}
+            onNext={() => gotoPage(pageIndex + 1)}
             onSelect={(r) => setSelected(r)}
             onDownload={(r) => void download(r)}
             onCopyLink={(r) => void copyLink(r)}
             onRename={(r) => startRename(r)}
             onDelete={(r) => void remove(r)}
             onDeleteDir={(r) => void removeDir(r)}
+            onUpload={() => void upload()}
+            onNewDir={() => openBar('dir')}
           />
         )}
 
@@ -794,4 +821,18 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
 function baseName(path: string): string {
   const i = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
   return i < 0 ? path : path.slice(i + 1)
+}
+
+/** active 一直真到 ms 之后才转真；中途落下或换页立刻归假。快网下转圈一闪都不闪，慢网下 200ms 才露面 */
+function useDelayedActive(active: boolean, ms: number): boolean {
+  const [shown, setShown] = useState(false)
+  useEffect(() => {
+    if (!active) {
+      setShown(false)
+      return
+    }
+    const timer = setTimeout(() => setShown(true), ms)
+    return () => clearTimeout(timer)
+  }, [active, ms])
+  return shown
 }

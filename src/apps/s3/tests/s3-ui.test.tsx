@@ -115,8 +115,22 @@ async function tap(m: Mount, selector: string): Promise<void> {
   await quiet(m)
 }
 
+/** 那句话现在住在哪：可见文字，或某颗键的悬停说明与无障碍名称（图标化之后按后者找） */
+function hasLabel(m: Mount, label: string): boolean {
+  return m.has(label) || m.container.querySelector(`[title="${label}"], [aria-label="${label}"]`) !== null
+}
+
 async function tapText(m: Mount, label: string): Promise<void> {
-  await m.press(label)
+  const el = m.container.querySelector<HTMLElement>(`button[title="${label}"], button[aria-label="${label}"]`)
+  if (!el) {
+    // 还写着字的键（源面板里那行「添加源」这一族）
+    await m.press(label)
+    await quiet(m)
+    return
+  }
+  await act(async () => {
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+  })
   await quiet(m)
 }
 
@@ -137,6 +151,31 @@ function objectRows(m: Mount): number {
 
 function prefixRows(m: Mount): number {
   return m.container.querySelectorAll('[data-test^="dir:"]').length
+}
+
+/** 翻页那一族用的对象堆：600 把键超一段的 500，正好演"端点截了一段" */
+function manyObjects(n: number): Record<string, SeedObject> {
+  const out: Record<string, SeedObject> = {}
+  for (let i = 1; i <= n; i += 1) out[`k${String(i).padStart(3, '0')}.txt`] = { body: 'x', type: 'text/plain' }
+  return out
+}
+
+/** OS-060 那一层：n 个目录、每个 files 把键——假端点按真账数键，一段 500 键装不下几个目录 */
+function dirLayer(n: number, files: number): Record<string, SeedObject> {
+  const out: Record<string, SeedObject> = {}
+  for (let i = 1; i <= n; i += 1) {
+    const d = `d${String(i).padStart(3, '0')}/`
+    for (let f = 0; f < files; f += 1) out[`${d}f${f}.txt`] = { body: 'x', type: 'text/plain' }
+  }
+  return out
+}
+
+function pageText(m: Mount): string {
+  return m.field('page')?.textContent ?? ''
+}
+
+function disabledOf(m: Mount, test: string): boolean {
+  return (m.field(test) as HTMLButtonElement | null)?.disabled !== false
 }
 
 /** 假端点上那个对象现在的文本内容（没有这个对象就是空串） */
@@ -203,7 +242,7 @@ describe('连接：五个格子与它的记忆', () => {
   })
 
   it('OS-004 连上之后顶栏那颗源键念得出这个源的名字', async () => {
-    const { m, s3, endpoint, host } = await openFresh()
+    const { m, s3, endpoint } = await openFresh()
     await fill(m, 's3-name', '家里的')
     await fill(m, 's3-endpoint', endpoint)
     await fill(m, 's3-ak', 'rustfsadmin')
@@ -211,9 +250,9 @@ describe('连接：五个格子与它的记忆', () => {
     await tapText(m, '连上')
 
     expect(m.field('sources-toggle')?.textContent).toContain('家里的')
-    // 主机与端口在那一列里念得出（点开源键才看得见）
+    // 那一列里这一行念的就是名字——主机不再出现在行里（2026-11-22 他点名去掉）
     await tap(m, '[data-test="sources-toggle"]')
-    expect(m.text()).toContain(host)
+    expect(m.field('pick:家里的')?.textContent).toContain('家里的')
 
     expect(m.has('demo')).toBe(true)
     expect(m.has('archive')).toBe(true)
@@ -235,7 +274,7 @@ describe('连接：五个格子与它的记忆', () => {
 
     // 同一份设置再开一次：不该再摊出那五个格子
     const again = await open({ name: '家里的' })
-    expect(again.m.has('连上')).toBe(false)
+    expect(hasLabel(again.m, '连上')).toBe(false)
     expect(again.m.has('demo')).toBe(true)
 
     // 再摊开卡片，五格里念的还是上次那五样值
@@ -268,7 +307,7 @@ describe('连接：五个格子与它的记忆', () => {
     await tap(m, '[data-test="modal-backdrop"]')
     expect(cardIsOpen(m)).toBe(true)
     // 收不掉不等于走不通：那五个格子还摊着，可以直接填下一个
-    expect(m.has('连上')).toBe(true)
+    expect(hasLabel(m, '连上')).toBe(true)
   })
 })
 
@@ -337,7 +376,7 @@ describe('一层的对象：目录在前，翻得完', () => {
     expect(m.has('2026-11/')).toBe(true)
     expect(m.text()).toContain('demo / logs/')
 
-    await tapText(m, '上一级')
+    await tap(m, '[data-test="crumb:-1"]')
     expect(objectRows(m)).toBe(3)
     expect(prefixRows(m)).toBe(1)
   })
@@ -347,19 +386,6 @@ describe('一层的对象：目录在前，翻得完', () => {
     await enter(m, 'demo')
     await tap(m, '[data-test="dir:logs/"]')
     expect(m.text()).toContain('这一格里没有东西')
-  })
-
-  it('OS-011 一页装不下就给「还有更多」，按下不清空已有的', async () => {
-    const many: Record<string, SeedObject> = {}
-    for (let i = 1; i <= 501; i += 1) many[`k${String(i).padStart(3, '0')}.txt`] = { body: 'x', type: 'text/plain' }
-    const { m } = await open({ seed: { demo: many, archive: {} } })
-    await enter(m, 'demo')
-
-    expect(objectRows(m)).toBe(500)
-    expect(m.has('还有更多')).toBe(true)
-    await tapText(m, '还有更多')
-    expect(objectRows(m)).toBe(501)
-    expect(m.has('k001.txt')).toBe(true)
   })
 
   it('OS-033 新建的目录也占一行，进去是空的', async () => {
@@ -443,6 +469,84 @@ describe('一层的对象：目录在前，翻得完', () => {
     // 弹问句之前先问过有没有标记：没有就一条删都不该发
     expect(s3.requests.some((r) => r.method === 'DELETE')).toBe(false)
     expect(s3.object('demo', 'logs/run.txt')).toBeDefined()
+  })
+})
+
+describe('翻页：一段固定问 500 把键，端点回多少行就显示多少行', () => {
+  it('OS-059 列层请求永远问 500 把键，页脚照实念行数', async () => {
+    const { m, s3 } = await open({ seed: { demo: manyObjects(600), archive: {} } })
+    await enter(m, 'demo')
+    const lists = s3.requests.filter((r) => r.method === 'GET' && r.query.includes('list-type=2'))
+    expect(lists.length).toBe(1)
+    expect(lists[0]?.query).toContain('max-keys=500')
+    expect(objectRows(m)).toBe(500)
+    expect(pageText(m)).toBe('本页 500 个')
+    expect(disabledOf(m, 'next')).toBe(false)
+    expect(disabledOf(m, 'prev')).toBe(true)
+  })
+
+  it('OS-060 目录行把一段的键扣完，行数远少于 500 也不加问', async () => {
+    const { m, s3 } = await open({ seed: { demo: dirLayer(30, 30), archive: {} } })
+    await enter(m, 'demo')
+    // 假端点按真账数键：每个目录扣 30 把，500 键的一段只装得下 17 行目录——应用不拼页，就这么画
+    const lists = s3.requests.filter((r) => r.method === 'GET' && r.query.includes('list-type=2'))
+    expect(lists.length).toBe(1)
+    expect(prefixRows(m)).toBe(17)
+    expect(pageText(m)).toBe('本页 17 个')
+    expect(m.field('idx:d001/')?.textContent).toBe('1')
+
+    await tap(m, '[data-test="next"]')
+    expect(prefixRows(m)).toBe(13)
+    expect(m.field('idx:d018/')?.textContent).toBe('1')
+    expect(disabledOf(m, 'next')).toBe(true)
+  })
+
+  it('OS-061 一段装得下就没有下一页', async () => {
+    const { m } = await open({ seed: { demo: manyObjects(60), archive: {} } })
+    await enter(m, 'demo')
+    expect(objectRows(m)).toBe(60)
+    expect(pageText(m)).toBe('本页 60 个')
+    expect(disabledOf(m, 'next')).toBe(true)
+    expect(disabledOf(m, 'prev')).toBe(true)
+  })
+
+  it('OS-054 上一页回到刚读过的那一段', async () => {
+    const { m } = await open({ seed: { demo: manyObjects(600), archive: {} } })
+    await enter(m, 'demo')
+    await tap(m, '[data-test="next"]')
+    expect(objectRows(m)).toBe(100)
+    expect(m.has('k501.txt')).toBe(true)
+    await tap(m, '[data-test="prev"]')
+
+    expect(pageText(m)).toBe('本页 500 个')
+    expect(objectRows(m)).toBe(500)
+    expect(m.has('k001.txt')).toBe(true)
+    expect(m.has('k500.txt')).toBe(true)
+    expect(m.has('k501.txt')).toBe(false)
+  })
+
+  it('OS-055 删掉一个对象停在当前段', async () => {
+    const { m, s3 } = await open({ seed: { demo: manyObjects(600), archive: {} }, confirm: true })
+    await enter(m, 'demo')
+    await tap(m, '[data-test="next"]')
+    await tap(m, '[data-test="del:k501.txt"]')
+
+    expect(m.text()).toContain('已删掉 k501.txt')
+    expect(s3.object('demo', 'k501.txt')).toBeUndefined()
+    expect(pageText(m)).toBe('本页 99 个')
+    expect(m.has('k502.txt')).toBe(true)
+    expect(disabledOf(m, 'prev')).toBe(false)
+  })
+
+  it('OS-057 行号按段记，换段从 1 重新数', async () => {
+    const { m } = await open({ seed: { demo: manyObjects(600), archive: {} } })
+    await enter(m, 'demo')
+    expect(m.field('idx:k001.txt')?.textContent).toBe('1')
+    expect(m.field('idx:k500.txt')?.textContent).toBe('500')
+
+    await tap(m, '[data-test="next"]')
+    expect(m.field('idx:k501.txt')?.textContent).toBe('1')
+    expect(m.field('idx:k600.txt')?.textContent).toBe('100')
   })
 })
 
@@ -861,13 +965,11 @@ describe('一台机器上的多个源', () => {
     return [...m.container.querySelectorAll('[data-test^="pick:"]')].map((e) => e.getAttribute('data-test')!.slice(5))
   }
 
-  it('OS-026 添加源之后那一列念得出两个名字与各自主机，「添加源」在最后', async () => {
-    const { m, host, host2 } = await openTwo()
+  it('OS-026 添加源之后那一列念得出两个名字，「添加源」在最后', async () => {
+    const { m } = await openTwo()
     await tap(m, '[data-test="sources-toggle"]')
 
     expect(rowNames(m)).toEqual(['本机', '另一家'])
-    expect(m.field('pick:本机')?.textContent).toContain(host)
-    expect(m.field('pick:另一家')?.textContent).toContain(host2)
     // 「添加源」排在两枚源之后，是这一列的最后一行
     const rows = [...m.container.querySelectorAll('.s3__menu-row')]
     expect(rows[rows.length - 1]?.getAttribute('data-test')).toBe('sources-add')
@@ -944,11 +1046,24 @@ describe('一台机器上的多个源', () => {
     await tap(m, '[data-test="source-remove"]')
 
     expect(m.field('sources-toggle')?.textContent).toContain('还没连上任何端点')
-    expect(m.has('连上')).toBe(true)
+    expect(hasLabel(m, '连上')).toBe(true)
     expect(fake.settingsStore[SOURCES_KEY]).toEqual([])
 
     await tap(m, '[data-test="sources-toggle"]')
     expect(rowNames(m)).toEqual([])
     expect(m.has('添加源')).toBe(true)
+  })
+
+  it('OS-062 卡顶念得出是新增还是修改', async () => {
+    const { m } = await openTwo()
+    await tap(m, '[data-test="sources-toggle"]')
+    await tap(m, '[data-test="sources-add"]')
+    expect(m.has('添加源')).toBe(true)
+    expect(m.has('修改源')).toBe(false)
+
+    await tapText(m, '取消')
+    await tapText(m, '连接设置')
+    expect(m.has('修改源')).toBe(true)
+    expect(m.has('添加源')).toBe(false)
   })
 })

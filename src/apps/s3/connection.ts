@@ -126,12 +126,3 @@ export async function saveSources(api: AppApi, sources: Source[]): Promise<void>
 export async function saveCurrent(api: AppApi, name: string): Promise<void> {
   await api.settings.set(CURRENT_KEY, name)
 }
-
-/** 端点的主机与端口，界面上跟在名字后面念一句 */
-export function hostOf(endpoint: string): string {
-  try {
-    return new URL(endpoint).host
-  } catch {
-    return endpoint
-  }
-}

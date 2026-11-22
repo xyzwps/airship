@@ -1,5 +1,7 @@
 import { useState, type JSX } from 'react'
+import { Icon } from '@iconify/react'
 import { DEFAULT_ENDPOINT, DEFAULT_REGION, type Source, type SourceInput } from './connection.ts'
+import './icons.ts'
 
 /**
  * 连接卡：一个源的五个格子。
@@ -10,6 +12,8 @@ import { DEFAULT_ENDPOINT, DEFAULT_REGION, type Source, type SourceInput } from 
  * 把输入格挤成一个字宽。
  *
  * 新增与编辑走同一张卡：带着 `current` 就是编辑那一个源（名字可以改），不给就是新增。
+ * 卡顶的 title 念得出是哪一种（「添加源」/「修改源」，判据见册子 OS-062）；
+ * 底部三颗：删掉靠左，取消与保存靠右（取消在前、保存在后）。
  * 重名由应用层判（它才知道列表里已有谁），卡片只管这五个格子。
  */
 export function ConnectionCard({
@@ -38,6 +42,7 @@ export function ConnectionCard({
 
   return (
     <div className="s3__card">
+      <p className="s3__card-title">{current ? '修改源' : '添加源'}</p>
       <div className="s3__fields">
         <div className="s3__field">
           <label htmlFor="s3-name">名字</label>
@@ -97,18 +102,18 @@ export function ConnectionCard({
       {error !== '' ? <p className="s3__error">{error}</p> : null}
       <div className="s3__card-foot">
         {onRemove ? (
-          <button type="button" className="btn btn--ghost btn--danger" data-test="source-remove" onClick={onRemove}>
-            删掉这个源
+          <button type="button" className="icon-btn icon-btn--danger s3__card-del" data-test="source-remove" title="删掉这个源" aria-label="删掉这个源" onClick={onRemove}>
+            <Icon icon="lucide:trash-2" width="16" height="16" aria-hidden="true" />
           </button>
         ) : null}
-        <button type="button" className="btn btn--primary" disabled={busy} onClick={submit}>
-          {current ? '存下' : '连上'}
-        </button>
         {onCancel ? (
-          <button type="button" className="btn btn--ghost" onClick={onCancel}>
-            取消
+          <button type="button" className="icon-btn" title="取消" aria-label="取消" onClick={onCancel}>
+            <Icon icon="lucide:x" width="16" height="16" aria-hidden="true" />
           </button>
         ) : null}
+        <button type="button" className="icon-btn s3__ibtn--go" title={current ? '存下' : '连上'} aria-label={current ? '存下' : '连上'} disabled={busy} onClick={submit}>
+          <Icon icon="lucide:check" width="16" height="16" aria-hidden="true" />
+        </button>
       </div>
     </div>
   )

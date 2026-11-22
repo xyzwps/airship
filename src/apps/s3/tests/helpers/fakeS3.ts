@@ -152,7 +152,10 @@ export class FakeS3 {
   }
 
   /**
-   * 按分隔符列一层：真端点怎么分组，这里就怎么分组。
+   * 按分隔符列一层：按真端点的账——`max-keys` 数的是**键**，不是行，
+   * 几把键聚合成一个 `CommonPrefixes` 行时，一次回话的行数可以远少于问出去的键数
+   * （2026-11-20 RustFS 实拍：50 档只回 25 行目录）。目录行不劈两半：
+   * 一段的键用尽时把当前这组剩下的键一起吞掉，token 落在组边界上。
    * `max-keys` 与 `continuation-token` 都认，分页那条判据要靠它。
    */
   private listObjects(bucket: string, query: URLSearchParams): Reply {
@@ -163,37 +166,41 @@ export class FakeS3 {
     const max = Number(query.get('max-keys') ?? '1000')
     const from = Number(query.get('continuation-token') ?? '0')
 
+    const keys = [...dir.keys()].filter((k) => k.startsWith(prefix)).sort()
+    const prefixes: string[] = []
     const entries: Array<{ key: string; obj: Stored }> = []
-    const prefixes = new Set<string>()
-    for (const [key, obj] of [...dir].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
-      if (!key.startsWith(prefix)) continue
+    let i = from
+    let consumed = 0
+    while (i < keys.length && consumed < max) {
+      const key = keys[i]
       const rest = key.slice(prefix.length)
       if (delimiter !== '' && rest.includes(delimiter)) {
-        prefixes.add(prefix + rest.slice(0, rest.indexOf(delimiter) + delimiter.length))
-        continue
+        const p = prefix + rest.slice(0, rest.indexOf(delimiter) + delimiter.length)
+        prefixes.push(p)
+        do {
+          i += 1
+          consumed += 1
+        } while (i < keys.length && keys[i].startsWith(p))
+      } else {
+        entries.push({ key, obj: dir.get(key)! })
+        i += 1
+        consumed += 1
       }
-      entries.push({ key, obj })
     }
-
-    const merged: Array<{ kind: 'prefix'; key: string } | { kind: 'object'; key: string; obj: Stored }> = [
-      ...[...prefixes].sort().map((p) => ({ kind: 'prefix' as const, key: p })),
-      ...entries.map((e) => ({ kind: 'object' as const, ...e }))
-    ]
-    const page = merged.slice(from, from + max)
-    const truncated = from + max < merged.length
+    const truncated = i < keys.length
 
     const body = [
       `<ListBucketResult><Name>${esc(bucket)}</Name><Prefix>${esc(prefix)}</Prefix>`,
-      `<KeyCount>${page.length}</KeyCount><MaxKeys>${max}</MaxKeys>`,
+      `<KeyCount>${prefixes.length + entries.length}</KeyCount><MaxKeys>${max}</MaxKeys>`,
       delimiter !== '' ? `<Delimiter>${esc(delimiter)}</Delimiter>` : '',
       `<IsTruncated>${truncated}</IsTruncated>`,
-      truncated ? `<NextContinuationToken>${from + max}</NextContinuationToken>` : '',
-      ...page.map((row) =>
-        row.kind === 'prefix'
-          ? `<CommonPrefixes><Prefix>${esc(row.key)}</Prefix></CommonPrefixes>`
-          : `<Contents><Key>${esc(row.key)}</Key><LastModified>${new Date(row.obj.mtime).toISOString()}` +
-            `</LastModified><ETag>&quot;x&quot;</ETag><Size>${sizeOf(row.obj)}</Size>` +
-            `<StorageClass>STANDARD</StorageClass></Contents>`
+      truncated ? `<NextContinuationToken>${i}</NextContinuationToken>` : '',
+      ...prefixes.map((p) => `<CommonPrefixes><Prefix>${esc(p)}</Prefix></CommonPrefixes>`),
+      ...entries.map(
+        (e) =>
+          `<Contents><Key>${esc(e.key)}</Key><LastModified>${new Date(e.obj.mtime).toISOString()}` +
+          `</LastModified><ETag>&quot;x&quot;</ETag><Size>${sizeOf(e.obj)}</Size>` +
+          `<StorageClass>STANDARD</StorageClass></Contents>`
       ),
       '</ListBucketResult>'
     ].join('')

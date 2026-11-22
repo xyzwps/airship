@@ -1,8 +1,10 @@
 import { useEffect, useState, type JSX } from 'react'
 import type { AppApi } from '@airship/contract'
 import type { S3Client } from '@aws-sdk/client-s3'
+import { Icon } from '@iconify/react'
 import { errorText, formatSize, formatTime, getObjectBytes, headObject, type ObjectMeta, type ObjectRow } from './client.ts'
 import { PREVIEW_MAX, makePreview, tooBigReason, type Preview } from './preview.ts'
+import './icons.ts'
 
 /**
  * 右侧那一栏：选中对象的详情与预览。
@@ -69,8 +71,8 @@ export function PreviewPane({
     <aside className="s3__pane">
       <div className="s3__pane-head">
         <span className="s3__pane-title">{row.label}</span>
-        <button type="button" className="btn btn--ghost" onClick={onClose}>
-          收起
+        <button type="button" className="icon-btn" title="收起" aria-label="收起" onClick={onClose}>
+          <Icon icon="lucide:x" width="16" height="16" aria-hidden="true" />
         </button>
       </div>
       <dl className="s3__meta">

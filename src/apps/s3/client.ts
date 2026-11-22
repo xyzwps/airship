@@ -54,11 +54,14 @@ export interface ObjectRow {
   lastModified: string
 }
 
-/** 一页对象，加上"还有下一页"那一点信息 */
+/** 一段对象，加上"还有下一段"那一点信息 */
 export interface ObjectPage {
   rows: ObjectRow[]
   nextToken: string | null
 }
+
+/** 每段问端点几把键：固定 500，没有档位可选（判据 OS-059）。MaxKeys 数的是键，不是行 */
+export const LIST_PAGE_KEYS = 500
 
 export async function listBuckets(client: S3Client): Promise<BucketRow[]> {
   const out = await client.send(new ListBucketsCommand({}))
@@ -69,21 +72,31 @@ export async function listBuckets(client: S3Client): Promise<BucketRow[]> {
 }
 
 /**
- * 列一个"目录"下的一层：分隔符固定 `/`，所以键里的斜杠在界面上就是目录。
+ * 列一层里的一段：分隔符固定 `/`，所以键里的斜杠在界面上就是目录。
  * 这是 S3 的通用做法——它本来没有目录，前缀加斜杠是唯一能读成层级形状的东西。
+ *
+ * 一次问 500 把键，端点回多少行就显示多少行（照单全收，判据 OS-059~061）：
+ * `MaxKeys` 数的是**键**不是**行**，一层全是目录时几把键聚合成一行，
+ * 一次回话的行数可以远少于 500（2026-11-20 RustFS 实拍：50 档只回 25 行目录）。
+ * 从前这里按行拼页、凑满档位才罢休（OS-058 一族），2026-11-21 退场：
+ * 拼页在一个大目录面前要烧掉上百条串问，而各家端点对"一个目录算几把键"的账还不一样
+ * （AWS 的文档说 roll-up 按一条计，RustFS 按底层键计），应用侧拼不起端点的账。
+ *
+ * 往后翻是端点原生支持的 `NextContinuationToken`（只有往后的，没有往前的——
+ * 上一页靠应用记住沿途的 token，判据见册子 OS-054）。
  */
 export async function listObjects(
   client: S3Client,
   bucket: string,
   prefix: string,
-  token?: string
+  token: string | undefined
 ): Promise<ObjectPage> {
   const out = await client.send(
     new ListObjectsV2Command({
       Bucket: bucket,
       Prefix: prefix === '' ? undefined : prefix,
       Delimiter: '/',
-      MaxKeys: 500,
+      MaxKeys: LIST_PAGE_KEYS,
       ContinuationToken: token
     })
   )

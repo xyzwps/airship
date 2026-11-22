@@ -4,6 +4,8 @@
    （主题三档由标题栏那颗键改，各应用各记各的）；按钮、输入框、图标键都复用 SDK 的 .btn / .input / .icon-btn。 */
 
 .s3 {
+  /* 左栏那一列的宽度：源键与它的浮层都钉成这一档（2026-11-22 他点名"宽度和左栏一样"） */
+  --s3-rail: 208px;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -19,7 +21,8 @@
   gap: 6px;
   height: 44px;
   flex-shrink: 0;
-  padding: 0 12px;
+  /* 左边不留白：源键就是左栏那一列的头，它的两条竖边要正对着下面那一栏 */
+  padding: 0 12px 0 0;
   border-bottom: 1px solid var(--border);
   background: var(--bg-elev);
 }
@@ -45,7 +48,8 @@
   align-items: center;
   gap: 8px;
   height: 30px;
-  max-width: 240px;
+  /* 钉成左栏那一列的宽度：键与浮层都对齐那一栏 */
+  width: var(--s3-rail);
   padding: 0 8px 0 11px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
@@ -71,6 +75,10 @@
 }
 
 .s3__menu-current {
+  /* 撑满剩余宽度，箭头才被顶到键的右沿；按钮默认居中会被继承进来，钉回左 */
+  flex: 1;
+  min-width: 0;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -85,7 +93,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 300px;
+  width: var(--s3-rail);
   max-height: 320px;
   overflow-y: auto;
   padding: 4px;
@@ -122,18 +130,7 @@
 }
 
 .s3__menu-label {
-  max-width: 160px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.s3__menu-host {
-  margin-left: auto;
-  color: var(--fg-faint);
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 400;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -205,6 +202,13 @@
   padding: 16px 18px;
 }
 
+/* 卡顶念的是「添加源」还是「修改源」：一眼分清新旧（判据 OS-062） */
+.s3__card-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
 /* 五格共用这一个网格：标签列按内容宽，输入列吃下剩下的空间。
    错误条与按钮行都不进这里——它们横穿整张卡，进网格会把标签列撑宽、把输入格挤扁。 */
 .s3__fields {
@@ -234,6 +238,11 @@
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
+}
+
+/* 删掉那颗靠左站，其余两颗（取消在前、保存在后）贴右 */
+.s3__card-del {
+  margin-right: auto;
 }
 
 /* 改名模态第一行：把"改的是哪一个"整个键念出来，行与条离得远也不会认错对象 */
@@ -279,7 +288,7 @@
 
 /* 左栏：一列桶，按宿主的导航那一档走 */
 .s3__buckets {
-  width: 208px;
+  width: var(--s3-rail);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -350,7 +359,8 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  /* 整栏不滚——滚的只有 .s3__scroll 那块表，页脚那条翻页栏钉在栏底 */
+  overflow: hidden;
 }
 
 .s3__crumbs {
@@ -398,9 +408,20 @@
   background: transparent;
 }
 
-.s3__up,
-.s3__more {
-  margin-left: 8px;
+/* 面包屑行尾的「上传」「新建目录」：管的是当前这一层，跟着这一层的头走，推到行尾贴右 */
+.s3__crumb-acts {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+}
+
+/* 提交类的图标键（建/改/连上/存下）：形状就是图标键，用强调色说"这是主行动" */
+.s3__ibtn--go {
+  color: var(--accent);
+}
+
+.s3__ibtn--go:hover:not(:disabled) {
+  color: var(--accent);
 }
 
 .s3__empty {
@@ -429,8 +450,8 @@
   text-align: left;
 }
 
-.s3__table th:nth-child(2),
-.s3__table th:nth-child(3) {
+.s3__table th:nth-child(3),
+.s3__table th:nth-child(4) {
   text-align: right;
 }
 
@@ -465,6 +486,16 @@
   font-weight: 600;
 }
 
+/* 行号那一列：按段从 1 数起，弱色等宽，别跟名字抢注意力 */
+.s3__table th.s3__idx,
+.s3__table td.s3__idx {
+  width: 44px;
+  padding-right: 0;
+  text-align: right;
+  color: var(--fg-faint);
+  font-variant-numeric: tabular-nums;
+}
+
 .s3__num,
 .s3__time {
   text-align: right;
@@ -491,10 +522,89 @@
   vertical-align: middle;
 }
 
+/* 表区这一层：转圈的定位父级，页脚不在这层里、盖不着 */
+.s3__stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+}
+
+.s3__scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* 迟到的转圈（观感，不进册子）：列层跑过 200ms 才盖上，快网下不出现 */
+.s3__loading {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+}
+
+.s3__spinner {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: s3-spin 0.8s linear infinite;
+}
+
+@keyframes s3-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .s3__spinner {
+    animation: s3-fade 1.2s ease-in-out infinite;
+    border-top-color: var(--border-strong);
+  }
+
+  @keyframes s3-fade {
+    50% {
+      opacity: 0.3;
+    }
+  }
+}
+
+/* 页脚：钉在栏底的一条——左边路径那句话，右边翻页那一排（上一页/下一页 + 本页行数） */
+.s3__foot {
+  flex-shrink: 0;
+  margin: 0 14px;
+  padding: 6px 0 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--bg);
+}
+
 .s3__hint {
-  margin: auto 14px 10px;
+  margin: 0;
   color: var(--fg-faint);
   font-size: 11.5px;
+}
+
+.s3__pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.s3__page {
+  color: var(--fg-faint);
+  font-size: 11.5px;
+  margin: 0 4px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* 右侧：选中对象的详情与预览 */
