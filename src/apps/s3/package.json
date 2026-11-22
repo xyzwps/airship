@@ -1,6 +1,6 @@
 {
   "name": "@airship/s3",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "一句话说明这个应用是干什么的",
   "type": "module",
