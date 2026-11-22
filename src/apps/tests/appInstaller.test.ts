@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { installerScript, nsisText } from '../../../code/make-app-installer.mjs'
-import { capabilitiesPhrase, installConfirmMessage, runtimeNotFound } from '@airship/contract'
+import { capabilitiesPhrase, runtimeNotFound } from '@airship/contract'
 import { REAL_APPS } from '../../runtime/tests/helpers/realApps'
 
 /**
@@ -51,14 +51,9 @@ describe('装完留下什么', () => {
     expect(script).toContain('File "icon.ico"')
   })
 
-  it('PK-033 装之前念能力清单', () => {
+  it('PK-033 装之前念能力清单（并进欢迎页，不再弹窗）', () => {
     const script = scriptOf(vcp)
-    expect(script).toContain('MessageBox MB_OKCANCEL')
-    expect(script).toContain(nsisText(installConfirmMessage(vcp.name)))
     expect(script).toContain(nsisText(`它要的能力：${capabilitiesPhrase(vcp.capabilities)}`))
-    // 取消就中止：MessageBox 之后紧跟 Abort
-    const boxAt = script.indexOf('MessageBox MB_OKCANCEL')
-    expect(script.indexOf('Abort', boxAt)).toBeGreaterThan(boxAt)
 
     // 空清单念的是「不碰你的文件」；每个应用的措辞都与契约层逐字一致（烘进，不另写）
     const lifeScript = scriptOf(life)

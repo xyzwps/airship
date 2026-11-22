@@ -44,8 +44,7 @@ import {
   MANIFEST_NAME,
   PACKAGE_SUFFIX,
   WINDOWS_ICON_NAME,
-  installConfirmDetail,
-  installConfirmMessage,
+  capabilitiesPhrase,
   runtimeNotFound
 } from '@airship/contract'
 
@@ -58,14 +57,14 @@ export function nsisText(text) {
 
 /**
  * 生成安装脚本（纯函数，用例钉的就是这份文本）。
- * 能力措辞在这里烘进去：installConfirmMessage / installConfirmDetail / runtimeNotFound
- * 全部来自契约层，脚本里不另写一份人话。
- * 界面走 MUI2 向导（欢迎 / 进度 / 完成 + 卸载三页，简中+英文）：欢迎页念安装目录，
- * 进度页不刷日志，完成页点「完成」直接关窗。能力确认仍是 .onInit 里那张 MessageBox（PK-033）。
+ * 能力措辞在这里烘进去：capabilitiesPhrase / runtimeNotFound 全部来自契约层，脚本里不另写一份人话。
+ * 界面走 MUI2 向导（欢迎 / 进度 / 完成 + 卸载三页，简中+英文）：欢迎页念安装目录与能力清单，
+ * 进度页不刷日志，完成页点「完成」直接关窗。能力清单并进欢迎页（PK-033），不再弹 MessageBox；
+ * 代价是 /S 静默跑会跳过欢迎页、清单不被念——这条路不再支持。
  */
 export function installerScript({ id, name, version, capabilities }) {
   const displayName = nsisText(name)
-  const confirm = nsisText(`${installConfirmMessage(name)}\n\n${installConfirmDetail(capabilities)}`)
+  const capsPhrase = nsisText(capabilitiesPhrase(capabilities))
   const notFound = nsisText(runtimeNotFound())
   const archiveName = `${id}${PACKAGE_SUFFIX}`
   const regKey = `Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\airship-${id}`
@@ -78,14 +77,14 @@ RequestExecutionLevel user
 InstallDir "$LOCALAPPDATA\\airship\\apps\\${id}"
 
 ; ---- MUI2 向导（2026-11-19：安装过程美观些）----
-; 欢迎页念安装目录，进度页干净不刷日志，完成页点「完成」直接关窗（不带「运行」勾选）。
+; 欢迎页念安装目录与能力清单，进度页干净不刷日志，完成页点「完成」直接关窗（不带「运行」勾选）。
 ; 图标用包内那张转成的 icon.ico（与快捷方式同一张）；简中在前作默认语言。
 !include "MUI2.nsh"
 !define MUI_ICON "icon.ico"
 !define MUI_UNICON "icon.ico"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "安装 ${displayName}"
-!define MUI_WELCOMEPAGE_TEXT "${displayName} 要装到这台机器上。$\\r$\\n$\\r$\\n安装目录：$INSTDIR$\\r$\\n$\\r$\\n装完在桌面与开始菜单各留一枚快捷方式，双击它就用 airship runtime 打开这个应用。$\\r$\\n$\\r$\\n点「下一步」继续。"
+!define MUI_WELCOMEPAGE_TEXT "${displayName} 要装到这台机器上。$\\r$\\n$\\r$\\n安装目录：$INSTDIR$\\r$\\n$\\r$\\n它要的能力：${capsPhrase}。$\\r$\\n$\\r$\\n装完在桌面与开始菜单各留一枚快捷方式，双击它就用 airship runtime 打开这个应用。$\\r$\\n$\\r$\\n点「下一步」继续。"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
@@ -100,10 +99,6 @@ ShowUninstDetails nevershow
 Var RuntimeDir
 
 Function .onInit
-  ; 装前念能力清单（PK-033）：取消就中止，一个文件都不写。/SD IDOK 只服务静默安装。
-  MessageBox MB_OKCANCEL "${confirm}" /SD IDOK IDOK install_ok
-  Abort
-  install_ok:
   ; 找 runtime（PK-031）：AIRSHIP_PATH > 固定目录；环境变量指不到就落到固定目录再试。
   ReadEnvStr $0 "AIRSHIP_PATH"
   StrCmp $0 "" try_fixed
@@ -116,6 +111,7 @@ Function .onInit
   StrCpy $RuntimeDir $0
   Goto found
   not_found:
+  ; 找不到 runtime：念契约层那句原话（转义后烘进脚本），然后中止，一个文件都不写。
   MessageBox MB_OK "${notFound}" /SD IDOK
   Abort
   found:
