@@ -232,8 +232,7 @@ describe('命令行指来的包就是应用名单', () => {
       clipboard: ['clipboard'],
       log: ['log'],
       proc: ['proc'],
-      tools: ['proc'],
-      backend: ['backend']
+      tools: ['proc']
     }
     for (const m of REAL_APPS) {
       const dir = join(APPS_DIR, m.id)

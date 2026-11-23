@@ -11,3 +11,6 @@ shots/
 
 # 打包产物（安装包与免安装目录）
 release/
+
+# custom by user
+.npmrc

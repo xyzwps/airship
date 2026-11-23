@@ -18,6 +18,7 @@ import { createHash } from 'node:crypto'
 import { strFromU8, unzipSync } from 'fflate'
 import {
   MANIFEST_NAME,
+  PACKAGE_BACKEND_ENTRY,
   PACKAGE_SUFFIX,
   WINDOWS_ICON_NAME,
   capabilitiesPhrase,
@@ -32,12 +33,13 @@ export function nsisText(text) {
 /**
  * 生成安装脚本（纯函数，用例钉的就是这份文本）。
  * 能力措辞在这里烘进去：capabilitiesPhrase / runtimeNotFound 全部来自契约层，脚本里不另写一份人话。
+ * 后台那句念的是**包形状**（hasBackend 由调用方从归档条目读出来），不是能力位。
  * 界面走 MUI2 向导（欢迎 / 进度 / 完成 + 卸载三页，简中+英文）：欢迎页念安装目录与能力清单，
  * 进度页不刷日志，完成页点「完成」直接关窗。能力清单并进欢迎页（PK-033），不再弹 MessageBox。
  */
-export function installerScript({ id, name, version, capabilities, publisher = 'airship' }) {
+export function installerScript({ id, name, version, capabilities, hasBackend = false, publisher = 'airship' }) {
   const displayName = nsisText(name)
-  const capsPhrase = nsisText(capabilitiesPhrase(capabilities))
+  const capsPhrase = nsisText(capabilitiesPhrase(capabilities, hasBackend))
   const notFound = nsisText(runtimeNotFound())
   const archiveName = `${id}${PACKAGE_SUFFIX}`
   const regKey = `Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\airship-${id}`
@@ -125,6 +127,12 @@ export function readArchiveManifest(archivePath) {
   return JSON.parse(strFromU8(entry))
 }
 
+/** 这份包有没有自带后台：读包形状——归档根有没有 backend.js 条目（约定，不是清单字段） */
+export function archiveHasBackend(archivePath) {
+  const bytes = new Uint8Array(readFileSync(archivePath))
+  return Object.keys(unzipSync(bytes, { filter: (f) => f.name === PACKAGE_BACKEND_ENTRY })).length > 0
+}
+
 /** 取包根那份 icon.ico（PK-036/PK-039）：快捷方式与安装目录用的就是它，安装器不自己转第二遍 */
 export function extractWindowsIcon(archivePath, work) {
   const bytes = new Uint8Array(readFileSync(archivePath))
@@ -172,7 +180,14 @@ export function buildInstaller({ archivePath, version, publisher, outDir, makens
     copyFileSync(archivePath, join(work, `${id}${PACKAGE_SUFFIX}`))
     writeFileSync(
       join(work, 'installer.nsi'),
-      installerScript({ id, name: manifest.name, version, capabilities: manifest.capabilities, publisher }),
+      installerScript({
+        id,
+        name: manifest.name,
+        version,
+        capabilities: manifest.capabilities,
+        hasBackend: archiveHasBackend(archivePath),
+        publisher
+      }),
       'utf8'
     )
     const res = spawnSync(makensis, ['/INPUTCHARSET', 'UTF8', '/V2', 'installer.nsi'], { cwd: work, stdio: 'inherit' })

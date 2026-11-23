@@ -36,12 +36,13 @@ export const ICON_PATTERN = /^icon\.(svg|png|jpe?g|webp)$/
 export const WINDOWS_ICON_NAME = 'icon.ico'
 
 /**
- * 后台入口的文件名后缀（PK-037）。
+ * 后台程序在包根的条目名（约定，不是清单字段）。
  *
- * utilityProcess.fork 吃的是真文件；runtime 会把这个条目从归档里解到磁盘再 fork，
- * 所以只认 Node 直接跑得起来的三档扩展名——`.ts` 之类要先编译的不在包格式里许诺。
+ * 源项目里放 `src/backend.ts` 或 `src/backend.js`，产包流水按约定编成包根的 `backend.js`；
+ * runtime 看到归档根有这个条目就为它起进程，没有就没有——不声明、不配置。
+ * utilityProcess.fork 吃的是磁盘上的真文件，所以包里那份必须是编译好的 JS（`.ts` 在产包期编掉）。
  */
-export const BACKEND_ENTRY_PATTERN = /\.(js|mjs|cjs)$/
+export const PACKAGE_BACKEND_ENTRY = 'backend.js'
 
 /** 包清单允许的键 */
 export const ALLOWED_KEYS = [
@@ -55,7 +56,6 @@ export const ALLOWED_KEYS = [
   'defaultHeight',
   'platforms',
   'tools',
-  'backend',
   'schemaVersion',
   'sdkVersion',
   'entry'
@@ -151,12 +151,6 @@ export function packageManifestProblems(manifest: unknown, at = ''): string[] {
   if (typeof m.entry === 'string' && m.entry !== '' && !isInsidePackagePath(m.entry)) {
     out.push(`${p}包清单 entry 必须是包内的相对路径，收到 ${JSON.stringify(m.entry)}`)
   }
-  if (m.backend !== undefined && (typeof m.backend !== 'string' || m.backend.trim() === '')) {
-    out.push(`${p}包清单 backend 不写就等于没有后台，写了必须是包内后端入口的相对路径，收到 ${JSON.stringify(m.backend)}`)
-  }
-  if (typeof m.backend === 'string' && m.backend !== '' && (!isInsidePackagePath(m.backend) || !BACKEND_ENTRY_PATTERN.test(m.backend))) {
-    out.push(`${p}包清单 backend 必须是包内的相对路径，以 .js / .mjs / .cjs 结尾，收到 ${JSON.stringify(m.backend)}`)
-  }
   for (const key of ['defaultWidth', 'defaultHeight'] as const) {
     const v = m[key]
     if (v !== undefined && (typeof v !== 'number' || !Number.isInteger(v) || v <= 0)) {
@@ -191,9 +185,10 @@ export function rootIconName(entryNames: readonly string[]): { name?: string; er
 }
 
 /**
- * 清单点名的文件在不在包里（PK-004 落盘版与 PK-038）：入口、图标、后端入口各念一句原话。
+ * 清单点名的文件在不在包里（PK-004 落盘版）：入口与图标各念一句原话。
  *
  * 产包侧喂产物目录的文件名，注册侧喂归档条目名——同一份判据，两侧不可能说岔。
+ * 后台不在这张判据表里：包根有没有 `backend.js` 是约定，有就有、没有就没有，清单无从点名。
  */
 export function packageLayoutProblems(manifest: PackageManifest, entryNames: readonly string[], at = ''): string[] {
   const p = at ? `${at}: ` : ''
@@ -203,10 +198,6 @@ export function packageLayoutProblems(manifest: PackageManifest, entryNames: rea
   }
   const icon = rootIconName(entryNames)
   if (icon.error) out.push(`${p}${icon.error}`)
-  const backend = manifest.backend
-  if (typeof backend === 'string' && backend !== '' && !entryNames.includes(backend)) {
-    out.push(`${p}包里没有后端入口文件 ${backend}（清单 backend 指的就是它在包里的路径）`)
-  }
   return out
 }
 

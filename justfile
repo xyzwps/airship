@@ -40,6 +40,14 @@ tasks:
 build-libs:
     node code/build-libs.mjs
 
+# 把发布物推到 npm：顺序按依赖链走 contract → sdk → cli → create-airship-app（后三个都吃 contract）。
+# dist 是发布物本体，所以挂在 build-libs 之后。registry 不在这里写死——npm 自己按 .npmrc > 全局默认解析。
+publish: build-libs
+    cd src/shared/contract && npm publish
+    cd src/sdk && npm publish
+    cd src/cli && npm publish
+    cd src/scaffold && npm publish
+
 # 产各应用的 airship 包到 dist-apps/：每应用一次独立构建，产物装成 <id>.airship（一个 zip 换了扩展名）
 # 契约见 src/apps/specs/package.md
 build-apps: clean-apps build-libs

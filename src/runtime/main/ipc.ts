@@ -464,7 +464,7 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('backend:invoke', async (event, appArg: unknown, method: unknown, payload: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'backend')
+    // 没有能力闸：有没有后端归包形状判，backendHost 起不来时念的就是那条约定
     const m = assertNonEmptyString(method, 'method')
     // 后端回的错误原样上抛：应用 catch 到的就是它自己后端写的那句话
     return backendHost.invoke(id, m, payload)

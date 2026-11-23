@@ -78,10 +78,10 @@ export const runtimeNotFound = (): string =>
   '找不到 airship runtime：先装 runtime（固定装在 C:\\Program Files\\airship\\runtime），' +
   '或把 AIRSHIP_PATH 指到它所在的目录。'
 
-/** 装应用前的能力确认念的那两句（与直跑那份同一套人话摘要） */
+/** 装应用前的能力确认念的那两句（与直跑那份同一套人话摘要；后台事实从包形状来） */
 export const installConfirmMessage = (name: string): string => `${name} 要装到这台机器上`
-export const installConfirmDetail = (list: readonly Capability[]): string =>
-  `它要的能力：${capabilitiesPhrase(list)}。\n` +
+export const installConfirmDetail = (list: readonly Capability[], hasBackend = false): string =>
+  `它要的能力：${capabilitiesPhrase(list, hasBackend)}。\n` +
   '装完会在桌面留一个快捷方式，双击它就用 airship runtime 打开这个应用。'
 
 /* ---------------- 装包失败的措辞（应用安装器与直跑共用） ---------------- */
@@ -114,11 +114,11 @@ export const noBridge = (): string =>
 export const toolDenied = (app: string, tool: string): string =>
   `${app} 没有声明 ${tool} 工具（要用它就在 apps/${app}/app.ts 的 tools 里声明）`
 
-/* ---------------- 后台程序的措辞（清单 backend 字段 ↔ api.backend） ---------------- */
+/* ---------------- 后台程序的措辞（包根 backend.js 约定 ↔ api.backend） ---------------- */
 
-/** 声明了 backend 能力，清单却没写后端入口 */
-export const backendEntryMissing = (app: string): string =>
-  `${app} 声明了 backend 能力，清单里却没写 backend 入口（backend 写后端入口在包里的路径，例如 'backend/index.js'）`
+/** 包里没有 backend.js 却调了 api.backend：念约定，不念能力 */
+export const backendAbsent = (app: string): string =>
+  `${app} 没有自带后台程序：包根要有 backend.js——源项目里放一个 src/backend.ts 或 src/backend.js，产包就会带上`
 
 /** 注册时验过条目在包里；运行期读不到只剩一种解释——包被换掉或损坏 */
 export const backendEntryUnreadable = (app: string, entry: string): string =>

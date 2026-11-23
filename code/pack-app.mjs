@@ -24,7 +24,6 @@ import { Resvg } from '@resvg/resvg-js'
 import { packPackage } from '@airship/cli/pack'
 import {
   APP_ID_PATTERN,
-  BACKEND_ENTRY_PATTERN,
   MANIFEST_NAME,
   PACKAGE_SUFFIX,
   SCHEMA_VERSION,
@@ -39,7 +38,6 @@ import {
 // 旧导出名留给用例与 build-apps.mjs——判据就是契约那一份，不再有两份要钉相等。
 export {
   APP_ID_PATTERN,
-  BACKEND_ENTRY_PATTERN,
   MANIFEST_NAME,
   PACKAGE_SUFFIX,
   SCHEMA_VERSION,

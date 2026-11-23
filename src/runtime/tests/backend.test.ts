@@ -133,7 +133,7 @@ const { backendHost, setBackendEmitter, READY_TIMEOUT_SECONDS, INVOKE_TIMEOUT_SE
 )
 const { registerPackageAt } = await import('../main/services/packageRegistry')
 const { packageFixtureRoot, installPackageAt } = await import('./helpers/packages')
-const { backendEntryMissing, backendExited, backendNoAnswer, backendNotReady, capDenied, identityMismatch, needString } =
+const { backendAbsent, backendExited, backendNoAnswer, backendNotReady, identityMismatch, needString } =
   await import('@airship/contract')
 
 registerIpc()
@@ -168,23 +168,19 @@ function tick(): Promise<void> {
 const VCP = 101
 const DAGOGO = 102
 const TODO = 104
-const DEMO = 105
 const NOTE = 106
 
-const base = { description: '带后端的示例应用', capabilities: ['backend'] as Capability[] }
+const base = { description: '带后端的示例应用', capabilities: [] as Capability[] }
 
-// 两份额外夹具：todo / note 是"清单写了后端"的应用，demo 只声明能力不写入口
+// 两份额外夹具：todo / note 的包根带 backend.js（有后台由包形状判）；
+// dagogo 用真清单那份——包根没有条目，正是 BE-001 要念约定的对象。
 const root = packageFixtureRoot()
 for (const [id, name] of [
   ['todo', '待办'],
   ['note', '便签']
 ] as const) {
-  const { problems } = registerPackageAt(installPackageAt(root, { ...base, id, name, backend: 'backend/index.js' }))
+  const { problems } = registerPackageAt(installPackageAt(root, { ...base, id, name }, { backend: true }))
   if (problems.length > 0) throw new Error(`后端夹具注册失败 ${id}：${problems.join('；')}`)
-}
-{
-  const { problems } = registerPackageAt(installPackageAt(root, { ...base, id: 'demo', name: '只有能力没有入口' }))
-  if (problems.length > 0) throw new Error(`后端夹具注册失败 demo：${problems.join('；')}`)
 }
 
 beforeEach(() => {
@@ -192,7 +188,6 @@ beforeEach(() => {
   shellState.owners.set(VCP, 'vcp')
   shellState.owners.set(DAGOGO, 'dagogo')
   shellState.owners.set(TODO, 'todo')
-  shellState.owners.set(DEMO, 'demo')
   shellState.owners.set(NOTE, 'note')
   shellState.sent.length = 0
   fake.children.length = 0
@@ -204,9 +199,10 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('后端通道过的是同样三道闸', () => {
-  it('BE-001 没声明 backend 能力，调用被拒且点出能力名', async () => {
-    expect(reason(await call('backend:invoke', DAGOGO, 'dagogo', 'echo'))).toBe(capDenied('dagogo', 'backend'))
+describe('后端有没有由包形状判，身份与来源照旧过同一道闸', () => {
+  it('BE-001 包根没有 backend.js，调用被拒并念出这条约定', async () => {
+    expect(reason(await call('backend:invoke', DAGOGO, 'dagogo', 'echo'))).toBe(backendAbsent('dagogo'))
+    expect(fake.children.length, '没有那个条目就不该起进程').toBe(0)
   })
 
   it('BE-002 冒充别的应用名义调用被拒', async () => {
@@ -233,10 +229,6 @@ describe('一次调用是一次请求-回话', () => {
     const p = call('backend:invoke', TODO, 'todo', 'fail')
     expect(reason(await p)).toBe('没有这条待办')
   })
-
-  it('BE-006 声明了能力却没写后端入口，拒并点名缺哪个字段', async () => {
-    expect(reason(await call('backend:invoke', DEMO, 'demo', 'echo'))).toBe(backendEntryMissing('demo'))
-  })
 })
 
 describe('后端是自己的一份进程，拿到的目录只有它应用那一族', () => {
@@ -246,7 +238,7 @@ describe('后端是自己的一份进程，拿到的目录只有它应用那一�
     expect(child.options.env?.AIRSHIP_APP_ID).toBe('todo')
     expect(child.options.env?.AIRSHIP_DATA_DIR.replace(/\\/g, '/')).toMatch(/apps\/todo\/data$/)
     expect(child.options.env?.AIRSHIP_CACHE_DIR.replace(/\\/g, '/')).toMatch(/apps\/todo\/cache$/)
-    expect(child.file.replace(/\\/g, '/')).toMatch(/apps\/todo\/backend\/index\.js$/)
+    expect(child.file.replace(/\\/g, '/')).toMatch(/apps\/todo\/backend\/backend\.js$/)
     expect(existsSync(child.file), 'fork 吃的是落盘的真文件').toBe(true)
     expect(readFileSync(child.file, 'utf8'), '落的就是包里那份后端入口').toContain('ready')
   })

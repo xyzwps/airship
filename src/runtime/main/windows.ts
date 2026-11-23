@@ -173,10 +173,10 @@ export function openAppWindow(appId: string): BrowserWindow {
   appWindows.set(appId, window)
   wireWindow(window, appId, meta.name)
   loadPackageEntry(window, pkg.entryUrl)
-  // 带了后端入口、且声明了 backend 能力的应用：窗口一开就把后端拉起来预热。
-  // 没声明能力就不预热——前端本来就调不动它，白起一个进程。
+  // 包根带 backend.js 的应用：窗口一开就把后端拉起来预热。
+  // 判据是包形状，不是清单字段也不是能力位——没这个条目就没有，白起一个进程才是真浪费。
   // 起不来只进日志不开错误弹窗——窗口的第一句错误该由应用自己的界面念。
-  if (meta.backend && hasCapability(appId, 'backend')) {
+  if (backendHost.hasBackend(appId)) {
     backendHost.ensure(appId).catch((err: unknown) => {
       log.error(appId, '后端程序预热失败', { message: err instanceof Error ? err.message : String(err) })
     })

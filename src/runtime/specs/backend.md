@@ -2,15 +2,16 @@
 
 ## Purpose
 应用随包自带的后台程序：前端怎么调它、它拿到哪几个目录、它退出了会怎样、什么时候被收掉。
-后台是最重的一档能力（应用第一次拥有"自己的一份进程"），所以它照旧过 I-3 那三道闸，
-对话复用桥上的信封与单事件频道（`bridge.md`）；包清单里那个入口字段的形状归 `package.md` PK-037 / PK-038。
+后台**不是能力位、也不进清单**：有它靠约定——源项目应用目录里一份 `backend.ts` 或 `backend.js`，
+产包流水编成包根 `backend.js`（`package.md` PK-040 / PK-041），runtime 见到那个条目才起进程。
+对话复用桥上的信封与单事件频道（`bridge.md`）；这本册子钉的是**应用调用时读得到的句子与 runtime 这一侧看得见的事**。
 真机上的崩溃隔离与进程形态（独立 Node 进程、父子消息通道的不对称、就绪握手）是实测记进
-[架构](../../../docs/architecture.md) 的，这本册子钉的是**应用调用时读得到的句子与 runtime 这一侧看得见的事**。
+[架构](../../../docs/architecture.md) 的。
 
-### Requirement: 后端通道过的是同样三道闸
-#### Scenario: BE-001 没声明 backend 能力，调用被拒且点出能力名
-- **WHEN** 一个没声明 `backend` 能力的应用调 `api.backend.invoke`
-- **THEN** 拒，原因原样读得到「<id> 没有声明 backend 能力（要用它就在 apps/<id>/app.ts 的 capabilities 里声明）」
+### Requirement: 后端有没有由包形状判，身份与来源照旧过同一道闸
+#### Scenario: BE-001 包根没有 backend.js，调用被拒并念出这条约定
+- **WHEN** 一个归档根里没有 `backend.js` 条目的应用调 `api.backend.invoke`
+- **THEN** 拒，原因原样读得到「<id> 没有自带后台程序：包根要有 backend.js——源项目里放一个 src/backend.ts 或 src/backend.js，产包就会带上」
 
 #### Scenario: BE-002 冒充别的应用名义调用被拒
 - **WHEN** vcp 的窗口以 `pdf` 的名义发起后端调用
@@ -28,10 +29,6 @@
 #### Scenario: BE-005 后端回的失败原样读得到，不被套第二层话
 - **WHEN** 后端对一条调用回了失败，原因写的是「没有这条待办」
 - **THEN** 应用 catch 到的就是「没有这条待办」，不出现 "Error invoking remote method" 这类内部措辞
-
-#### Scenario: BE-006 声明了能力却没写后端入口，拒并点名缺哪个字段
-- **WHEN** 清单 capabilities 里有 `backend`，`backend` 字段却没写，前端发起调用
-- **THEN** 拒，原因读得到「<id> 声明了 backend 能力，清单里却没写 backend 入口（backend 写后端入口在包里的路径，例如 'backend/index.js'）」
 
 ### Requirement: 后端是它自己的一份进程，拿到的目录只有它应用那一族
 #### Scenario: BE-007 起后端时把三个位置原样交给它
@@ -66,3 +63,9 @@
 #### Scenario: BE-013 后端推事件，只有归属窗口收得到
 - **WHEN** vcp 的后端主动推一条事件
 - **THEN** vcp 的窗口收到一条 `backend:event`，method 与 payload 原样；别的应用的窗口一条都收不到
+
+<!--
+  BE-006 于 2026-11-23 删除：backend 退出能力位与清单字段，改走 src/backend.ts|js → 包根 backend.js 的约定
+  （package.md PK-040 / PK-041），"声明了能力却没写入口"这条配对契约失去了对象；
+  BE-001 随之改写为"包根没有 backend.js 时念出约定"。编号按规矩不复用、不重排。
+-->

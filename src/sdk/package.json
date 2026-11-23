@@ -1,6 +1,6 @@
 {
   "name": "@airship/sdk",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "description": "airship 应用面向的那一面：宿主、观感、CSP、工装钩子与测试替身",
   "license": "MIT",
   "type": "module",
@@ -30,7 +30,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@airship/contract": "^0.4.0"
+    "@airship/contract": "^0.4.2"
   },
   "peerDependencies": {
     "react": "^19.3.1",

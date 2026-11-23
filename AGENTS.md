@@ -23,6 +23,7 @@ just start id          跑构建好的产物（文档从包里加载，与装好
 just new-app id 名     从 templates/app 造一个新应用（复制、换名、链 workspace、只产它的包）
 just compile           编译 runtime 的两个目标（src/runtime/out/{main,preload}，没有 renderer）
 just build-libs        把 contract 与 sdk 编成发布形态（tsc 直出 JS + d.ts 到各自 dist/）；读它们的配方都先走这条
+just publish           contract → sdk → cli → create-airship-app 依次发 npm（先走 build-libs；registry 按 .npmrc > 全局默认解析，不在仓里写死）
 just shot              逐窗口截图（先 compile + build-apps），打每窗口内存与首屏耗时
 just app-installer id  产那一个应用的每用户安装器（release/apps/<id>-Setup-<版本>.exe）
 just installers        产全部应用的安装器（先 build-apps；名单与产包同源 code/app-dirs.mjs）
@@ -61,14 +62,15 @@ src/shared/textdecode  @airship/textdecode   中文解码
 `devDependencies`——它们被构建进包，运行时不需要机器上装着（AP-016 钉这条）。
 说明符一律写包名（`@airship/...`），**手写别名已全部拆掉**：边界现在由 node 的解析器守，不靠注释。
 
-**版本号的规矩**：根 `package.json` 与 `src/runtime/package.json` **保持一致**——它们是同一个发布物，
-就该念同一个数；`@airship/sdk`、`@airship/contract` 与 `@airship/cli` 是发到 npm 的那三份，版本号**独立演化**，
+**版本号的规矩**（正式约定在 [docs/version.md](docs/version.md)）：根 `package.json` 与 `src/runtime/package.json` **保持一致**——它们是同一个发布物，
+就该念同一个数；`@airship/contract`、`@airship/sdk`、`@airship/cli` 与 `create-airship-app` 是 npm 发布线的**基础包四件套，版本号一致演进**——
+"加一个版本号"不特别说明就是加 patch，四件套一起加（模板清单里 `@airship/*` 的范围跟着走）；
 包清单里的 `sdkVersion` 取 `src/sdk/package.json` 那份（取错来源等于清单在说谎）；
 各应用自己的 `package.json` 版本**独立演化**，不跟 runtime 跳，一个应用发自己的版不该惊动别的区和 runtime。
 
 应用与 SDK 都不许 import `src/runtime/**`（AP-013 守着）；runtime 也不 import 任何应用——
-名单来自命令行指来的包，不是写死的 id 表。`src/sdk`、`src/shared/contract` 与 `src/cli` 是发到 npm 的那三份，
-改它们的导出等于改公开面（TD-013）。
+名单来自命令行指来的包，不是写死的 id 表。`src/sdk`、`src/shared/contract`、`src/cli` 与 `src/scaffold` 在 npm 发布线上（版本号一致演进），
+改前三者的导出等于改公开面（TD-013）。
 runtime 给应用窗口的 DOM 只有 SDK 那一份——`src/runtime` 里没有 `AppHost`，也没有 `app.html`，更没有启动器。
 
 ## 加一个应用 = 造一个包
@@ -174,8 +176,9 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
   用 ASCII 或中文（GBK 能编码）；乱码输出不代表文件坏了。PowerShell 5.1 读无 BOM 的 UTF-8 `.ps1` 按 GBK 解，
   所以 `.ps1` 要纯 ASCII；bash 双引号里 `$_` 会被展开，要写 PowerShell 就落成 `.ps1` 再 `-File`。
   Git Bash 的 MSYS 路径转换会破坏 NSIS 的 `/S`，静默安装走 `cmd //c "set VAR=...&& prog.exe /S"`。
-- Electron 与 electron-builder 的二进制走 npmmirror：`.npmrc` 里配了 `electron_mirror` 与
-  `electron_builder_binaries_mirror`，`just build-runtime` 里也显式带上同名环境变量。
+- Electron 与 electron-builder 的二进制走 npmmirror：机器本地的 `.npmrc`（个人配置，**已不入库**）里配了
+  `electron_mirror` 与 `electron_builder_binaries_mirror`，`just build-runtime` 里也显式带上同名环境变量。
+  registry 一律不在仓库里写死：npm 系命令按 `.npmrc` > 全局默认解析。
 - Pillow 不认 SVG，无头 Chrome 截内联 SVG 会出空白；要 SVG→位图用 `@resvg/resvg-js`（根 devDep）。
   应用安装器把包内 SVG 图标经 resvg 出 256 PNG，再交 `code/app-ico.py`（Pillow）转多尺寸 `.ico`。
 - 系统级动作（重启 explorer、清图标缓存、覆盖安装、**把 runtime 装进 Program Files**）**只给命令，由使用者执行**，别自己跑。

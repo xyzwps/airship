@@ -179,7 +179,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 ### 5.1 契约（`src/shared/contract/protocol.ts`）
 
 `AirshipBridge` 声明应用能碰的全部面：`paths` / `theme` / `setTheme` / `settings` / `dialog` /
-`fs` / `proc` / `tools` / `tray` / `notify` / `clipboard` / `log` / `window` / `on`。
+`fs` / `proc` / `tools` / `backend` / `tray` / `notify` / `clipboard` / `log` / `window` / `on`。
 **没有 app 参数**：身份由该窗口的 preload 从启动参数注入，主进程再用 `event.sender` 反查归属二次确认。
 应用既看不到"传 id"这个动作，也就没法冒充别的应用。线格式（preload ↔ 主进程）仍然带 id，
 那是实现细节，不进契约。
@@ -188,7 +188,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 `AppPaths.runtimeVersion` 是 runtime 版本。`SettingsScope = AppId`——runtime 自己不持有设置屏，
 主题这类窗口观感也落在应用自己那份设置文件里（由 `theme:set` 这条窗口面通道写，不占 settings 能力）。
 
-事件频道 `ShellEvent`：`proc:chunk` / `proc:exit` / `tray:click` / `window:maximized`。
+事件频道 `ShellEvent`：`proc:chunk` / `proc:exit` / `tray:click` / `window:maximized` / `backend:event`。
 **没有 `theme:changed` 全局广播**——主题按应用各记各的（见 §10），不需要广播。
 
 ### 5.2 preload（`src/runtime/preload/`）
@@ -238,6 +238,12 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 runtime 代发就得伪造响应头，而把传输交回渲染侧才能保住 SDK 的流式上传与分块下载。
 所以请求由应用的文档自己发（fetch），runtime 只做两件事——产包时按清单给它那条放宽了 `connect-src` 的 CSP，
 建窗口时按清单给它豁免同源策略。边界仍由清单钉住：没声明的应用拿到的还是收紧那条 CSP，同源策略照旧。
+
+**后台程序不是能力位，也不进清单**：能力位收的是宿主代管的资源（文件、剪贴板、进程……），
+而"随包自带一段 Node 代码"是包的构成物——像原生应用自带的线程，不是向外求的授权。
+有它靠约定：源项目在应用目录平铺一份 `backend.ts` 或 `backend.js`，产包流水编成包根 `backend.js`
+（PK-040/041）；runtime 在包里见到那个条目才起进程（`backend.md`）。
+该让人知道的是安装期的那一眼：安装器欢迎页在能力清单末尾念「跑它自带的后台程序」，措辞从包形状读（PK-033）。
 
 ### 6.1 路径授权（`grants.ts`，GR 册）
 
@@ -425,10 +431,11 @@ runtime 自己没有界面：`createDesktopShortcut` / `createStartMenuShortcut`
 根 package.json 已经没有 dependencies（foliate-js / pdfjs-dist 各自记在用它的应用名下，都是 devDependencies，
 构建期打进各家的包），所以不再需要"排除某个 node_modules 目录"那几条。
 
-**版本号两条规矩**：根 `package.json` 与 `src/runtime/package.json` **保持一致**——它们是同一个发布物，
-就该念同一个数（现 0.4.0）。安装包文件名与 exe 文件版本取 `src/runtime/package.json` 的 version
-（出包项目根是 `src/runtime`）；包清单里的 `sdkVersion` 取**根** `package.json` 的 version
-（`code/build-apps.mjs`），两处不一致等于清单在说谎。各应用自己的 `package.json` 版本**独立演化**，
+**版本号规矩**（正式约定在 [version.md](version.md)）：根 `package.json` 与 `src/runtime/package.json` **保持一致**——它们是同一个发布物，
+就该念同一个数（现 0.4.2）。安装包文件名与 exe 文件版本取 `src/runtime/package.json` 的 version
+（出包项目根是 `src/runtime`）；包清单里的 `sdkVersion` 取 `src/sdk/package.json` 的 version
+（`code/build-apps.mjs`）——那是 npm 发布线（基础包四件套 `@airship/contract`/`@airship/sdk`/`@airship/cli`/`create-airship-app`
+一致演进）的版本，与安装器线的 runtime 版本是两本账，混着取等于清单在说谎。各应用自己的 `package.json` 版本**独立演化**，
 不跟 runtime 跳。runtime 的 `package.json` 里 electron 写**固定版本**（`45.2.3`，不带 `^`）——
 electron-builder 要按它取二进制，写范围会被拒。
 

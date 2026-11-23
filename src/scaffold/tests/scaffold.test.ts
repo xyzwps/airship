@@ -38,15 +38,17 @@ describe('create-airship-app', () => {
     const appTs = readFileSync(join(srcDir, 'app.ts'), 'utf8')
     expect(appTs).toContain("id: 'my-todo'")
     expect(appTs).toContain("name: '待办清单'")
-    expect(appTs).toContain("capabilities: ['backend']")
-    expect(appTs).toContain("backend: 'backend/index.js'")
-    expect(existsSync(join(srcDir, 'backend', 'index.js')), '后端入口随模板在').toBe(true)
+    expect(appTs).toContain('capabilities: []')
+    expect(existsSync(join(srcDir, 'backend.ts')), '后端入口按约定平铺在 src/backend.ts').toBe(true)
+    expect(existsSync(join(srcDir, 'backend')), '后端不再是目录').toBe(false)
     expect(statSync(join(srcDir, 'icon.ico')).size, '自备的外壳图标随模板在（PK-039）').toBeGreaterThan(1000)
 
     // id 的真源：根 package.json 的 name 就是 id，版本也只有这一份
     const pkg = JSON.parse(readFileSync(join(work, 'my-todo', 'package.json'), 'utf8'))
     expect(pkg.name).toBe('my-todo')
     expect(typeof pkg.version).toBe('string')
+    // 四个动词包进 scripts：作者跑的是 npm run，不是 npx
+    expect(pkg.scripts).toMatchObject({ dev: 'airship dev', start: 'airship start', pack: 'airship pack', installer: 'airship installer' })
     expect(existsSync(join(srcDir, 'package.json')), 'src/ 下不该再有第二份 package.json').toBe(false)
     for (const file of walk(join(work, 'my-todo'))) {
       if (/\.(json|md|ts|tsx|js|css|html)$/.test(file)) {
@@ -62,7 +64,14 @@ describe('create-airship-app', () => {
     const appTs = readFileSync(join(work, 'ping', 'src', 'app.ts'), 'utf8')
     expect(appTs).toContain("name: 'ping'")
     expect(appTs).toContain('capabilities: []')
-    expect(existsSync(join(work, 'ping', 'src', 'backend'))).toBe(false)
+    expect(existsSync(join(work, 'ping', 'src', 'backend.ts')), 'minimal 不带后端').toBe(false)
+    expect(existsSync(join(work, 'ping', 'src', 'backend.js')), 'minimal 不带后端').toBe(false)
+    // 模板里那份叫 gitignore（npm pack 不收 .gitignore），落项目时必须改名就位
+    const ignore = readFileSync(join(work, 'ping', '.gitignore'), 'utf8')
+    const lines = new Set(ignore.split('\n').map((s) => s.trim().replace(/\/$/, '')))
+    for (const entry of ['node_modules', 'dist-apps', 'release', '.airship-dev']) {
+      expect(lines.has(entry), `.gitignore 该忽略 ${entry}`).toBe(true)
+    }
   })
 
   it('目录名当不了 id 就拒并念规则；非空目录不往里盖', () => {

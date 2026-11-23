@@ -1,0 +1,33 @@
+# @airship/sdk
+
+airship 应用面向的那一面：宿主、观感、CSP、工装钩子与测试替身。
+
+写一个 airship 应用，前端代码里只需要这一个包——窗口外壳、主题落地、留白与占位都由宿主接管，你的组件只管画自己的内容。
+
+## 起步
+
+```tsx
+// src/main.tsx（整个入口就一行）
+import { createAirshipApp } from '@airship/sdk'
+import { app } from './app.ts'
+import App from './App.tsx'
+
+createAirshipApp({ meta: app, component: App, icon: './icon.svg' })
+```
+
+组件里拿到的 `api` 就是 runtime 的全部通道：用了 `api.settings.` / `api.proc.` 这类域，就回清单把对应能力声明上——没声明的一律拒绝，且拒绝时收到的是句人话。
+
+常用导出：`createAirshipApp`、`useTheme`、`Titlebar` / `IconButton` / `Glyph`、`AIRSHIP_CSP`。
+
+## 子入口
+
+- `@airship/sdk/styles.css` —— 宿主样式（CSS 变量这一族是配色的唯一正源）；
+- `@airship/sdk/testing` —— `FakeAirship` 与 `mountUi`，jsdom 里跑组件用例，不需要真 runtime；
+- `@airship/sdk/vite` —— 给 vite 的 CSP 注入插件。
+
+```tsx
+import { FakeAirship, mountUi } from '@airship/sdk/testing'
+
+const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities })
+const m = await mountUi(<MyApp api={fake.api} />, { fake })
+```

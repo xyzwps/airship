@@ -33,7 +33,7 @@ const USAGE = `用法：npx create-airship-app <目录> [--template minimal|todo
 /** 文本占位替换只给文本文件做：icon.ico 那种二进制直接拷字节 */
 const TEXT_EXT = new Set(['.json', '.md', '.ts', '.tsx', '.js', '.mjs', '.css', '.html', '.txt'])
 function isTextFile(name) {
-  if (name === '.gitignore') return true
+  if (name === 'gitignore') return true
   const dot = name.lastIndexOf('.')
   return dot >= 0 && TEXT_EXT.has(name.slice(dot))
 }
@@ -47,7 +47,8 @@ function copyTree(src, dest, vars) {
   mkdirSync(dest, { recursive: true })
   for (const entry of readdirSync(src)) {
     const from = join(src, entry)
-    const toName = entry.replaceAll('__APP_ID__', vars.id)
+    // 模板里那份叫 gitignore：npm pack 永远不把 .gitignore 打进发布物，落项目时才改回点开头
+    const toName = entry === 'gitignore' ? '.gitignore' : entry.replaceAll('__APP_ID__', vars.id)
     const to = join(dest, toName)
     if (statSync(from).isDirectory()) {
       copyTree(from, to, vars)
@@ -94,14 +95,11 @@ function cli(argv) {
   console.log(`已建 ${template} 项目：${target}`)
   console.log(`
 下一步（都在 ${basename(target)} 里跑）：
-  npm install            装上 @airship/sdk、@airship/cli 与 react/vite
-  npx airship dev        开发模式起窗——改 src 下的源码，窗口里刷新即见
-  npx airship start      直跑构建好的产物，与装好后双击快捷方式同一条路
-  npx airship pack       产 dist-apps/${id}.airship
-  npx airship installer  产每用户安装器（这台机器要先有 NSIS：winget install nsis.nsis）
-
-前提：这台机器装过 airship runtime（${'C:\\Program Files\\airship\\runtime'}），
-或把 AIRSHIP_PATH 指到它所在的目录。`)
+  npm install       装上 @airship/sdk、@airship/cli 与 react/vite
+  npm run dev       开发模式起窗——改 src 下的源码，窗口里刷新即见
+  npm run start     直跑构建好的产物，与装好后双击快捷方式同一条路
+  npm run pack      产 dist-apps/${id}.airship
+  npm run installer 产每用户安装器（这台机器要先有 NSIS：winget install nsis.nsis）`)
   return 0
 }
 

@@ -13,9 +13,9 @@
 
 import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { build, createServer } from 'vite'
-import { WINDOWS_ICON_NAME } from '@airship/contract'
+import { PACKAGE_BACKEND_ENTRY, WINDOWS_ICON_NAME } from '@airship/contract'
 import { packPackage } from './pack.mjs'
 import { findAppManifestFile, readAppManifest } from './manifest.mjs'
 
@@ -70,19 +70,33 @@ function copyIcons(appDir, outDir) {
 }
 
 /**
- * 后端入口不在前端的模块图里，vite 不会自己搬：把清单 `backend` 所在的那个目录整个拷进产物。
- * 整个目录而不是单文件——后台程序照例要 import 自己那族模块，PK-038 只认包里有没有那个路径。
- * 目录不存在就在这里默默不拷，让产包以「包里没有后端入口文件 …」那句原话炸——判据只有产包侧一份。
+ * 后端按约定走：应用目录里有 `backend.ts` 或 `backend.js` 就有后台，没有就没有。
+ * 不读清单、不认能力位——简单应用平铺一个文件；复杂应用在这个文件底下自己组织目录，
+ * esbuild 把 import 的东西全 bundle 成包根那一份 `backend.js`（utilityProcess.fork 吃磁盘真文件，
+ * 所以包里必须是编好的 JS；node 内置模块保持 external，其余随包带着走）。
+ * 两份都在是作者没想清楚，响亮失败；编译失败也响亮失败，不产一个"安静没有后端"的包。
  */
-function copyBackend(appDir, outDir, backend) {
-  if (typeof backend !== 'string' || backend === '') return
-  const dir = dirname(backend)
-  if (dir === '' || dir === '.') {
-    cpSync(join(appDir, backend), join(outDir, backend))
-    return
+export async function compileBackend(appDir, outDir) {
+  const ts = join(appDir, 'backend.ts')
+  const js = join(appDir, 'backend.js')
+  const hasTs = existsSync(ts)
+  const hasJs = existsSync(js)
+  if (hasTs && hasJs) {
+    throw new Error(
+      '后端入口只能有一份：backend.ts 与 backend.js 都在——留一个，复杂应用的目录归这个文件自己组织'
+    )
   }
-  const from = join(appDir, dir)
-  if (existsSync(from)) cpSync(from, join(outDir, dir), { recursive: true })
+  const entry = hasTs ? ts : hasJs ? js : null
+  if (!entry) return
+  const { build: bundle } = await import('esbuild')
+  await bundle({
+    entryPoints: [entry],
+    bundle: true,
+    platform: 'node',
+    format: 'cjs',
+    outfile: join(outDir, PACKAGE_BACKEND_ENTRY),
+    logLevel: 'warning'
+  })
 }
 
 /** 构建 + 装包。中间产物全在系统临时目录，只有包落在 packagesOut 里。 */
@@ -98,7 +112,7 @@ export async function buildAndPack({ projectRoot, id, packagesOut }) {
     const built = join(work, `built-${id}`)
     await buildApp(appDir, built)
     copyIcons(appDir, built)
-    copyBackend(appDir, built, manifest.backend)
+    await compileBackend(appDir, built)
     const { file } = packPackage({ srcDir: built, outRoot: resolve(projectRoot, packagesOut), manifest })
     return { file, manifest }
   } finally {

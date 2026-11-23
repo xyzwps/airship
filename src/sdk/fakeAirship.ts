@@ -1,4 +1,5 @@
 import {
+  backendAbsent,
   capDenied,
   dupJob,
   exeDenied,
@@ -474,12 +475,10 @@ export class FakeAirship implements AirshipBridge {
 
   readonly backend = {
     invoke: async <T,>(method: string, payload?: unknown): Promise<T> => {
-      this.needCap('backend')
       const m = this.needString(method, 'method')
+      // 与真机同判据：有没有后端看"包"，不看能力位——替身里 options.backend 没装就等于包里没有 backend.js
+      if (!this.opts.backend) throw new Error(backendAbsent(this.id))
       this.backendCalls.push({ method: m, payload })
-      if (!this.opts.backend) {
-        throw new Error(`假后端没装处理器：${m}（用例要在 FakeAirship 的 options.backend 里应答）`)
-      }
       return (await this.opts.backend(m, payload)) as T
     }
   }

@@ -12,6 +12,8 @@
 
 ---
 
+- [ ] capabilities 含义太模糊了，需要细化
+
 ## runtime 与发布
 
 ### TD-001 快捷方式（`.lnk`）上还没有 per-app 的身份

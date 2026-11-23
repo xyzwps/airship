@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { installerScript, nsisText } from '../../../code/make-app-installer.mjs'
-import { capabilitiesPhrase, runtimeNotFound } from '@airship/contract'
+import { BACKEND_PHRASE, capabilitiesPhrase, runtimeNotFound } from '@airship/contract'
 import { REAL_APPS } from '../../runtime/tests/helpers/realApps'
 
 /**
@@ -63,6 +63,11 @@ describe('装完留下什么', () => {
         nsisText(`它要的能力：${capabilitiesPhrase(meta.capabilities)}`)
       )
     }
+
+    // 包根带 backend.js（hasBackend 由调用方从归档条目读出来）：末尾多念一句后台，不占能力位
+    const backendScript = installerScript({ id: 'demo', name: '示范', version: '0.0.0-test', capabilities: [], hasBackend: true })
+    expect(backendScript).toContain(nsisText(`它要的能力：${capabilitiesPhrase([], true)}`))
+    expect(backendScript).toContain(nsisText(BACKEND_PHRASE))
   })
 })
 

@@ -5,14 +5,11 @@ create-airship-app 的 minimal 模板：一扇 airship 窗口，纯前端，`cap
 
 ```
 npm install
-npx airship dev        # 开发模式起窗，改 src 下的源码，窗口里刷新即见
-npx airship start      # 直跑构建好的产物
-npx airship pack       # 产 dist-apps/__APP_ID__.airship
-npx airship installer  # 产每用户安装器（要先有 NSIS：winget install nsis.nsis）
+npm run dev        # 开发模式起窗，改 src 下的源码，窗口里刷新即见
+npm run start      # 直跑构建好的产物
+npm run pack       # 产 dist-apps/__APP_ID__.airship
+npm run installer  # 产每用户安装器（要先有 NSIS：winget install nsis.nsis）
 ```
-
-前提是这台机器装过 airship runtime（`C:\Program Files\airship\runtime`），
-或把环境变量 `AIRSHIP_PATH` 指到 `airship.exe` 所在的目录。
 
 三处要紧的地方：
 

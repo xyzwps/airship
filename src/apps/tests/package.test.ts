@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   APP_ID_PATTERN,
-  BACKEND_ENTRY_PATTERN,
   MANIFEST_NAME,
   SCHEMA_VERSION,
   WINDOWS_ICON_NAME,
@@ -15,8 +14,8 @@ import {
   referenceProblems
 } from '../../../code/pack-app.mjs'
 import { packPackage } from '@airship/cli/pack'
-import { WINDOWS_ICON_NAME as CONTRACT_WINDOWS_ICON_NAME } from '@airship/contract'
-import { BACKEND_ENTRY_PATTERN as CONTRACT_BACKEND_ENTRY_PATTERN } from '@airship/contract'
+import { compileBackend } from '@airship/cli'
+import { WINDOWS_ICON_NAME as CONTRACT_WINDOWS_ICON_NAME, PACKAGE_BACKEND_ENTRY } from '@airship/contract'
 import { badAppId } from '@airship/contract'
 import { APP_ID_PATTERN as CONTRACT_APP_ID_PATTERN } from '@airship/contract'
 import { manifestProblems as registryManifestProblems } from '@airship/contract'
@@ -177,65 +176,40 @@ describe('包清单只写应用自己的事实', () => {
   })
 })
 
-describe('清单可以指一个随包自带的后台程序入口', () => {
-  it('PK-037 backend 形状不对两侧都点名，且原因列表逐字相同', () => {
-    // 两侧的正则必须是同一条判据
-    expect(BACKEND_ENTRY_PATTERN.source).toBe(CONTRACT_BACKEND_ENTRY_PATTERN.source)
+describe('随包自带的后台程序按约定进包', () => {
+  it('PK-040 应用目录里有 backend.ts，包根就有编好的 backend.js；没有就安静不带', async () => {
+    const appDir = mkdtempSync(join(work, 'app-'))
+    writeFileSync(join(appDir, 'backend.ts'), "import { pong } from './ping'\nprocess.parentPort.postMessage({ ready: pong() })\n", 'utf8')
+    writeFileSync(join(appDir, 'ping.ts'), "export const pong = () => 'pong'\n", 'utf8')
+    const srcDir = fixture()
+    await compileBackend(appDir, srcDir)
+    const js = readFileSync(join(srcDir, PACKAGE_BACKEND_ENTRY), 'utf8')
+    expect(js, '本地 import 被 bundle 进同一条文件').toContain('pong')
+    expect(js, '包里的是编好的 JS：不剩相对 ESM 引用').not.toMatch(/from ['"]\.\//)
 
-    for (const bad of [5, '', '   ', 'backend/nope.ts', '/backend/index.js', '../outside/index.js']) {
-      const problems = manifestProblems({ ...goodManifest, backend: bad })
-      expect(problems.some((p: string) => p.includes('backend')), `${JSON.stringify(bad)} 该被拒：${problems.join('；')}`).toBe(
-        true
-      )
-    }
-    for (const ok of ['backend/index.js', 'server.mjs', 'run.cjs']) {
-      expect(manifestProblems({ ...goodManifest, backend: ok }), `${ok} 该收下`).toEqual([])
-    }
+    const out = outRoot()
+    const packed = pack({ srcDir, outRoot: out, manifestText: json() })
+    expect(archiveEntryNames(packed.file), '包根有那个条目').toContain(PACKAGE_BACKEND_ENTRY)
+    expect(JSON.parse(readArchiveText(packed.file, MANIFEST_NAME)), '清单里没有键表述它').not.toHaveProperty('backend')
 
-    // 坏清单喂两边，backend 相关的原因列表一字不差（契约侧多带"位置: "前缀，比时剥掉）
-    const at = 'apps/demo/app.ts'
-    for (const bad of [5, '', 'backend/nope.ts', '/backend/index.js']) {
-      const packer = manifestProblems({ ...goodManifest, backend: bad }).filter((p: string) => p.includes('backend'))
-      const runtime = packageManifestProblems({ ...goodManifest, backend: bad }, at)
-        .map((p: string) => p.slice(at.length + 2))
-        .filter((p: string) => p.includes('backend'))
-      expect(packer.length, `${JSON.stringify(bad)} 该至少给一条原因`).toBeGreaterThan(0)
-      expect(runtime, `${JSON.stringify(bad)} 两侧逐字相同`).toEqual(packer)
-    }
+    // 没有条目就没有后台：应用目录不放文件，包不带 backend.js
+    const plain = fixture()
+    await compileBackend(mkdtempSync(join(work, 'empty-')), plain)
+    const out2 = outRoot()
+    const plainPacked = pack({ srcDir: plain, outRoot: out2, manifestText: json() })
+    expect(archiveEntryNames(plainPacked.file), '没有后端入口，包根不该多出条目').not.toContain(PACKAGE_BACKEND_ENTRY)
+
+    // 清单再写 backend 键：它已不在允许字段里，按未知键拒
+    expect(manifestProblems({ ...goodManifest, backend: 'backend.js' })[0]).toContain('不认的键')
   })
 
-  it('PK-038 后端入口文件包里必须有：缺了产包与注册都拒，且一个字节都不动', () => {
-    const pointsNowhere = json({ backend: 'backend/index.js' })
-
-    // 产包侧：产物目录里没有那个文件 → 响亮失败，不落任何半成品
-    const out = outRoot()
-    expect(() => pack({ srcDir: fixture(), outRoot: out, manifestText: pointsNowhere })).toThrow(
-      /包里没有后端入口文件 backend\/index\.js（清单 backend 指的就是它在包里的路径）/
+  it('PK-041 backend.ts 与 backend.js 都在，产期响亮失败', async () => {
+    const appDir = mkdtempSync(join(work, 'app-'))
+    writeFileSync(join(appDir, 'backend.ts'), 'x', 'utf8')
+    writeFileSync(join(appDir, 'backend.js'), 'x', 'utf8')
+    await expect(compileBackend(appDir, mkdtempSync(join(work, 'built-')))).rejects.toThrow(
+      '后端入口只能有一份：backend.ts 与 backend.js 都在——留一个，复杂应用的目录归这个文件自己组织'
     )
-    expect(readdirSync(out), '不合格的包一个都不留').toEqual([])
-
-    // 注册侧：归档里缺清单指的那个条目 → 同一句话，字节不动
-    const dir = mkdtempSync(join(work, 'reg-'))
-    const archive = writeArchive(join(dir, 'pk038.airship'), {
-      [MANIFEST_NAME]: json({ id: 'pk038', backend: 'backend/index.js' }),
-      [DEFAULT_ENTRY]: '<html></html>',
-      'icon.svg': ICON_SVG
-    })
-    const bytes = readFileSync(archive)
-    const res = registerPackageAt(archive)
-    expect(res.pkg).toBeUndefined()
-    expect(res.problems.join('\n')).toContain(
-      '包里没有后端入口文件 backend/index.js（清单 backend 指的就是它在包里的路径）'
-    )
-    expect(readFileSync(archive).equals(bytes), '被拒的归档字节没变').toBe(true)
-
-    // 有它就放行：产物里带这个条目，包形状完整
-    const withBackend = fixture({
-      extraFiles: { 'backend/index.js': 'process.parentPort.postMessage({ ready: true })\n' }
-    })
-    const out2 = outRoot()
-    const packed = pack({ srcDir: withBackend, outRoot: out2, manifestText: json({ backend: 'backend/index.js' }) })
-    expect(archiveEntryNames(packed.file), '后端入口要进归档').toContain('backend/index.js')
   })
 })
 

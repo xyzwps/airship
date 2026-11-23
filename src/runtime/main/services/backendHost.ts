@@ -1,10 +1,10 @@
 import { utilityProcess, type UtilityProcess } from 'electron'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
 import {
-  BACKEND_ENTRY_PATTERN,
-  backendEntryMissing,
+  PACKAGE_BACKEND_ENTRY,
+  backendAbsent,
   backendEntryUnreadable,
   backendExited,
   backendNoAnswer,
@@ -20,9 +20,12 @@ import { log } from './logging'
 /**
  * 应用自带的后台程序：一份随包归档的 Node 脚本，runtime 用 utilityProcess 为它单独起进程。
  *
+ * 有没有后端不读清单、不读能力位，读**包形状**：归档根有 `backend.js` 这个条目就有
+ * （源项目里的 `src/backend.ts|js` 由产包流水按约定编进来）。
+ *
  * 为什么不直接 fork 包里的路径：fork 要的是磁盘上的真文件，而包是一个 zip 归档。
- * 所以启动前把后端入口**所在目录**的条目摊平落到 `<userData>/apps/<id>/backend/`
- * （只落入口一个文件的话，后端 `require('./store.js')` 就找不到邻居了）；
+ * 所以启动前把包根那份 `backend.js` 落到 `<userData>/apps/<id>/backend/`——
+ * 单文件是因为产包期已经把它 import 的东西全 bundle 进去了；
  * 这份落盘与任务栏图标同族——是可再生的派生物，不是应用数据。
  *
  * 进程间只有这一种对话（形状是档1样件实测钉下的）：
@@ -36,8 +39,8 @@ import { log } from './logging'
  * 生命周期跟着窗口走（与 proc 的转码任务同一条纪律）：窗口关了进程就收掉；
  * 它自己崩了不拖累窗口——在途的调用拿到 backendExited 那句，下一次 invoke 再拉起一个新的。
  *
- * 三道闸（身份 / 能力 / 参数）不住在这里，住 ipc.ts——和 settings、proc 那些频道一样，
- * 被调到时就假定"来的人有这个能力"已经判过了。
+ * 三道闸里的身份与参数住在 ipc.ts——和 settings、proc 那些频道一样，被调到时就假定
+ * "来的人报得出身份、method 是字符串"已经判过了；"有没有后端"不归闸判，归包形状判（见上）。
  */
 
 /** 等后端报就绪的时限；超时就把进程收掉，不留一个"永远起不来"的摊子 */
@@ -62,29 +65,19 @@ export function backendRootDir(id: AppId): string {
 }
 
 /**
- * 把归档里后端入口所在目录的条目摊平落盘，返回入口文件在磁盘上的绝对路径。
+ * 把包根那份 backend.js 落到磁盘，返回它的绝对路径。
  *
  * 每次都重写字节：包是活动包表里那份唯一的真，落盘只是它的影子——
  * 比对内容再决定写不写，省下的那点写盘换来的是"影子跟真身不一致还看不出来"的风险。
  */
-function extractBackend(archive: string, entry: string, id: AppId): string {
-  const root = backendRootDir(id)
-  const prefix = entry.includes('/') ? entry.slice(0, entry.lastIndexOf('/') + 1) : ''
-  let files = 0
-  for (const name of archiveEntryNames(archive)) {
-    // 入口在包根时只摊平包根那层的 .js——别的目录是前端产物，不该进后端的落点
-    if (prefix ? !name.startsWith(prefix) : name.includes('/')) continue
-    if (!BACKEND_ENTRY_PATTERN.test(name)) continue
-    const raw = readArchiveEntry(archive, name)
-    if (raw === null) continue
-    const target = join(root, name.slice(prefix.length))
-    mkdirSync(dirname(target), { recursive: true })
-    writeFileSync(target, Buffer.from(raw))
-    files++
-  }
-  if (files === 0) throw new Error(backendEntryUnreadable(id, entry))
-  log.info(id, '后端程序已落盘', { entry, files })
-  return join(root, entry.slice(prefix.length))
+function extractBackend(archive: string, id: AppId): string {
+  const raw = readArchiveEntry(archive, PACKAGE_BACKEND_ENTRY)
+  if (raw === null) throw new Error(backendEntryUnreadable(id, PACKAGE_BACKEND_ENTRY))
+  const target = join(backendRootDir(id), PACKAGE_BACKEND_ENTRY)
+  mkdirSync(join(backendRootDir(id)), { recursive: true })
+  writeFileSync(target, Buffer.from(raw))
+  log.info(id, '后端程序已落盘', { entry: PACKAGE_BACKEND_ENTRY })
+  return target
 }
 
 interface Pending {
@@ -111,6 +104,16 @@ export function setBackendEmitter(fn: (app: AppId, event: ShellEvent) => void): 
 
 let seqCounter = 0
 
+/**
+ * 这个应用有没有自带后台：读包形状——归档根有没有 `backend.js` 条目。
+ * 列条目名不解压内容（fflate 的 filter 判据），一次中央目录扫描，便宜。
+ */
+export function hasBackend(app: AppId): boolean {
+  const pkg = packageFor(app)
+  if (!pkg) return false
+  return archiveEntryNames(pkg.archive).includes(PACKAGE_BACKEND_ENTRY)
+}
+
 /** 正在启动的那一份（含等就绪）：同应用并发 invoke 共享它，不双开进程 */
 const starting = new Map<AppId, Promise<LiveBackend>>()
 /** 已就绪在跑的那一份 */
@@ -127,17 +130,16 @@ function killQuietly(child: UtilityProcess): void {
 function beginStart(app: AppId, wakeMethod: string): Promise<LiveBackend> {
   const pkg = packageFor(app)
   if (!pkg) return Promise.reject(new Error(notRegistered(app)))
-  const entry = pkg.meta.backend
-  if (!entry) return Promise.reject(new Error(backendEntryMissing(app)))
+  if (!hasBackend(app)) return Promise.reject(new Error(backendAbsent(app)))
 
   let file: string
   try {
-    file = extractBackend(pkg.archive, entry, app)
+    file = extractBackend(pkg.archive, app)
   } catch (e) {
     return Promise.reject(e instanceof Error ? e : new Error(String(e)))
   }
 
-  log.info(app, '启动后端程序', { entry })
+  log.info(app, '启动后端程序', { entry: PACKAGE_BACKEND_ENTRY })
   let child: UtilityProcess
   try {
     child = utilityProcess.fork(file, [], { env: backendEnv(app), stdio: 'pipe' })
@@ -248,11 +250,8 @@ function beginStart(app: AppId, wakeMethod: string): Promise<LiveBackend> {
 }
 
 export const backendHost = {
-  /** 这份清单有没有后端入口（开窗口时据此决定要不要拉起） */
-  isDeclared(app: AppId): boolean {
-    const entry = packageFor(app)?.meta.backend
-    return typeof entry === 'string' && entry !== ''
-  },
+  /** 这份包有没有自带后台（开窗口时据此决定要不要预热，判据是包形状不是清单） */
+  hasBackend,
 
   /**
    * 确保后端在跑并等它报就绪；已在跑 / 在起都复用同一份，不双开。

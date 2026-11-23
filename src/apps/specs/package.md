@@ -42,19 +42,19 @@
 - **AND** `name`、`description` 缺或为空、`capabilities` 不是字符串数组、
   `defaultWidth` 不是正整数，各自在产包期点名是哪个字段与收到了什么
 
-### Requirement: 清单可以指一个随包自带的后台程序入口
-依据：后台入口是应用自己的事实（与 `entry` 同族）——它是包内一个真文件的路径，
-runtime 只在 capabilities 里有 `backend` 时才会去用它（通道侧契约见 `src/runtime/specs/backend.md`）。
+### Requirement: 随包自带的后台程序按约定进包，归档根只有一份 `backend.js`
+依据：后台不是清单字段也不是能力位——有没有它是包形状的事实。源项目在应用目录平铺
+一份 `backend.ts` 或 `backend.js`（有且只有一处），产包流水把它编成包根 `backend.js`；
+runtime 见到那个条目才起进程（通道侧契约见 `src/runtime/specs/backend.md`）。
 
-#### Scenario: PK-037 `backend` 字段形状不对，产包期就把规则念出来
-- **WHEN** 包清单 `backend` 写成数字、空串，或指一个包外/越界/不以 `.js` `.mjs` `.cjs` 结尾的路径
-- **THEN** 产包失败，原因点名 backend 并说明"必须是包内的相对路径，以 .js / .mjs / .cjs 结尾"
-- **AND** 这条判据产包器与 runtime 两侧逐字相同（坏清单喂两边，原因列表一字不差）
+#### Scenario: PK-040 应用目录里有后端入口，产出来的包根就有 `backend.js`
+- **WHEN** 应用目录里有 `backend.ts`（或 `backend.js`），走产包流水编译并装包
+- **THEN** 归档根上有 `backend.js` 条目，那是编好的 JS（`fork` 吃磁盘真文件，包里不许躺着一份没编的 TS）
+- **AND** 应用目录里没有这个文件，归档根就不带 `backend.js`——manifest 里没有任何键或能力位表述它
 
-#### Scenario: PK-038 清单指了后端入口，包里就得真有那个文件
-- **WHEN** 产物目录里没有 `backend` 指的那个文件，产包；或归档里缺它，注册
-- **THEN** 两边都拒，原因读得到「包里没有后端入口文件 <路径>（清单 backend 指的就是它在包里的路径）」
-- **AND** 不合格的归档一个字节都不动（与 PK-007 同一条纪律）
+#### Scenario: PK-041 `backend.ts` 与 `backend.js` 都在，产期响亮失败
+- **WHEN** 应用目录里两份后端入口同时存在
+- **THEN** 产包失败，原因原样读得到「后端入口只能有一份：backend.ts 与 backend.js 都在——留一个，复杂应用的目录归这个文件自己组织」
 
 ### Requirement: 包根另带一份 Windows 外壳认得的派生图标
 依据：外壳（任务栏按钮、固定到任务栏那颗）读图标只认文件系统路径，既不认 asar 也不认 `airship://`，
@@ -113,6 +113,7 @@ runtime 只在 capabilities 里有 `backend` 时才会去用它（通道侧契�
 - **WHEN** 安装器启动
 - **THEN** 先念「<名字> 要装到这台机器上」与「它要的能力：<人话摘要>」，确定才装、取消就中止
 - **AND** 空清单念的是「不碰你的文件」；措辞与 `CAPABILITY_LABEL` 逐字一致（生成时烘进脚本，不在脚本里另写一份）
+- **AND** 归档根带 `backend.js`（PK-040）的，清单末尾多念一句「跑它自带的后台程序」——这条事实从包形状读，不占能力位
 
 #### Scenario: PK-034 卸载删归档留数据
 - **WHEN** 走控制面板的卸载项或安装目录里的卸载器
@@ -132,6 +133,8 @@ runtime 只在 capabilities 里有 `backend` 时才会去用它（通道侧契�
   两个包根、优先级遮蔽、AIRSHIP_APPS_ROOT 整族失去对象。
   PK-015~019、PK-021~026 于 2026-11-19 删除：拖装与启动器里的卸载退场，
   装与卸改由应用自己的安装包承担（PK-031~035）。
+  PK-037~038 于 2026-11-23 删除：backend 清单字段与 backend 能力位整族退场（能力位收的是宿主资源的授权，
+  自带一段 Node 代码是包的构成物），改走 src/backend.ts|js → 包根 backend.js 的约定（PK-040~041）。
   PK-007 原为"装包失败旧包原样还在"，现改写为直跑注册的只读判定。
   PK-020 于 2026-11-07 删除：安装包改成纯 runtime、不带任何应用，"出厂根"这一族整个退场。
   编号按规矩不复用、不重排。
