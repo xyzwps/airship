@@ -30,7 +30,9 @@ process.env.VITE_CONFIG_NATIVE_IGNORE_WARNING = 'true'
 const ROOT = resolve(import.meta.dirname, '..')
 const CONFIG = join(ROOT, 'code', 'app.vite.config.mts')
 const OUT_ROOT = resolve(process.env.AIRSHIP_APPS_OUT ?? join(ROOT, 'dist-apps'))
-const SDK_VERSION = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version
+// sdkVersion 的真值是 SDK 自己的版本，不是 runtime 的——SDK 独立演化（将来发到 npm 更是各发各的），
+// 取根 package.json 等于清单在说谎
+const SDK_VERSION = JSON.parse(readFileSync(join(ROOT, 'src', 'sdk', 'package.json'), 'utf8')).version
 
 /** app.ts → 包清单：抹掉类型、import 那份纯数据、补上包格式的三个字段 */
 async function readManifest(dirId, work) {

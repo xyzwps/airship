@@ -199,6 +199,7 @@ describe('应用只引 SDK 与契约层（§4 / I-6）', () => {
     const expected = [
       join(SRC, 'runtime', 'package.json'),
       join(SRC, 'sdk', 'package.json'),
+      join(SRC, 'cli', 'package.json'),
       join(SRC, 'shared', 'contract', 'package.json'),
       join(SRC, 'shared', 'library', 'package.json'),
       join(SRC, 'shared', 'textdecode', 'package.json'),
@@ -206,10 +207,20 @@ describe('应用只引 SDK 与契约层（§4 / I-6）', () => {
     ]
     for (const file of expected) {
       expect(existsSync(file), `${file.replace(ROOT + '\\', '')} 必须存在`).toBe(true)
-      const pkg = JSON.parse(readFileSync(file, 'utf8')) as { name?: string; private?: boolean }
+      const pkg = JSON.parse(readFileSync(file, 'utf8')) as {
+        name?: string
+        private?: boolean
+        publishConfig?: { access?: string }
+      }
       expect(pkg.name, `${file} 的 name 要带作用域前缀`).toMatch(/^@airship\//)
-      // 这个仓库还没往任何 registry 发东西：每一个包都得是 private，写错就会误发
-      expect(pkg.private, `${file} 得是 private`).toBe(true)
+      // SDK、契约层与 CLI 是要发到 npm 的那三份（外部作者装的就是它们）；其余仍是不许误发的 private。
+      // 带 scope 的包 npm 默认按 restricted 拒发，所以这三份必须写 access: public——漏了这里就喊。
+      if (/@airship\/(sdk|contract|cli)/.test(pkg.name ?? '')) {
+        expect(pkg.private, `${file} 是要发布的那三份之一，不许标 private`).toBeFalsy()
+        expect(pkg.publishConfig?.access, `${file} 得写 publishConfig.access = "public"`).toBe('public')
+      } else {
+        expect(pkg.private, `${file} 得是 private`).toBe(true)
+      }
     }
     // 根只声明 workspaces，不带 scripts（命令的唯一真源是 justfile）
     const root = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')) as {

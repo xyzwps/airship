@@ -1,11 +1,12 @@
 import { basename, join } from 'node:path'
 import { manifestProblems } from '@airship/contract'
 import {
-  ICON_PATTERN,
   MANIFEST_NAME,
   PACKAGE_SUFFIX,
   entryOf,
+  packageLayoutProblems,
   packageManifestProblems,
+  rootIconName,
   sameIdDifferentArchive,
   type PackageManifest
 } from '@airship/contract'
@@ -43,47 +44,35 @@ export interface InstalledPackage {
   iconUrl: string | null
 }
 
-/** 归档根上那张唯一的图标；不是一张就说清为什么不是一张 */
-function iconIn(archive: string): { name?: string; error?: string } {
-  let names: string[]
-  try {
-    names = archiveEntryNames(archive)
-  } catch (e) {
-    return { error: `归档读不出来：${e instanceof Error ? e.message : String(e)}` }
-  }
-  // 只看包根那一层：条目名里没有斜杠的才算（assets/icon.svg 那种是应用自己的素材）
-  const icons = names.filter((n) => !n.includes('/') && ICON_PATTERN.test(n))
-  if (names.length === 0) return { error: '包里没有条目，也没有 manifest.json' }
-  if (icons.length === 0) return { error: '包里缺图标 icon.svg（也接受 png / jpg / jpeg / webp）' }
-  if (icons.length > 1) return { error: `包里的图标有多张，只留一张：${icons.join(', ')}` }
-  return { name: icons[0]! }
-}
-
-/** 一个归档的合格性判定：清单形状 + 图标 + 入口在不在包里 */
+/**
+ * 一个归档的合格性判定：清单形状 + 包里的东西齐不齐（入口、图标、后端入口）。
+ *
+ * 判据全部取自契约层——与产包侧调的是同一批函数（`packageManifestProblems` /
+ * `packageLayoutProblems`），"装的时候说能跑、产包说不合格"那种分裂在结构上就不成立了。
+ * 带位置前缀的那份是给注册期念的：`at` 是清单在归档里的位置，`archive` 是包本身。
+ */
 function packageProblemsAt(
   archive: string,
   dirId: string,
   manifest: PackageManifest,
-  icon: { name?: string; error?: string }
-): string[] {
+  entryNames: string[] | null,
+  namesError: string | null
+): { problems: string[]; iconName?: string } {
   const at = join(archive, MANIFEST_NAME)
   const out = [
     ...packageManifestProblems(manifest, at),
     // 与产包期同一份清单规矩：工具表、平台名、尺寸、id 与包名一致
     ...manifestProblems(at, dirId, manifest, [])
   ]
-  // 两份规矩会各念一遍同一句（id 形状那类），诊断里留一句就够
-  const entries = [...new Set(out)]
-
-  if (icon.error) entries.push(`${archive}: ${icon.error}`)
-  try {
-    if (!archiveEntryNames(archive).includes(entryOf(manifest))) {
-      entries.push(`${archive}: 包里没有入口文件 ${entryOf(manifest)}`)
-    }
-  } catch (e) {
-    entries.push(`${archive}: 归档读不出来：${e instanceof Error ? e.message : String(e)}`)
+  if (namesError) {
+    out.push(`${archive}: 归档读不出来：${namesError}`)
+  } else if (entryNames) {
+    out.push(...packageLayoutProblems(manifest, entryNames, archive))
   }
-  return entries
+  // 两份清单规矩会各念一遍同一句（id 形状那类），诊断里留一句就够
+  const problems = [...new Set(out)]
+  const icon = entryNames ? rootIconName(entryNames) : undefined
+  return { problems, iconName: icon?.name }
 }
 
 /**
@@ -117,9 +106,19 @@ export function validateArchive(archive: string): {
     }
   }
 
-  const icon = iconIn(archive)
-  const problems = packageProblemsAt(archive, dirId, manifest, icon)
-  return problems.length > 0 ? { problems } : { manifest, iconName: icon.name, problems: [] }
+  // 中央目录只列一次：布局判定与图标名都从这份条目表来
+  let entryNames: string[] | null = null
+  let namesError: string | null = null
+  try {
+    entryNames = archiveEntryNames(archive)
+  } catch (e) {
+    namesError = e instanceof Error ? e.message : String(e)
+  }
+
+  const checked = packageProblemsAt(archive, dirId, manifest, entryNames, namesError)
+  return checked.problems.length > 0
+    ? { problems: checked.problems }
+    : { manifest, iconName: checked.iconName, problems: [] }
 }
 
 /* ---------------- 活的那一份：命令行指来的包 ---------------- */

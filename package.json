@@ -21,6 +21,8 @@
   "workspaces": [
     "src/shared/*",
     "src/sdk",
+    "src/cli",
+    "src/scaffold",
     "src/runtime",
     "src/apps/*"
   ]

@@ -1,0 +1,17 @@
+{
+  "name": "create-airship-app",
+  "version": "0.1.0",
+  "description": "airship 应用项目手脚架：npx create-airship-app <目录> [--template minimal|todo]",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-airship-app": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "templates"
+  ],
+  "dependencies": {
+    "@airship/contract": "^0.4.0"
+  }
+}

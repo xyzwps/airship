@@ -106,6 +106,15 @@ export type Capability =
    * 边界仍然由清单钉住：没声明的应用拿到的还是收紧那条 CSP，同源策略照旧。
    */
   | 'net'
+  /**
+   * 应用跑一份随包自带的 Node 后台程序（清单 `backend` 字段指的那个入口文件）。
+   *
+   * runtime 用 utilityProcess 为这个应用单独起一个进程——不在主进程里跑应用代码，
+   * 崩溃隔离与"一应用一份摊子"的账都还按窗口归。前端经 `api.backend.invoke` 与它对话；
+   * 它主动推的事件走 on() 那条单频道（`backend:event`），只回这个应用的窗口。
+   * 它能直接读写的位置只有它自己那套应用目录（启动时由 env 交给它）。
+   */
+  | 'backend'
 
 /**
  * 能力位的界面说法。首次直跑一个陌生包时要把它念给人听——capabilities 是授权面，
@@ -123,7 +132,8 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   notify: '发系统通知',
   clipboard: '读写剪贴板',
   log: '写日志',
-  net: '自己连外部服务'
+  net: '自己连外部服务',
+  backend: '跑它自带的后台程序'
 }
 
 /** 能力清单的人话摘要：空清单念不碰你的文件，而不是念一个空字符串 */
@@ -232,6 +242,7 @@ export type ShellEvent =
   | { kind: 'proc:exit'; jobId: string; result: ProcResult }
   | { kind: 'tray:click' }
   | { kind: 'window:maximized'; value: boolean }
+  | { kind: 'backend:event'; method: string; payload?: unknown }
 
 export type ShellEventListener = (event: ShellEvent) => void
 
@@ -302,6 +313,15 @@ export interface AirshipBridge {
    * 应用既不能自己找一个来跑，也不能借 runtime 发现的名义跑没声明的工具。
    */
   tools: { path(name: ToolName): Promise<string | null> }
+
+  /**
+   * 应用自带的后台程序（清单 `backend` 字段指的那个包内入口，runtime 为它单独起进程）。
+   * 要 `backend` 能力。invoke 是一次请求-回话；后台主动推的事件走 on() 收 `backend:event`。
+   * 后台没起来时 invoke 会先把它拉起来；它崩了不影响窗口，下一次 invoke 再拉一个新的。
+   */
+  backend: {
+    invoke<T>(method: string, payload?: unknown): Promise<T>
+  }
 
   tray: {
     set(state: TrayState): Promise<void>

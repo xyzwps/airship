@@ -1,0 +1,84 @@
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { describe, expect, it } from 'vitest'
+import { fileURLToPath } from 'node:url'
+
+/**
+ * 手脚架产出来的必须是一个能直接 npm install 的项目骨架：
+ * 占位换干净、目录按真 id 落、坏目录名响亮拒。真装真跑（要网络）归教程的实测，这里只判落盘形状。
+ */
+
+const REPO = resolve(fileURLToPath(import.meta.url), '..', '..', '..', '..')
+const SCAFFOLD = join(REPO, 'src', 'scaffold', 'index.mjs')
+
+function run(args: string[], cwd: string) {
+  return spawnSync(process.execPath, [SCAFFOLD, ...args], { cwd, encoding: 'utf8' })
+}
+
+function walk(dir: string): string[] {
+  const out: string[] = []
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name)
+    if (statSync(p).isDirectory()) out.push(...walk(p))
+    else out.push(p)
+  }
+  return out
+}
+
+describe('create-airship-app', () => {
+  it('todo 模板：常规形状 src/、占位全换、icon.ico 随模板就位', () => {
+    const work = mkdtempSync(join(tmpdir(), 'airship-scaffold-'))
+    const res = run(['my-todo', '--template', 'todo'], work)
+    expect(res.status, res.stderr).toBe(0)
+
+    const srcDir = join(work, 'my-todo', 'src')
+    expect(existsSync(srcDir), '应用文件该落在 src/').toBe(true)
+    const appTs = readFileSync(join(srcDir, 'app.ts'), 'utf8')
+    expect(appTs).toContain("id: 'my-todo'")
+    expect(appTs).toContain("name: '待办清单'")
+    expect(appTs).toContain("capabilities: ['backend']")
+    expect(appTs).toContain("backend: 'backend/index.js'")
+    expect(existsSync(join(srcDir, 'backend', 'index.js')), '后端入口随模板在').toBe(true)
+    expect(statSync(join(srcDir, 'icon.ico')).size, '自备的外壳图标随模板在（PK-039）').toBeGreaterThan(1000)
+
+    // id 的真源：根 package.json 的 name 就是 id，版本也只有这一份
+    const pkg = JSON.parse(readFileSync(join(work, 'my-todo', 'package.json'), 'utf8'))
+    expect(pkg.name).toBe('my-todo')
+    expect(typeof pkg.version).toBe('string')
+    expect(existsSync(join(srcDir, 'package.json')), 'src/ 下不该再有第二份 package.json').toBe(false)
+    for (const file of walk(join(work, 'my-todo'))) {
+      if (/\.(json|md|ts|tsx|js|css|html)$/.test(file)) {
+        expect(readFileSync(file, 'utf8'), `${file} 里不许留占位`).not.toMatch(/__APP_(ID|NAME)__/)
+      }
+    }
+  })
+
+  it('minimal 模板：显示名落成 id（改不改归 src/app.ts 里用户自己），且不带后端', () => {
+    const work = mkdtempSync(join(tmpdir(), 'airship-scaffold-'))
+    const res = run(['ping'], work)
+    expect(res.status, res.stderr).toBe(0)
+    const appTs = readFileSync(join(work, 'ping', 'src', 'app.ts'), 'utf8')
+    expect(appTs).toContain("name: 'ping'")
+    expect(appTs).toContain('capabilities: []')
+    expect(existsSync(join(work, 'ping', 'src', 'backend'))).toBe(false)
+  })
+
+  it('目录名当不了 id 就拒并念规则；非空目录不往里盖', () => {
+    const work = mkdtempSync(join(tmpdir(), 'airship-scaffold-'))
+    const bad = run(['我的应用'], work)
+    expect(bad.status).toBe(1)
+    expect(bad.stderr).toContain('当不了应用 id')
+
+    mkdirSync(join(work, 'taken'))
+    writeFileSync(join(work, 'taken', 'note.txt'), '有东西', 'utf8')
+    const taken = run(['taken'], work)
+    expect(taken.status).toBe(1)
+    expect(taken.stderr).toContain('不是空目录')
+
+    const oldFlag = run(['x1', '--name', '某名'], work)
+    expect(oldFlag.status, '显示名不再是命令行参数').toBe(1)
+    expect(oldFlag.stderr).toContain('不认识的参数：--name')
+  })
+})

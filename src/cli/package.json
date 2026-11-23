@@ -1,0 +1,37 @@
+{
+  "name": "@airship/cli",
+  "version": "0.1.0",
+  "description": "airship 应用作者的命令行：产包、开发模式起窗、直跑产物、每用户安装器",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "airship": "./bin/airship.mjs"
+  },
+  "exports": {
+    ".": "./index.mjs",
+    "./pack": "./lib/pack.mjs",
+    "./installer": "./lib/installer.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "index.mjs"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@airship/contract": "^0.4.0",
+    "@airship/sdk": "^0.4.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "fflate": "^0.8.3"
+  },
+  "peerDependencies": {
+    "vite": "^6.0.0 || ^7.0.0 || ^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  }
+}

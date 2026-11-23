@@ -12,8 +12,9 @@ const SRC = resolve(__dirname, '..')
 const APPS = resolve(SRC, 'apps')
 const DEDUPE = ['react', 'react-dom', 'react/jsx-runtime']
 
-// 渲染根还是 src：dev 时应用窗口的文档地址是 <devUrl>/apps/<id>/index.html，
-// 那棵树必须在服务端可达——这是"改一行组件即热更"的前提。
+// 渲染根还是 src：dev 时应用窗口的文档地址是 <devUrl>/apps/<id>/index.html——
+// 这个完整 URL 由 just 配方放进 AIRSHIP_DEV_URL，runtime 不再自己拼。
+// host 钉 127.0.0.1、端口钉死 5173 且不静默换：justfile 里那个 URL 就是按它们写的。
 // 入口逐个应用列出来（specs/tests 这类没有 index.html 的目录不算）。
 const appEntries = Object.fromEntries(
   readdirSync(APPS, { withFileTypes: true })
@@ -25,6 +26,7 @@ export default defineConfig({
   ...compile,
   renderer: {
     root: SRC,
+    server: { host: '127.0.0.1', port: 5173, strictPort: true },
     resolve: { dedupe: DEDUPE },
     plugins: [react(), airshipCspPlugin()],
     build: {

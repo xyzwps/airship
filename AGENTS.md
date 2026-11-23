@@ -22,6 +22,7 @@ just dev id            直跑那一个应用（先 build-apps；文档热更，�
 just start id          跑构建好的产物（文档从包里加载，与装好的 runtime 最接近）
 just new-app id 名     从 templates/app 造一个新应用（复制、换名、链 workspace、只产它的包）
 just compile           编译 runtime 的两个目标（src/runtime/out/{main,preload}，没有 renderer）
+just build-libs        把 contract 与 sdk 编成发布形态（tsc 直出 JS + d.ts 到各自 dist/）；读它们的配方都先走这条
 just shot              逐窗口截图（先 compile + build-apps），打每窗口内存与首屏耗时
 just app-installer id  产那一个应用的每用户安装器（release/apps/<id>-Setup-<版本>.exe）
 just installers        产全部应用的安装器（先 build-apps；名单与产包同源 code/app-dirs.mjs）
@@ -44,6 +45,13 @@ src/runtime            @airship/runtime      主进程、preload、窗口、能�
 src/sdk                @airship/sdk          宿主（标题栏 / 主题落地 / 留白 / 占位）、图标键、CSP、工装钩子
                                              子入口：./testing（假 runtime 与挂载器）、./styles.css、./vite（CSP 注入插件）
 src/apps/<id>          @airship/<id>         八个应用，各自自持 index.html + main.tsx
+src/cli                @airship/cli          作者命令行：产包流水、dev 起窗、直跑、每用户安装器（bin/airship.mjs）
+                                             四个动词都不接 id——id 的真源是项目根 package.json 的 name；
+                                             外部项目是常规 src/ 形状（mono repo 只属于本仓），dev 的文档地址整份由它经 AIRSHIP_DEV_URL 递给 runtime
+                                             仓库内 code/pack-app.mjs 与 code/make-app-installer.mjs 是它的薄适配——
+                                             resvg/Pillow 派生图标与 electron-builder 缓存那份 makensis 留在仓库侧
+src/scaffold           create-airship-app    npm 手脚架（npx create-airship-app）：minimal 与 todo 两套模板，
+                                             模板里 `__APP_ID__` 与 `__APP_NAME__` 是渲染位；不参与 casecov
 src/shared/contract    @airship/contract     契约、清单类型、拒绝措辞、注册与包形状的规矩
 src/shared/library     @airship/library      共享书库（墨读与 PDF 同一份数据）
 src/shared/textdecode  @airship/textdecode   中文解码
@@ -53,12 +61,14 @@ src/shared/textdecode  @airship/textdecode   中文解码
 `devDependencies`——它们被构建进包，运行时不需要机器上装着（AP-016 钉这条）。
 说明符一律写包名（`@airship/...`），**手写别名已全部拆掉**：边界现在由 node 的解析器守，不靠注释。
 
-**版本号只有两条规矩**：根 `package.json` 与 `src/runtime/package.json` **保持一致**——它们是同一个发布物，
-就该念同一个数（`code/build-apps.mjs` 取根那份当包清单里的 `sdkVersion`，两处不一致等于清单在说谎）；
+**版本号的规矩**：根 `package.json` 与 `src/runtime/package.json` **保持一致**——它们是同一个发布物，
+就该念同一个数；`@airship/sdk`、`@airship/contract` 与 `@airship/cli` 是发到 npm 的那三份，版本号**独立演化**，
+包清单里的 `sdkVersion` 取 `src/sdk/package.json` 那份（取错来源等于清单在说谎）；
 各应用自己的 `package.json` 版本**独立演化**，不跟 runtime 跳，一个应用发自己的版不该惊动别的区和 runtime。
 
 应用与 SDK 都不许 import `src/runtime/**`（AP-013 守着）；runtime 也不 import 任何应用——
-名单来自命令行指来的包，不是写死的 id 表。`src/sdk` 是将来要独立发布的那一份，改它的导出等于改公开面（TD-013）。
+名单来自命令行指来的包，不是写死的 id 表。`src/sdk`、`src/shared/contract` 与 `src/cli` 是发到 npm 的那三份，
+改它们的导出等于改公开面（TD-013）。
 runtime 给应用窗口的 DOM 只有 SDK 那一份——`src/runtime` 里没有 `AppHost`，也没有 `app.html`，更没有启动器。
 
 ## 加一个应用 = 造一个包
@@ -80,11 +90,11 @@ sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `iconPath`
 用了 `api.settings.` / `api.proc.` 这些域就必须声明对应能力，AP-011 会扫。
 
 包格式（**归档文件名** `<id>.airship`——里面是一个 zip，条目名就是包内路径；`manifest.json` 的字段、id 的形状、引用不许越出包）
-的唯一叙述是 `src/apps/specs/package.md`；产包器 `code/pack-app.mjs` 与 runtime 侧 `@airship/contract`
-各判一遍，两份由用例比对输出相等来钉——原因不是偷懒：**Node 自己解不开本仓 TS 里那种不带扩展名的
-相对 import**，所以 `.mjs` 引不了 `.ts`。也因此，被 Node 直接加载的那几个源码包（`@airship/sdk`、
-`@airship/contract` 等）内部的相对 import **必须写扩展名**（`./csp.ts`），新加文件时别忘了。
-（`code/make-app-installer.mjs` 是例外：Node 24 的类型剥离吃得下契约包，它直接 import `@airship/contract`，措辞只一份。）
+的唯一叙述是 `src/apps/specs/package.md`；**判据只有 `@airship/contract` 那一份**（`packageRules.ts`），
+产包侧（`@airship/cli` 的流水，仓库内 `code/pack-app.mjs` 是薄适配）与 runtime 注册侧调的是同一批函数。
+从前"两侧各写一遍、用例钉相等"的局面是因为 Node 解不开本仓 TS 里那种不带扩展名的相对 import——
+这个理由随 contract 的 `dist/` 一起退场了。contract 与 sdk 的 `exports` 因此指向各自的 `dist/`（见下面的发布形态小节），
+Node 脚本走软链读的就是那份 JS；这两区**源码里**的相对 import 仍写扩展名（`./csp.ts`），编译期 tsc 改写成 `./csp.js`。
 
 ## 规格册
 
@@ -181,9 +191,16 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
   这台机器上真实目录是 `C:\Users\xyzwp\Develop\airship`，**命令一律按这个拼法走**；
   已经踩了就 `rm -rf node_modules/@airship && npm install` 重建软链，再顺手清 `node_modules/.vite`。
   npm install/prune 不清 lock 里已不存在的 workspace 孤儿条目（踩过 `src/shell`），要手删那一块。
-- 源码包（`@airship/*`）被 Node 直接加载时解不开省略扩展名的相对 import，症状是
-  `import * as x from '@airship/sdk/testing'` 拿到一个**空对象**而不是报错——比抛错难查得多。
-  所以这些包内部写 `./foo.ts` / `./foo.tsx`；vitest 那边还要 `server.deps.inline: [/^@airship\//]`。
+- **sdk 与 contract 的发布形态只有一条路：dist**。两区 `exports` 指各自 `dist/`，`just build-libs` 用
+  tsc 直出 JS + d.ts（`rewriteRelativeImportExtensions` 把源码里的 `./foo.ts` 改写成 `./foo.js`；
+  CSS 不是编译物，build-libs 手动拷进 `dist/styles/`）。**npm 不会用 `publishConfig.exports` 改写发布物清单**
+  （实测 `npm pack`：exports 原样带着 `./index.ts`）——所以不能靠它把"仓库里指源码、发布时指 dist"合成两幅面孔，
+  只能一幅：未发布时仓内经 workspace 软链读的也是那份 dist，`npm publish --dry-run` 打进 tarball 的还是它，三面同一份产物。
+  代价是"改了源码没编译"会静默用旧 dist——所有读它们的配方（build-apps / compile / typecheck / test / casecov /
+  app-installer / e2e / wsld-real）都已挂 build-libs 依赖，走 just 就不存在忘编。
+  vitest 的 `server.deps.inline: [/^@airship\//]` 仍要留着（`@airship/library` 与 SDK 的 CSS 还是源码消费）。
+- 这台机器 npm 默认 registry 是 **npmmirror（只读镜像）**：`npm publish` 会撞"requires you to be logged in to
+  https://registry.npmmirror.com"——真要发布得 `--registry https://registry.npmjs.org` 且先 `npm login` 到官方源。
 - `app.setName('airship')` 是必须的：Electron 的 userData 默认取 package.json 的 name，
   而 runtime 的 name 现在是 `@airship/runtime`——不钉住的话 `%APPDATA%/airship` 里的书架与设置会"凭空消失"。
 - runtime 的 `package.json` 里 electron 必须写**固定版本**（`45.2.3`，不带 `^`）：

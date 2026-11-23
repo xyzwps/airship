@@ -79,6 +79,11 @@ export interface FakeOptions {
   /** 对话框依次要"选中"的结果，一次一个 */
   picks?: Array<string[] | string | null>
   theme?: ThemeSnapshot
+  /**
+   * 假后端的应答：按 method 给值（可异步）。不装的话 invoke 会喊出来——
+   * 缺什么要响亮，别把"没装后端"吞成"后端回了 undefined"。
+   */
+  backend?: (method: string, payload: unknown) => unknown | Promise<unknown>
 }
 
 export class FakeAirship implements AirshipBridge {
@@ -96,6 +101,7 @@ export class FakeAirship implements AirshipBridge {
 
   /** 记录与断言用的账本 */
   readonly procCalls: Array<{ exe: string; args: string[]; jobId?: string }> = []
+  readonly backendCalls: Array<{ method: string; payload: unknown }> = []
   readonly settingsLog: Array<['get' | 'set' | 'dump', string]> = []
   readonly notifications: NotifyOptions[] = []
   readonly logs: Array<{ level: 'info' | 'warn' | 'error'; message: string; detail?: unknown }> = []
@@ -463,6 +469,18 @@ export class FakeAirship implements AirshipBridge {
       this.needCap('proc')
       if (!this.declaredTools.includes(name)) throw new Error(toolDenied(this.id, name))
       return this.toolPaths[name] ?? null
+    }
+  }
+
+  readonly backend = {
+    invoke: async <T,>(method: string, payload?: unknown): Promise<T> => {
+      this.needCap('backend')
+      const m = this.needString(method, 'method')
+      this.backendCalls.push({ method: m, payload })
+      if (!this.opts.backend) {
+        throw new Error(`假后端没装处理器：${m}（用例要在 FakeAirship 的 options.backend 里应答）`)
+      }
+      return (await this.opts.backend(m, payload)) as T
     }
   }
 

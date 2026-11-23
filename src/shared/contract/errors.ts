@@ -114,6 +114,28 @@ export const noBridge = (): string =>
 export const toolDenied = (app: string, tool: string): string =>
   `${app} 没有声明 ${tool} 工具（要用它就在 apps/${app}/app.ts 的 tools 里声明）`
 
+/* ---------------- 后台程序的措辞（清单 backend 字段 ↔ api.backend） ---------------- */
+
+/** 声明了 backend 能力，清单却没写后端入口 */
+export const backendEntryMissing = (app: string): string =>
+  `${app} 声明了 backend 能力，清单里却没写 backend 入口（backend 写后端入口在包里的路径，例如 'backend/index.js'）`
+
+/** 注册时验过条目在包里；运行期读不到只剩一种解释——包被换掉或损坏 */
+export const backendEntryUnreadable = (app: string, entry: string): string =>
+  `${app} 读不出后端入口 ${entry}：那份归档可能已被替换或损坏，重新装一次这个应用`
+
+/** 后台进程在回话之前退出（崩溃或被杀） */
+export const backendExited = (method: string): string =>
+  `后端程序中途退出，没等到 ${method} 的回话（下一次调用会再拉起一个新的）`
+
+/** 后台程序没在时限内报就绪 */
+export const backendNotReady = (app: string, seconds: number): string =>
+  `${app} 的后端程序没在 ${seconds} 秒内报就绪：后端入口启动后要最先给 runtime 发一条 { ready: true }`
+
+/** 一次调用超时（进程活着，这条不回） */
+export const backendNoAnswer = (method: string, seconds: number): string =>
+  `后端程序没在 ${seconds} 秒内回话：${method}（调用取消了，后端进程还留着——它要是之后回了话会被丢弃）`
+
 /** 清单里写了 runtime 不认识的运行期工具 */
 export const unknownTool = (app: string, tool: string): string =>
   `${app} 的清单声明了 runtime 不认识的工具 ${tool}（runtime 只认 ${TOOL_NAMES.join(' / ')}）`

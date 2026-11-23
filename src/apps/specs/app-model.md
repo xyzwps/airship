@@ -85,8 +85,8 @@
 - **AND** 八个应用的 `index.html` 里都找不到 `Content-Security-Policy` 那一条
 
 #### Scenario: AP-016 每个区都是真包，范本复制得出去
-- **WHEN** 看 runtime、SDK、契约层、两个共享包与八个应用各自目录下的 `package.json`
-- **THEN** 每份都在，名字都带 `@airship/` 前缀，且都写着不发布
+- **WHEN** 看 runtime、SDK、CLI、契约层、两个共享包与八个应用各自目录下的 `package.json`
+- **THEN** 每份都在，名字都带 `@airship/` 前缀；SDK、CLI 与契约层三份写着公开发布，其余都写着不发布
 - **AND** 应用的 `package.json` 里 SDK 与 react 记在 `devDependencies`——运行时机器上不需要装着它们
 - **AND** 根那份只声明工作区，没有 `scripts`（命令的唯一真源仍是 justfile）
 - **AND** 仓库里再没有 `@shared/…`、`@sdk/…`、`@apps/…` 这类手写别名说明符

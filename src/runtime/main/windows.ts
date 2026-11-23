@@ -8,6 +8,7 @@ import { WindowLedger, defaultSizeFor } from './services/windowLedger'
 import { applyTaskbarIdentity, taskbarIdentityFor } from './services/taskbarIdentity'
 import { log } from './services/logging'
 import { proc } from './services/proc'
+import { backendHost } from './services/backendHost'
 import { trayService } from './services/tray'
 import type { ShellEvent } from '@airship/contract'
 
@@ -75,14 +76,14 @@ export function currentPlatform(): ReturnType<typeof platformIdOf> {
 /**
  * 应用窗口加载的是包自己的入口文档。
  *
- * dev 与产包只在这一处不同：dev 走 vite dev server（源码那一份，热更才有效），
+ * dev 与产包只在这一处不同：dev 时 launcher（仓库里的 just、外部项目的 airship CLI）
+ * 把入口文档的完整地址放进 `AIRSHIP_DEV_URL`，窗口直接加载它（源码那一份，热更才有效）；
  * 产包走 `airship://<id>/<entry>`（那一份在包根，由 `packageProtocol.ts` 供）。
+ * runtime 不认识任何项目目录形状——拼路径是 launcher 的事。
  * preload 注入的身份两边完全一样——`--airship-app=<id>` 跟文档来源无关。
  */
-function loadPackageEntry(window: BrowserWindow, id: string, entryUrl: string): void {
-  const devUrl = process.env.ELECTRON_RENDERER_URL
-  const target = devUrl ? `${devUrl}/apps/${id}/index.html` : entryUrl
-  void window.loadURL(target)
+function loadPackageEntry(window: BrowserWindow, entryUrl: string): void {
+  void window.loadURL(process.env.AIRSHIP_DEV_URL ?? entryUrl)
 }
 
 function wireWindow(window: BrowserWindow, owner: Owner, title: string): void {
@@ -98,8 +99,9 @@ function wireWindow(window: BrowserWindow, owner: Owner, title: string): void {
   window.on('closed', () => {
     ledger.close(contentsId)
     appWindows.delete(owner)
-    // 应用窗口没了，它名下的摊子要收干净：还在跑的转码/容器命令、它占着的托盘
+    // 应用窗口没了，它名下的摊子要收干净：还在跑的转码/容器命令、它的后端进程、它占着的托盘
     proc.killApp(owner)
+    backendHost.kill(owner)
     trayService.clear(owner)
   })
 
@@ -170,7 +172,15 @@ export function openAppWindow(appId: string): BrowserWindow {
 
   appWindows.set(appId, window)
   wireWindow(window, appId, meta.name)
-  loadPackageEntry(window, appId, pkg.entryUrl)
+  loadPackageEntry(window, pkg.entryUrl)
+  // 带了后端入口、且声明了 backend 能力的应用：窗口一开就把后端拉起来预热。
+  // 没声明能力就不预热——前端本来就调不动它，白起一个进程。
+  // 起不来只进日志不开错误弹窗——窗口的第一句错误该由应用自己的界面念。
+  if (meta.backend && hasCapability(appId, 'backend')) {
+    backendHost.ensure(appId).catch((err: unknown) => {
+      log.error(appId, '后端程序预热失败', { message: err instanceof Error ? err.message : String(err) })
+    })
+  }
   log.info(appId, '应用窗口已打开')
   return window
 }

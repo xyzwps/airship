@@ -1,0 +1,16 @@
+{
+  "name": "__APP_ID__",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "一个 airship 应用（create-airship-app 的 minimal 模板）",
+  "dependencies": {
+    "@airship/cli": "^0.1.0",
+    "@airship/contract": "^0.4.0",
+    "@airship/sdk": "^0.4.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vite": "^8.3.5"
+  }
+}

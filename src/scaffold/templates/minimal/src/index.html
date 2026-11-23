@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>__APP_NAME__</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      这里不写 CSP：那一条由 @airship/sdk 在构建时注入（airship pack 走的就是那条流水）。
+    -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- 必须是相对路径：dev 时这份文档在 /src/ 下，产包后在包根（airship://__APP_ID__/） -->
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

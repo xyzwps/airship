@@ -1,21 +1,50 @@
 {
   "name": "@airship/sdk",
-  "version": "0.3.1",
-  "private": true,
+  "version": "0.4.0",
   "description": "airship 应用面向的那一面：宿主、观感、CSP、工装钩子与测试替身",
+  "license": "MIT",
   "type": "module",
   "exports": {
-    ".": "./index.ts",
-    "./testing": "./testing.ts",
-    "./styles.css": "./styles/airship.css",
-    "./vite": "./cspPlugin.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js",
+      "default": "./dist/testing.js"
+    },
+    "./styles.css": "./dist/styles/airship.css",
+    "./package.json": "./package.json",
+    "./vite": {
+      "types": "./dist/cspPlugin.d.ts",
+      "import": "./dist/cspPlugin.js",
+      "default": "./dist/cspPlugin.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@airship/contract": "^0.4.0"
   },
   "peerDependencies": {
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "vite": "^6.0.0 || ^7.0.0 || ^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "vite": "^8.3.5"
   }
 }

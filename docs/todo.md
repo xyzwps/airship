@@ -30,11 +30,12 @@
 
 ### TD-013 SDK 独立发布与版本协商
 
-包按某个 SDK 版本构建，却要跑在用户机器上任意一个 runtime 版本里——这条边今天是靠"同仓同一次构建"侥幸对齐的
-（根 `package.json` 与 `src/runtime/package.json` 版本一致，包清单 `sdkVersion` 取根那份）。
-要补三样：包清单里 `sdkVersion` / runtime 侧对 `requiresRuntime` 的判定（现在只记录不判）、
+包按某个 SDK 版本构建，却要跑在用户机器上任意一个 runtime 版本里——这条边今天仍旧靠"同仓同一次构建"对齐。
+"SDK 独立发布"这半已于 2026-11-23 落地：`@airship/sdk` 与 `@airship/contract` 的 `exports` 指各自 `dist/`，
+`just build-libs` 编译，`sdkVersion` 取 `src/sdk/package.json` 那份，版本号独立演化。
+还差三样：runtime 侧对 `requiresRuntime` 的判定（现在只记录不判）、
 不兼容时直跑前读得到的那句原因（而不是点开一个白屏）、runtime 侧 API 只加不改不删的纪律。
-`src/sdk` 是将来要独立发布的那一份，改它的导出等于改公开面。
+改 SDK 与契约层的导出等于改公开面。
 来源：2026-11-07 拆包时定下的第三步（A/B/C/D 四档已落，这一步是它的后续）。
 
 ### TD-014 装包的来源信任与更新

@@ -1,0 +1,28 @@
+/* 应用自己的版心。配色一律用宿主给的变量，别在这里写死颜色（主题三档由标题栏那颗键改）。 */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 640px;
+}
+
+.app h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--fg);
+}
+
+.app .hint {
+  color: var(--fg-dim);
+}
+
+.app button {
+  align-self: flex-start;
+  padding: 6px 18px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--fg);
+  cursor: pointer;
+}

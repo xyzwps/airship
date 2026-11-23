@@ -64,18 +64,25 @@ export function writeFixturePackages(root = packageFixtureRoot()): string {
 }
 
 /**
- * 往某个包根里装一个包：清单、入口文档、一张图标。
+ * 往某个包根里装一个包：清单、入口文档、一张图标（清单指了后端入口就再带上那个文件）。
  * 只补形状，不改清单——清单里写了什么，落盘就是什么。
  */
 export function installPackageAt(root: string, meta: AppMeta): string {
-  return writeArchive(join(root, `${meta.id}${PACKAGE_SUFFIX}`), {
+  const entries: Record<string, string | Uint8Array> = {
     [MANIFEST_NAME]: `${JSON.stringify(manifestOf(meta), null, 2)}\n`,
     [DEFAULT_ENTRY]: ENTRY_HTML,
     'icon.svg': ICON_SVG,
     [WINDOWS_ICON_NAME]: WINDOWS_ICON_BYTES,
     'assets/index.js': 'export default 1\n'
-  })
+  }
+  // 后端条目在用例包里的样子：报就绪 + 回声。外壳进程不参与用例，
+  // 真消息行为由 backend.test.ts 的假进程钉；这里只管"清单指了它，包里就得有它"的形状。
+  if (meta.backend) entries[meta.backend] = BACKEND_STUB
+  return writeArchive(join(root, `${meta.id}${PACKAGE_SUFFIX}`), entries)
 }
+
+/** 后端入口在用例包里的样子：够注册与落盘判据用的报就绪脚本 */
+export const BACKEND_STUB = 'process.parentPort.postMessage({ ready: true })\n'
 
 /** 写一个归档：条目名 → 内容（字符串或字节都行） */
 export function writeArchive(file: string, entries: Record<string, string | Uint8Array>): string {

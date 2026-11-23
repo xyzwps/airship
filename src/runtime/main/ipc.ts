@@ -59,6 +59,7 @@ import { settings } from './services/settings'
 import { grants } from './services/grants'
 import { log } from './services/logging'
 import { proc } from './services/proc'
+import { backendHost } from './services/backendHost'
 import { trayService } from './services/tray'
 import { toolPath } from './services/tools'
 import { bringAppToFront, ownerOfContents } from './windows'
@@ -457,6 +458,16 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
     const tool = assertNonEmptyString(toolArg, 'tool') as ToolName
     assertTool(id, tool)
     return toolPath(tool)
+  })
+
+  /* ---------- 后端程序：进程随窗口走，事件只回归属窗口 ---------- */
+
+  handle('backend:invoke', async (event, appArg: unknown, method: unknown, payload: unknown) => {
+    const id = assertApp(event, appArg)
+    assertCap(id, 'backend')
+    const m = assertNonEmptyString(method, 'method')
+    // 后端回的错误原样上抛：应用 catch 到的就是它自己后端写的那句话
+    return backendHost.invoke(id, m, payload)
   })
 
   /* ---------- 托盘 ---------- */

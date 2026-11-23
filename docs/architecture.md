@@ -286,12 +286,12 @@ sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `iconPath`
 ### 7.2 包格式（`src/apps/specs/package.md`，PK 册）
 
 归档文件名 `<id>.airship`——里面是一个 zip，条目名就是包内路径。`manifest.json` 由产包器从 `app.ts` 投影，
-带 `schemaVersion` 与 `sdkVersion`。id 的形状、引用不许越出包，产包器（`code/pack-app.mjs`）与
-runtime 侧（`@airship/contract`）各判一遍，两份由用例比对输出相等来钉。
-
-为什么两份：Node 自己解不开本仓 TS 里那种不带扩展名的相对 import，所以 `.mjs` 引不了 `.ts`。
-也因此，被 Node 直接加载的那几个源码包（`@airship/sdk`、`@airship/contract` 等）内部的相对 import
-**必须写扩展名**（`./csp.ts`）。
+带 `schemaVersion` 与 `sdkVersion`。id 的形状、引用不许越出包：**判据只有 `@airship/contract` 那一份**
+（`packageRules.ts`），产包侧与 runtime 注册侧调的是同一批函数。从前"两侧各写一份、用例比对输出钉相等"
+（`code/pack-app.mjs` 是 `.mjs`，Node 解不开本仓 TS 里那种不带扩展名的相对 import，`.mjs` 引不了 `.ts`）
+随 contract 编译成 `dist/` 一起退场了——产包流水本体现在住在 `@airship/cli`，仓库内外的包出自同一份实现。
+被 Node 直接加载的源码包（`@airship/sdk`、`@airship/contract`）内部相对 import 仍**必须写扩展名**（`./csp.ts`），
+编译期由 tsc 改写成 `./csp.js`。
 
 ### 7.3 注册与安装
 

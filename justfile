@@ -33,9 +33,16 @@ default:
 tasks:
     @just --list
 
+# 把 contract 与 sdk 编译成发布形态（各自 dist/ 的 JS + d.ts）。
+# 两个包的 package.json 的 exports 指的就是那份 dist——仓库里的一切（tsc、vitest、vite 构建、
+# code/ 下的 Node 脚本）都通过 workspace 软链读同一份 dist，与外部作者 npm install 之后看到的完全一样。
+# 改了这两区的源码，任何要读它们的配方之前都得先跑过这一条；下面凡是依赖它的配方都写成了依赖，不靠人记。
+build-libs:
+    node code/build-libs.mjs
+
 # 产各应用的 airship 包到 dist-apps/：每应用一次独立构建，产物装成 <id>.airship（一个 zip 换了扩展名）
 # 契约见 src/apps/specs/package.md
-build-apps: clean-apps
+build-apps: clean-apps build-libs
     node code/build-apps.mjs
 
 # 清掉 dist-apps/ 整个目录。
@@ -52,12 +59,14 @@ clean-apps:
 dev id: build-apps
     # electron-vite 的 dev 用 process.cwd() 找"runtime 的 package.json 的 main"当入口——
     # 必须在 src/runtime 里跑。包路径随之传绝对路径：electron 的 cwd 变了，相对 dist-apps 会指错地方。
-    cd src/runtime && ../../node_modules/.bin/electron-vite dev --config electron.vite.dev.config.ts -- "{{justfile_directory()}}/dist-apps/{{id}}.airship"
+    # 窗口的 dev 文档地址由 AIRSHIP_DEV_URL 整份给定（runtime 不拼路径）；
+    # 端口 5173 钉死在 electron.vite.dev.config.ts 的 renderer server 上（strictPort，被占就响亮失败）。
+    cd src/runtime && AIRSHIP_DEV_URL="http://127.0.0.1:5173/apps/{{id}}/index.html" ../../node_modules/.bin/electron-vite dev --config electron.vite.dev.config.ts -- "{{justfile_directory()}}/dist-apps/{{id}}.airship"
 
 # 编译 runtime 的两个目标 → src/runtime/out/{main,preload}（不出安装包）
 # runtime 没有自己的文档：配置里没有 renderer 目标，产物里也不许有 out/renderer。
 # 先清场再编：vite 只清它要写的那几个目标，旧时代留下的 out/renderer 不清就会一直躺着冒充产物。
-compile:
+compile: build-libs
     rm -rf src/runtime/out
     {{vite}} build src/runtime
 
@@ -68,7 +77,7 @@ start id: compile build-apps
 
 # 产一个应用的安装器：先产它那份包，再裹成每用户的 setup.exe（release/apps/<id>-Setup-<版本>.exe）。
 # 契约见 src/apps/specs/package.md PK-031~035；makensis 用 electron-builder 缓存里那份。
-app-installer id:
+app-installer id: build-libs
     node code/build-apps.mjs {{id}}
     node code/make-app-installer.mjs {{id}}
 
@@ -78,16 +87,16 @@ site port='4321':
     node code/serve-site.mjs {{port}}
 
 # 类型检查：node 侧与 web 侧两个 tsconfig
-typecheck:
+typecheck: build-libs
     {{bin}}/tsc --noEmit -p tsconfig.node.json
     {{bin}}/tsc --noEmit -p tsconfig.web.json
 
 # 全部单测
-test:
+test: build-libs
     {{vitest}} run
 
 # 规格册编号与用例编号的双向差集
-casecov:
+casecov: build-libs
     {{vitest}} run spec-coverage
 
 # 提交前的一轮：类型 + 单测 + 册子差集
@@ -101,7 +110,7 @@ shot: compile build-apps
 
 # 从范本造一个新应用：just new-app hello 你好
 # 复制 templates/app → src/apps/<id>、换掉三处名字、重链 workspaces、只产这一个应用的包
-new-app id *name:
+new-app id *name: build-libs
     node code/new-app.mjs {{id}} {{name}}
     npm install
     node code/build-apps.mjs {{id}}
@@ -148,9 +157,9 @@ verify-installer:
     node code/verify-installer.mjs
 
 # 真编码那一路：要本机 ffmpeg 与真素材
-e2e:
+e2e: build-libs
     VCP_E2E=1 {{vitest}} run e2e
 
 # 真 wslc 只读命令那一路：要本机有 wslc
-wsld-real:
+wsld-real: build-libs
     AIRSHIP_WSLD_INTEGRATION=1 {{vitest}} run src/apps/wsld/tests/real.test.ts

@@ -70,4 +70,12 @@ export interface AppMeta {
    * 声明了才拿得到路径，也只有这些路径能进 proc 白名单。
    */
   tools?: ToolName[]
+  /**
+   * 应用自带的后台程序在**包内**的入口路径（如 `'backend/index.js'`）。
+   *
+   * 写了它，runtime 才会在需要时把这个条目从归档里解出来、用独立 Node 进程跑起来
+   * （capabilities 里同时要有 `'backend'`，否则前端调用被拒）。不写 = 这个应用没有后台。
+   * 形状规矩（包内相对路径、`.js`/`.mjs`/`.cjs` 结尾）与包清单同一条，见 packageRules.ts。
+   */
+  backend?: string
 }

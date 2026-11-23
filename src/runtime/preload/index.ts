@@ -123,6 +123,10 @@ const bridge: AirshipBridge = {
     path: (name: ToolName) => call<string | null>('tools:path', needApp(), name)
   },
 
+  backend: {
+    invoke: <T>(method: string, payload?: unknown) => call<T>('backend:invoke', needApp(), method, payload)
+  },
+
   tray: {
     set: (state: TrayState) => call<void>('tray:set', needApp(), state),
     clear: () => call<void>('tray:clear', needApp())
