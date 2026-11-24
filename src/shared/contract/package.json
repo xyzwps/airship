@@ -1,6 +1,6 @@
 {
   "name": "@airship/contract",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "runtime 与应用之间的契约：能力表、清单类型、拒绝措辞、注册与包形状的规矩",
   "license": "MIT",
   "type": "module",

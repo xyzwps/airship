@@ -1,7 +1,7 @@
 # __APP_NAME__
 
-create-airship-app 的 minimal 模板：一扇 airship 窗口，纯前端，`capabilities` 是空数组——
-不碰文件、不跑进程、不上网，先跑起来再说。
+create-airship-app 的 minimal 模板：一扇 airship 窗口，带一份最小的随包后台——
+计数住在 `src/backend.ts` 的内存里，点一下是一次请求-回话。不碰文件、不跑进程、不上网。
 
 ```
 npm install

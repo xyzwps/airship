@@ -26,3 +26,8 @@
   color: var(--fg);
   cursor: pointer;
 }
+
+.app .error {
+  margin: 0;
+  color: var(--danger);
+}

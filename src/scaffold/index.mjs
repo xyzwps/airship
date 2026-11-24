@@ -26,7 +26,7 @@ const TEMPLATES = join(HERE, 'templates')
 const USAGE = `用法：npx create-airship-app <目录> [--template minimal|todo]
 
   目录名就是应用 id：小写字母开头，1~32 位小写字母、数字与连字符。
-  --template minimal  纯前端的最小起点（默认）
+  --template minimal  最小起点：一扇窗 + 一份内存计数的后端（默认）
   --template todo     前端 + 后端：数据落磁盘 JSON 的待办清单
   界面显示名写在 src/app.ts 的 name 里，起完项目自己改，中文随便。`
 

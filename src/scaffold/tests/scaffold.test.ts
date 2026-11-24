@@ -57,15 +57,15 @@ describe('create-airship-app', () => {
     }
   })
 
-  it('minimal 模板：显示名落成 id（改不改归 src/app.ts 里用户自己），且不带后端', () => {
+  it('minimal 模板：显示名落成 id（改不改归 src/app.ts 里用户自己），带一份最小后端', () => {
     const work = mkdtempSync(join(tmpdir(), 'airship-scaffold-'))
     const res = run(['ping'], work)
     expect(res.status, res.stderr).toBe(0)
     const appTs = readFileSync(join(work, 'ping', 'src', 'app.ts'), 'utf8')
     expect(appTs).toContain("name: 'ping'")
     expect(appTs).toContain('capabilities: []')
-    expect(existsSync(join(work, 'ping', 'src', 'backend.ts')), 'minimal 不带后端').toBe(false)
-    expect(existsSync(join(work, 'ping', 'src', 'backend.js')), 'minimal 不带后端').toBe(false)
+    expect(existsSync(join(work, 'ping', 'src', 'backend.ts')), 'minimal 也带后端——计数就在它内存里').toBe(true)
+    expect(existsSync(join(work, 'ping', 'src', 'backend.js')), '后端入口只有一份 ts 源').toBe(false)
     // 模板里那份叫 gitignore（npm pack 不收 .gitignore），落项目时必须改名就位
     const ignore = readFileSync(join(work, 'ping', '.gitignore'), 'utf8')
     const lines = new Set(ignore.split('\n').map((s) => s.trim().replace(/\/$/, '')))

@@ -432,7 +432,7 @@ runtime 自己没有界面：`createDesktopShortcut` / `createStartMenuShortcut`
 构建期打进各家的包），所以不再需要"排除某个 node_modules 目录"那几条。
 
 **版本号规矩**（正式约定在 [version.md](version.md)）：根 `package.json` 与 `src/runtime/package.json` **保持一致**——它们是同一个发布物，
-就该念同一个数（现 0.4.3）。安装包文件名与 exe 文件版本取 `src/runtime/package.json` 的 version
+就该念同一个数（现 0.4.4）。安装包文件名与 exe 文件版本取 `src/runtime/package.json` 的 version
 （出包项目根是 `src/runtime`）；包清单里的 `sdkVersion` 取 `src/sdk/package.json` 的 version
 （`code/build-apps.mjs`）——那是 npm 发布线（基础包四件套 `@airship/contract`/`@airship/sdk`/`@airship/cli`/`create-airship-app`
 一致演进）的版本，与安装器线的 runtime 版本是两本账，混着取等于清单在说谎。各应用自己的 `package.json` 版本**独立演化**，
