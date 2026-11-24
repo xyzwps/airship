@@ -109,10 +109,37 @@ pre {
   line-height: 1.7;
   margin: 0;
   border: 1px solid rgba(255, 255, 255, .07);
+  position: relative;
 }
 pre code { background: none; border: 0; padding: 0; color: inherit; font-size: inherit; }
 pre .c { color: #9a97ad; }
 pre .k { color: #ffb28a; }
+/* 高亮三族：关键字与 CSS 属性名同色，字符串绿，数字粉——都是品牌色板里的 */
+pre .tok-kw, pre .tok-prop { color: #98a5e9; }
+pre .tok-str { color: #80b6a8; }
+pre .tok-num { color: #eba6b8; }
+
+/* 复制键：平时不占眼，悬浮在代码块上或键盘聚焦到它时才亮；键本身在热区里 */
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--code-ink);
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 6px;
+  padding: 2px 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+pre:hover .copy-btn,
+pre:focus-within .copy-btn,
+.copy-btn:focus-visible,
+.copy-btn.done { opacity: 1; }
+.copy-btn:hover { background: rgba(255, 255, 255, .18); }
 
 .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
 .skip {
