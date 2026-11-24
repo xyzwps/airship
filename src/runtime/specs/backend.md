@@ -34,6 +34,7 @@
 #### Scenario: BE-007 起后端时把三个位置原样交给它
 - **WHEN** runtime 为一个应用起后端程序
 - **THEN** 交给它的启动环境里读得到 `AIRSHIP_APP_ID`（这个应用的 id）、`AIRSHIP_DATA_DIR` 与 `AIRSHIP_CACHE_DIR`（它自己那族数据与缓存目录的绝对路径）
+- **AND** 起的是磁盘上摊平落好的那份影子，文件名以 `.cjs` 结尾——扩展名自带 CommonJS 声明，落点哪怕在一份声明 `"type": "module"` 的 package.json 的目录树里（外部作者 dev 模式的落点就在项目里），也照旧起得来
 
 #### Scenario: BE-008 迟迟不报就绪，起动作废且进程不留
 - **WHEN** 后端入口起了但始终没发第一条就绪握手

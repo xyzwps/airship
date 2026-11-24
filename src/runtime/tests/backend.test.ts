@@ -238,7 +238,7 @@ describe('后端是自己的一份进程，拿到的目录只有它应用那一�
     expect(child.options.env?.AIRSHIP_APP_ID).toBe('todo')
     expect(child.options.env?.AIRSHIP_DATA_DIR.replace(/\\/g, '/')).toMatch(/apps\/todo\/data$/)
     expect(child.options.env?.AIRSHIP_CACHE_DIR.replace(/\\/g, '/')).toMatch(/apps\/todo\/cache$/)
-    expect(child.file.replace(/\\/g, '/')).toMatch(/apps\/todo\/backend\/backend\.js$/)
+    expect(child.file.replace(/\\/g, '/')).toMatch(/apps\/todo\/backend\/backend\.cjs$/)
     expect(existsSync(child.file), 'fork 吃的是落盘的真文件').toBe(true)
     expect(readFileSync(child.file, 'utf8'), '落的就是包里那份后端入口').toContain('ready')
   })

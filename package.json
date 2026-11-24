@@ -1,6 +1,6 @@
 {
   "name": "airship",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "private": true,
   "description": "飞船 —— airship runtime 与 vcp、墨读、打勾勾等自用应用",
   "author": "xyzwps",

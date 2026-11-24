@@ -24,8 +24,11 @@ import { log } from './logging'
  * （源项目里的 `src/backend.ts|js` 由产包流水按约定编进来）。
  *
  * 为什么不直接 fork 包里的路径：fork 要的是磁盘上的真文件，而包是一个 zip 归档。
- * 所以启动前把包根那份 `backend.js` 落到 `<userData>/apps/<id>/backend/`——
+ * 所以启动前把包根那份 `backend.js` 落到 `<userData>/apps/<id>/backend/backend.cjs`——
  * 单文件是因为产包期已经把它 import 的东西全 bundle 进去了；
+ * 影子叫 `.cjs` 是因为扩展名自带 CommonJS 声明：dev 模式的落点在作者项目树里，
+ * 项目根 package.json 的 `"type": "module"` 会顺着目录找上来，`.js` 会被当 ESM 加载，
+ * bundle 出来的那份第一行 `require` 就当场死掉（2026-11-24 外部项目实测复现）。
  * 这份落盘与任务栏图标同族——是可再生的派生物，不是应用数据。
  *
  * 进程间只有这一种对话（形状是档1样件实测钉下的）：
@@ -65,6 +68,12 @@ export function backendRootDir(id: AppId): string {
 }
 
 /**
+ * 影子在磁盘上的文件名：归档条目照旧叫 `backend.js`（那是约定），落盘却换成 `.cjs`——
+ * 扩展名自带 CommonJS 声明，落在哪棵树里都不受周围 package.json 的 `type` 影响。
+ */
+const EXTRACTED_FILE = 'backend.cjs'
+
+/**
  * 把包根那份 backend.js 落到磁盘，返回它的绝对路径。
  *
  * 每次都重写字节：包是活动包表里那份唯一的真，落盘只是它的影子——
@@ -73,7 +82,7 @@ export function backendRootDir(id: AppId): string {
 function extractBackend(archive: string, id: AppId): string {
   const raw = readArchiveEntry(archive, PACKAGE_BACKEND_ENTRY)
   if (raw === null) throw new Error(backendEntryUnreadable(id, PACKAGE_BACKEND_ENTRY))
-  const target = join(backendRootDir(id), PACKAGE_BACKEND_ENTRY)
+  const target = join(backendRootDir(id), EXTRACTED_FILE)
   mkdirSync(join(backendRootDir(id)), { recursive: true })
   writeFileSync(target, Buffer.from(raw))
   log.info(id, '后端程序已落盘', { entry: PACKAGE_BACKEND_ENTRY })
