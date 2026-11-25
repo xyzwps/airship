@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { SCHEMA_VERSION, WINDOWS_ICON_NAME, notRegistered } from '@airship/contract'
 
 /**
- * SH-015 / SH-016 / SH-018：窗口尺寸与摆放；BR-011：建窗口那一刻的安全参数；
+ * SH-015 / SH-016 / SH-018：窗口尺寸与摆放；建窗口那一刻的安全参数（webSecurity 一概不豁免）；
  * SH-010 / SH-034 / SH-035：任务栏上那颗按钮的身份、图标与重启动作。
  *
  * 这里跑的是**真的 openAppWindow**，只把 BrowserWindow 换成记账的替身——
@@ -182,20 +182,19 @@ describe('窗口尺寸只认清单，位置与尺寸都不记', () => {
 })
 
 /**
- * BR-011：`net` 能力换到的那一档跨源豁免（判据见 `src/runtime/specs/bridge.md`）。
+ * 每个应用窗口同一套收紧的 webPreferences（原 BR-011 的豁免随 `net` 能力位整族退场，注记见 bridge.md 末尾）。
  *
- * 这里钉的是建窗口那一刻传进去的安全参数：窗口构造之后就没机会再改了，
- * "声明了 net 的应用在自己窗口里读得到不回跨源许可的 http 服务响应"的前提就在这一位上。
- * 清单是真的（setup.ts 把仓库的 `app.ts` 落成归档并注册进活动包表）：s3 声明了 net，dagogo 没有。
+ * 这里钉的是建窗口那一刻传进去的安全参数：要连外部服务的应用把请求交给自带的后台进程，
+ * 没有任何窗口需要豁免同源策略——豁免这个概念本身不该再存在。
  */
-describe('声明了 net 的应用窗口豁免同源策略', () => {
-  it('BR-011 只有声明 net 的应用窗口豁免同源策略，其余窗口照旧', () => {
+describe('所有窗口的同源策略一概不豁免', () => {
+  it('建出来的每一扇应用窗口都带着默认收紧的 webSecurity', () => {
     resetWindows()
     openAppWindow('s3')
-    expect(lastWindow().options.webPreferences?.webSecurity, 's3 声明了 net，它的窗口该豁免同源策略').toBe(false)
-
     openAppWindow('dagogo')
-    expect(lastWindow().options.webPreferences?.webSecurity, 'dagogo 没声明 net，同源策略必须照旧').toBe(true)
+    for (const win of FakeBrowserWindow.created) {
+      expect(win.options.webPreferences?.webSecurity, '没有窗口该关掉同源策略').not.toBe(false)
+    }
   })
 })
 

@@ -22,6 +22,7 @@ import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build, transformWithOxc } from 'vite'
+import { compileBackend } from '@airship/cli'
 import { pack, SCHEMA_VERSION } from './pack-app.mjs'
 import { appIds, SRC_APPS } from './app-dirs.mjs'
 
@@ -79,6 +80,10 @@ async function buildOne(dirId, work) {
   // （包根那份 Windows 外壳用的 icon.ico 由产包器从这张源图派生，见 PK-036）
   const icon = readdirSync(join(SRC_APPS, dirId)).find((n) => /^icon\.(svg|png|jpe?g|webp)$/.test(n))
   cpSync(join(SRC_APPS, dirId, icon), join(built, icon))
+
+  // 后端按约定走：应用目录里有 backend.ts 就由流水（@airship/cli 那份，外部作者同路）
+  // 编成包根那份 backend.js；没有就什么都不做。改这个文件要重跑 just build-apps 才进包
+  await compileBackend(join(SRC_APPS, dirId), built)
 
   const manifest = await readManifest(dirId, work)
   const { file } = await pack({ srcDir: built, outRoot: OUT_ROOT, manifestText: JSON.stringify(manifest, null, 2) })

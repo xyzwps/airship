@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events'
 import type { Capability } from '@airship/contract'
 
 /**
- * BE-001 ~ BE-013：应用自带后台程序的通道与生命周期。
+ * BE-001 ~ BE-014：应用自带后台程序的通道与生命周期。
  *
  * 与 bridge.test.ts 同一套路：跑**真的 ipc.ts 与真的后端宿主**，只把两端换掉——
  * electron 的 `utilityProcess.fork` 换成一个可编程的假进程（桥的形状照 d.ts：
@@ -173,7 +173,7 @@ const NOTE = 106
 const base = { description: '带后端的示例应用', capabilities: [] as Capability[] }
 
 // 两份额外夹具：todo / note 的包根带 backend.js（有后台由包形状判）；
-// dagogo 用真清单那份——包根没有条目，正是 BE-001 要念约定的对象。
+// dagogo 用真清单那份——夹具本就不往归档里放应用代码，包根没有那个条目，正是 BE-001 要念约定的对象。
 const root = packageFixtureRoot()
 for (const [id, name] of [
   ['todo', '待办'],
@@ -183,16 +183,19 @@ for (const [id, name] of [
   if (problems.length > 0) throw new Error(`后端夹具注册失败 ${id}：${problems.join('；')}`)
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   shellState.owners.clear()
   shellState.owners.set(VCP, 'vcp')
   shellState.owners.set(DAGOGO, 'dagogo')
   shellState.owners.set(TODO, 'todo')
   shellState.owners.set(NOTE, 'note')
-  shellState.sent.length = 0
   fake.children.length = 0
   fake.autoReady = true
   backendHost.resetForTests()
+  // reset 收掉的进程会补一条 exit（BE-014：被收的也念 backend:exited）——
+  // 让那条微任务先落地再清台账，否则上一轮留着的活后端会漏进下一条用例的 sent
+  await tick()
+  shellState.sent.length = 0
 })
 
 afterEach(() => {
@@ -312,6 +315,20 @@ describe('后端主动推的东西只回它自己那扇窗', () => {
     lastChild().send({ event: true, method: 'changed', payload: { n: 1 } })
     expect(shellState.sent).toEqual([
       { owner: 'todo', event: { kind: 'backend:event', method: 'changed', payload: { n: 1 } } }
+    ])
+  })
+
+  it('BE-014 后端进程退出，归属窗口收到 backend:exited', async () => {
+    const p = call('backend:invoke', TODO, 'todo', 'hang')
+    await tick()
+    // 事件任务型调用的结局只从事件来——先让窗口确实收到过一条，证明这扇窗在听
+    lastChild().send({ event: true, method: 'upload:part', payload: { job: 'j1', name: 'a.txt', done: 1, total: 3 } })
+    shellState.sent.length = 0
+
+    lastChild().die(137)
+    expect(reason(await p)).toBe(backendExited('hang'))
+    expect(shellState.sent, '在途的事件任务要靠这一条就地判死').toEqual([
+      { owner: 'todo', event: { kind: 'backend:exited' } }
     ])
   })
 })

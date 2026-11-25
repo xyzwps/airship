@@ -1,3 +1,4 @@
+import { once } from 'node:events'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
@@ -45,6 +46,17 @@ interface Reply {
   body: Uint8Array | null
 }
 
+export interface StreamGet {
+  bucket: string
+  key: string
+  /** 报出去的 content-length：演 300 MB 的对象不真去分配 300 MB（OS-064） */
+  totalBytes: number
+  /** 发了这么多字节就掐断连接，演下载到一半断了线（OS-063） */
+  cutAfterBytes?: number
+  /** 反复发的那一块；不给就是 64 KB 的零字节 */
+  chunk?: Uint8Array
+}
+
 let uploadSeq = 0
 
 export class FakeS3 {
@@ -56,6 +68,8 @@ export class FakeS3 {
   denyAll = false
   /** 置真就一律回 404，用来演"端点上没有" */
   missingAll = false
+  /** 置了就按块流式回这一份对象，并按 `cutAfterBytes` 演半路断线（OS-063 / OS-064） */
+  streamGet: StreamGet | null = null
 
   private readonly uploads = new Map<string, { bucket: string; key: string; parts: Map<number, Uint8Array>; type: string }>()
   private server: Server | null = null
@@ -109,9 +123,55 @@ export class FakeS3 {
     for (const [name, value] of Object.entries(req.headers)) {
       if (typeof value === 'string') headers[name.toLowerCase()] = value
     }
+
+    const cfg = this.streamGet
+    if (cfg !== null && method === 'GET') {
+      const seg = path.replace(/^\/+/, '').split('/')
+      if (seg[0] === cfg.bucket && seg.slice(1).join('/') === cfg.key) {
+        await this.streamObject(res, cfg)
+        return
+      }
+    }
+
     const reply = this.dispatch(method, path, url.searchParams, body, headers)
     res.writeHead(reply.status, reply.headers)
     res.end(reply.body === null ? undefined : Buffer.from(reply.body))
+  }
+
+  /**
+   * 按 content-length 报的数把对象流出去：一块一块反复写同一份 `chunk`，
+   * 演 300 MB 的大对象不真去分配那 300 MB（OS-064）；写了 `cutAfterBytes` 就把连接掐掉，
+   * 剩下的字节永远到不了——后端那边该念「连不上端点（」并删掉半份文件（OS-063）。
+   */
+  private async streamObject(res: ServerResponse, cfg: StreamGet): Promise<void> {
+    const found = this.buckets.get(cfg.bucket)?.get(cfg.key)
+    if (!found) {
+      res.writeHead(404, { 'content-type': 'application/xml' })
+      res.end(Buffer.from('<Error><Code>NoSuchKey</Code><Message>没有这个对象</Message></Error>'))
+      return
+    }
+    res.writeHead(200, {
+      'content-length': String(cfg.totalBytes),
+      'last-modified': new Date(found.mtime).toUTCString(),
+      ...(found.type === '' ? {} : { 'content-type': found.type })
+    })
+    const src = cfg.chunk ?? new Uint8Array(64 * 1024)
+    const cut = cfg.cutAfterBytes ?? cfg.totalBytes
+    const head = Math.min(cut, cfg.totalBytes)
+    let sent = 0
+    while (sent < head) {
+      const n = Math.min(src.byteLength, head - sent)
+      const more = res.write(Buffer.from(src.buffer, src.byteOffset, n))
+      sent += n
+      if (!more && sent < head) await once(res, 'drain')
+    }
+    if (cut < cfg.totalBytes) {
+      // 半路断：让已经发出的那一段先到对面，再拆连接
+      await new Promise((r) => setTimeout(r, 10))
+      res.destroy()
+      return
+    }
+    res.end()
   }
 
   private dispatch(method: string, path: string, query: URLSearchParams, body: Uint8Array, headers: Record<string, string>): Reply {

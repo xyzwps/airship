@@ -1,6 +1,6 @@
 {
   "name": "@airship/dagogo",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "打勾勾：每日清单与托盘徽标",
   "type": "module",

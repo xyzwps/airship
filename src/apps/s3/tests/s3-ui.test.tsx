@@ -5,14 +5,17 @@ import { FakeAirship, mountUi, type Mount } from '@airship/sdk/testing'
 import S3App from '../s3App.tsx'
 import { app } from '../app.ts'
 import { CURRENT_KEY, SOURCES_KEY, type Source } from '../connection.ts'
+import { handle as backendHandle, type BackendIo } from '../backendStore.ts'
 import { FakeS3, type Content, type SeedObject } from './helpers/fakeS3.ts'
 
 /**
  * OS 册子的影子：界面读得到哪句话、点下去变成什么。
  *
- * 网络那一边是 `helpers/fakeS3.ts` 那个内存端点——它是一个真起在 127.0.0.1 上的 HTTP 服务，
- * 按 S3 的线格式回话，所以签名、分段、XML 解析这一整条链是原样跑过的
- * （换 `globalThis.fetch` 拦不到：测试里 SDK 挑的是 Node 那一档传输）。
+ * 2026-11-24 传输整族搬进随包后端之后，这里的地基是同一份 `backendStore.handle`
+ * 接在 `FakeAirship` 的 backend 替身上——应用侧调的 `backend.invoke` 走的就是
+ * 真业务代码，网络那一边仍是 `helpers/fakeS3.ts` 那个真起在 127.0.0.1 上的假端点
+ * （签名、分段、XML 解析这一整条链原样跑过；换 `globalThis.fetch` 拦不到：
+ * 测试里 SDK 挑的是 Node 那一档传输），盘那一边是替身的内存卷（`volumeIo`）。
  *
  * 浏览器里那条传输——也就是出包后那个窗口真正用的那一条——不在这里验，
  * 归 `just shot` 连真 RustFS：上传、列层、详情、中文预览都在那张截图里看得见。
@@ -24,6 +27,10 @@ interface OpenOptions {
   seed?: Record<string, Record<string, SeedObject>>
   files?: Record<string, Content>
   picks?: Array<string[] | string | null>
+  /** 拖放名 → 本机路径的对照表，喂给 `fs.pathForFile`；表里没有的名字换出来是空串 */
+  dropPaths?: Record<string, string>
+  /** 后端按区间读本地字节前等多久——给"传输还在进行中"那族判据留出窗口 */
+  ioDelay?: number
   /** 设置里已经存过连接（用这台假端点的地址）；不给就是"第一次打开" */
   stored?: boolean
   /** 那个源在列表里的名字 */
@@ -40,10 +47,79 @@ interface Opened {
   host: string
   /** 设置里那一个源（名字与密钥由 open 造出来） */
   source: Source
+  /** 下载写完的字节数：落点路径 → 字节（大对象不真留字节，判数就判这里） */
+  written: Map<string, number>
 }
 
 const stoppers: Array<() => Promise<void>> = []
 const mounts: Mount[] = []
+
+/**
+ * 后端要碰盘的那几件事在内存卷上的形状：上传按路径从这里读，下载完成后写回它。
+ * 超过 4 MB 的只数字节不存（演 300 MB 的下载不真分配那 300 MB，OS-064 判的是数）；
+ * 断线撤单时落点清零——与真后端那份"半份文件都不留"同形（OS-063）。
+ */
+function volumeIo(fake: FakeAirship, written: Map<string, number>, ioDelay = 0): BackendIo {
+  const bytesOf = (p: string): Uint8Array | null => {
+    const hit = fake.vol.get(p)
+    if (hit === undefined) return null
+    return typeof hit === 'string' ? Buffer.from(hit, 'utf8') : hit
+  }
+  return {
+    fileSize: async (p) => (p === '' ? null : (bytesOf(p)?.byteLength ?? null)),
+    readRange: async (p, start, length) => {
+      if (ioDelay > 0) await new Promise((r) => setTimeout(r, ioDelay))
+      const b = bytesOf(p)
+      if (b === null) throw new Error(`读不到文件：${p}`)
+      return b.slice(start, start + Math.max(0, Math.min(length, b.byteLength - start)))
+    },
+    sink: (p) => {
+      const parts: Uint8Array[] = []
+      let total = 0
+      return {
+        append: async (chunk) => {
+          parts.push(chunk)
+          total += chunk.byteLength
+        },
+        finish: async () => {
+          written.set(p, total)
+          if (total <= 4 * MB) {
+            const merged = new Uint8Array(total)
+            let at = 0
+            for (const x of parts) {
+              merged.set(x, at)
+              at += x.byteLength
+            }
+            fake.seed(p, merged)
+          }
+          return total
+        },
+        abort: async () => {
+          written.delete(p)
+          fake.vol.delete(p)
+        }
+      }
+    }
+  }
+}
+
+/** 替身 runtime 与真业务后端的接线：网络在假端点，盘在内存卷 */
+function newFake(
+  options: { files?: Record<string, Content>; picks?: Array<string[] | string | null>; dropPaths?: Record<string, string>; ioDelay?: number } = {}
+): { fake: FakeAirship; written: Map<string, number> } {
+  const written = new Map<string, number>()
+  let io!: BackendIo
+  const fake = new FakeAirship({
+    id: app.id,
+    capabilities: app.capabilities,
+    files: options.files,
+    picks: options.picks,
+    dropPaths: options.dropPaths,
+    backend: (method, payload, ctl) => backendHandle(method, payload, io, ctl.event)
+  })
+  io = volumeIo(fake, written, options.ioDelay ?? 0)
+  return { fake, written }
+}
 
 async function open(options: OpenOptions = {}): Promise<Opened> {
   const s3 = new FakeS3(options.seed ?? { demo: {}, archive: {} })
@@ -51,7 +127,12 @@ async function open(options: OpenOptions = {}): Promise<Opened> {
   stoppers.push(() => s3.stop())
   const host = new URL(endpoint).host
 
-  const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities, files: options.files, picks: options.picks })
+  const { fake, written } = newFake({
+    files: options.files,
+    picks: options.picks,
+    dropPaths: options.dropPaths,
+    ioDelay: options.ioDelay
+  })
   const source: Source = {
     name: options.name ?? '本机',
     endpoint,
@@ -67,7 +148,7 @@ async function open(options: OpenOptions = {}): Promise<Opened> {
   const m = await mountUi(<S3App api={fake.api} />, { fake, confirm: options.confirm })
   mounts.push(m)
   await quiet(m)
-  return { m, fake, s3, endpoint, host, source }
+  return { m, fake, s3, endpoint, host, source, written }
 }
 
 /** 第一次打开：设置里一个源都没有，连接卡摊着 */
@@ -189,8 +270,11 @@ function cardIsOpen(m: Mount): boolean {
   return m.container.querySelector('#s3-sk') !== null
 }
 
-/** 拖进来那一族用的那颗文件：界面拿到的就是名字与内容，本机路径从头到尾没有出现过 */
-function droppedFile(name: string, body: string): File {
+/**
+ * 拖进来那一族用的那颗文件：真窗口里 drop 事件交出来的就是它，应用只拿它去换本机路径
+ * （`fs.pathForFile`，替身按名字查对照表）——字节由后端按路径自己读，这里的内容只是样子货。
+ */
+function droppedFile(name: string, body = 'x'): File {
   return new File([body], name, { type: 'text/plain' })
 }
 
@@ -326,7 +410,7 @@ describe('端点的话翻译成人能读的下一句', () => {
     const endpoint = await dead.start()
     await dead.stop()
 
-    const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities })
+    const { fake } = newFake()
     fake.settingsStore[SOURCES_KEY] = [{ name: '关掉的', endpoint, region: 'us-east-1', accessKeyId: 'k', secretAccessKey: 's' }]
     fake.settingsStore[CURRENT_KEY] = '关掉的'
     const m = await mountUi(<S3App api={fake.api} />, { fake })
@@ -604,17 +688,67 @@ describe('上传与下载：字节要一样多', () => {
     expect(m.text()).toContain('已下载 说明.txt')
   })
 
-  it('OS-015 一次接不下的，动手之前就拒', async () => {
-    const { m, fake } = await open({
-      seed: { demo: { 'huge.bin': { body: '', type: 'application/octet-stream', sizeHint: 300 * MB } }, archive: {} },
+  it('OS-063 下载到一半断了线，落点上不留半份文件', async () => {
+    const { m, fake, s3 } = await open({
+      seed: { demo: { '半份.txt': { body: '断之前到过一段', type: 'text/plain' } }, archive: {} },
+      picks: ['/fake/out/半份.txt']
+    })
+    // 报 128 KB、只发 1 KB 就拆连接：对面收到的就是一句断线
+    s3.streamGet = { bucket: 'demo', key: '半份.txt', totalBytes: 128 * 1024, cutAfterBytes: 1024 }
+    await enter(m, 'demo')
+    await tap(m, '[data-test="dl:半份.txt"]')
+    await until(m, () => m.text().includes('连不上端点（'), 3000)
+
+    expect(fake.vol.has('/fake/out/半份.txt')).toBe(false)
+    expect(m.text()).not.toContain('已下载')
+  })
+
+  it('OS-064 端点上报 300 MB 的对象照下载，没有拒收句', async () => {
+    const huge = 300 * MB
+    const { m, s3, written } = await open({
+      seed: { demo: { 'huge.bin': { body: '', type: 'application/octet-stream', sizeHint: huge } }, archive: {} },
       picks: ['/fake/out/huge.bin']
     })
+    // 假端点把同一块 64 KB 反复流到报的字节数：不真分配 300 MB，链路上的字节却是真的
+    s3.streamGet = { bucket: 'demo', key: 'huge.bin', totalBytes: huge }
     await enter(m, 'demo')
     await tap(m, '[data-test="dl:huge.bin"]')
+    await until(m, () => m.text().includes('已下载 huge.bin'))
 
-    expect(m.text()).toContain('这个对象有 300 MB，超过一次能接的 256 MB')
-    expect(fake.vol.has('/fake/out/huge.bin')).toBe(false)
+    expect(m.text()).not.toContain('超过')
+    expect(m.text()).not.toContain('拒')
+    expect(written.get('/fake/out/huge.bin')).toBe(huge)
   })
+
+  it('OS-065 后端进程半路没了，正在传的就地判失败', async () => {
+    const size = 40 * MB
+    const body = new Uint8Array(size)
+    const { m, fake } = await open({
+      picks: [['/fake/in/big.bin']],
+      files: { '/fake/in/big.bin': body },
+      // 每段字节前都等一下：传输确实"还在进行中"，退出那一刻才判得干净
+      ioDelay: 40
+    })
+    await enter(m, 'demo')
+    const up = m.field('upload') as HTMLButtonElement | null
+    expect(up, '找不到上传键').not.toBeNull()
+    await act(async () => {
+      up!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    for (let i = 0; i < 100 && !m.text().includes('正在上传'); i += 1) {
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 5))
+      })
+    }
+    expect(m.text()).toContain('正在上传')
+    await act(async () => {
+      fake.emit({ kind: 'backend:exited' })
+    })
+    await until(m, () => m.text().includes('后端程序中途退出，正在传的东西没传完'))
+
+    expect(m.text()).not.toContain('正在上传')
+    // 40 MB 的 multipart 走完整条假端点实测要 5 秒上下，默认 5 秒线太贴，给这条单开超时
+  }, 20_000)
 
   it('OS-041 拖着一份文件悬在窗口上、还没松手，念得出落点', async () => {
     const { m, s3 } = await open({
@@ -633,11 +767,13 @@ describe('上传与下载：字节要一样多', () => {
 
   it('OS-042 拖进来松手就传到当前那一层', async () => {
     const { m, s3 } = await open({
-      seed: { demo: { 'logs/keep.txt': { body: '已有\n', type: 'text/plain' } }, archive: {} }
+      seed: { demo: { 'logs/keep.txt': { body: '已有\n', type: 'text/plain' } }, archive: {} },
+      files: { '/fake/drop/甲.txt': '甲的内容\n', '/fake/drop/乙.txt': '乙的内容\n' },
+      dropPaths: { '甲.txt': '/fake/drop/甲.txt', '乙.txt': '/fake/drop/乙.txt' }
     })
     await enter(m, 'demo')
     await tap(m, '[data-test="dir:logs/"]')
-    await m.dropFiles('.s3', [droppedFile('甲.txt', '甲的内容\n'), droppedFile('乙.txt', '乙的内容\n')])
+    await m.dropFiles('.s3', [droppedFile('甲.txt'), droppedFile('乙.txt')])
     await until(m, () => m.text().includes('已上传 2 个对象'))
 
     expect(textOf(s3, 'demo', 'logs/甲.txt')).toBe('甲的内容\n')
@@ -669,14 +805,8 @@ describe('上传与下载：字节要一样多', () => {
   it('OS-045 拖进来的那一样读不出来就念这一句', async () => {
     const { m, s3 } = await open()
     await enter(m, 'demo')
-    // 文件夹在拖放里也是一颗"文件"，读它区间时浏览器抛回来的是它自己那句英文错
-    const dir = droppedFile('logs', '')
-    dir.slice = (() => ({
-      arrayBuffer: async () => {
-        throw new Error('NotFoundError')
-      }
-    })) as unknown as typeof dir.slice
-    await m.dropFiles('.s3', [dir])
+    // 文件夹在拖放里也是一颗"文件"：换不出本机路径（替身对照表里没有它），后端在它自己的盘上也读不到
+    await m.dropFiles('.s3', [droppedFile('logs')])
     await until(m, () => m.text().includes('拖进来的那一样读不出来，没上传'))
 
     expect(s3.requests.filter((r) => r.method === 'PUT').length).toBe(0)

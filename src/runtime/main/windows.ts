@@ -1,6 +1,6 @@
 import { BrowserWindow, app } from 'electron'
 import { join } from 'node:path'
-import { packageFor, unavailableReason, hasCapability } from './services/appRegistry'
+import { packageFor, unavailableReason } from './services/appRegistry'
 import { platformIdOf } from '@airship/contract'
 import { notRegistered, platformUnsupported } from '@airship/contract'
 import { targetsFor, type WindowRef } from './services/routing'
@@ -43,22 +43,18 @@ function preloadPath(): string {
 
 function baseWebPreferences(owner: Owner): Electron.WebPreferences {
   /**
-   * 声明了 `net` 的应用窗口豁免同源策略，别的窗口照旧。
+   * 每个应用窗口同一套收紧的默认：同源策略不豁免。
    *
-   * 为什么豁免这一档而不是让 runtime 代发请求：对象存储的响应里没有跨源许可
-   * （S3 与阿里云 OSS 都要按桶配 CORS 规则，实测 RustFS 的预检回 200 却一个 `Access-Control-Allow-*`
-   * 都不带），代发就得伪造别人的响应头。豁免给的是"这个窗口能读跨源响应"，
-   * 与那条能力位说的原本是同一件事，且保住了 SDK 的流式上传与分块下载。
-   * 顺带这一档也让 `airship://`（安全上下文）能连 `http://` 的本地端点——
-   * 混合内容的拦截跟着同源策略一起放开，这条是实测出来的，见 BR-011。
-   * 放宽的只有这一个窗口的这一条：`sandbox`、`contextIsolation`、`nodeIntegration` 一概不动。
+   * 从前声明了 `net` 的窗口会换到 `webSecurity: false` 那一档（对象存储的响应没有跨源许可，
+   * 渲染侧直连就得豁免，判据见已删除的 BR-011 注记）。那条能力位整族退场后没有窗口需要豁免——
+   * 要连外部服务的应用把请求交给自带的后台进程（Node 侧，不受同源策略与 CSP 管），
+   * 窗口本身只剩包内的东西。
    */
   return {
     preload: preloadPath(),
     sandbox: true,
     contextIsolation: true,
     nodeIntegration: false,
-    webSecurity: !hasCapability(owner, 'net'),
     spellcheck: false,
     additionalArguments: [`--airship-app=${owner}`]
   }

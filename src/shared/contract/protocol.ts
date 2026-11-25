@@ -94,18 +94,6 @@ export type Capability =
   | 'clipboard'
   /** 写日志（日志按应用分命名空间） */
   | 'log'
-  /**
-   * 应用在自己的窗口里发网络请求。
-   *
-   * 这是唯一一个**不经过桥**的能力位：请求由应用的文档自己发（fetch），
-   * runtime 只做两件事——产包时按清单给它那条放宽了 `connect-src` 的 CSP，
-   * 建窗口时按清单给它豁免同源策略。
-   * 为什么不做成"runtime 代发请求"的接口：对象存储的响应里没有跨源许可
-   * （要按桶配 CORS 规则，S3 与阿里云 OSS 都这样），runtime 代发就得伪造响应头，
-   * 而把传输交回渲染侧才能保住 SDK 的流式上传与分块下载。
-   * 边界仍然由清单钉住：没声明的应用拿到的还是收紧那条 CSP，同源策略照旧。
-   */
-  | 'net'
 
 /**
  * 能力位的界面说法。首次直跑一个陌生包时要把它念给人听——capabilities 是授权面，
@@ -122,8 +110,7 @@ export const CAPABILITY_LABEL: Record<Capability, string> = {
   tray: '占托盘',
   notify: '发系统通知',
   clipboard: '读写剪贴板',
-  log: '写日志',
-  net: '自己连外部服务'
+  log: '写日志'
 }
 
 /**
@@ -243,8 +230,24 @@ export type ShellEvent =
   | { kind: 'tray:click' }
   | { kind: 'window:maximized'; value: boolean }
   | { kind: 'backend:event'; method: string; payload?: unknown }
+  /**
+   * 应用自带的后台进程没了（崩的，或被 runtime 收掉的）。
+   * 在途的 backend:invoke 会各自收到拒绝那句；但"事件任务"型调用（提交后靠
+   * backend:event 收进度的那种）没有回话可等——这个事件就是让它们就地失败的信号。
+   */
+  | { kind: 'backend:exited' }
 
 export type ShellEventListener = (event: ShellEvent) => void
+
+/**
+ * 拖放/选择事件里浏览器交出来的那一颗文件——契约只认换路径用得上的那几个字段。
+ *
+ * 真身是 DOM 的 `File`（形状比这个宽）；契约层不引整棵 DOM 类型树，与它不引 Electron 同一个道理。
+ */
+export interface DroppedFile {
+  readonly name: string
+  readonly size: number
+}
 
 /**
  * 应用侧看到的表面（`window.airship`）。
@@ -297,6 +300,14 @@ export interface AirshipBridge {
      * 应用必须在自己的清单里声明了该命名空间，否则主进程拒绝。
      */
     resolveInShared(ns: SharedNamespace, ...segments: string[]): Promise<string>
+    /**
+     * 拖放/选择事件里那个 File 对象对应的本机路径；换不出路径（JS 自造、没盘上真身）就是空字符串。
+     *
+     * 整件事留在渲染进程内：preload 用 Electron 的 `webUtils.getPathForFile` 就地算，
+     * 不过桥、不占 fs 能力位——它只是"读出浏览器已经给你的那个对象的名字"，
+     * 能不能读那份文件仍由 fs.read / fs.write 的闸门说了算。
+     */
+    pathForFile(file: DroppedFile): string
   }
 
   proc: {

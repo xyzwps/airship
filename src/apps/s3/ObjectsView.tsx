@@ -1,6 +1,7 @@
 import { type JSX } from 'react'
 import { Icon } from '@iconify/react'
-import { formatSize, formatTime, type ObjectRow } from './client.ts'
+import { formatSize, formatTime } from './display.ts'
+import type { ObjectRow } from './backendStore.ts'
 import './icons.ts'
 
 /**

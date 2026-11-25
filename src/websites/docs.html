@@ -261,8 +261,8 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
               <div class="dg-group">
                 <div class="dg-g">网络</div>
                 <div>
-                  <div class="dg-chips"><span class="dg-chip bypass">net —— 唯一一个不经桥</span><span class="dg-chip">fetch 由应用自己的文档发</span></div>
-                  <p class="dg-why">对象存储的响应里没有跨源许可，代发就得伪造别人的响应头。runtime 只做两件事：产包时按清单给它放宽 <code>connect-src</code> 的那条 CSP，建窗口时给它豁免同源策略。没声明的应用拿到的还是收紧那条，同源策略照旧。</p>
+                  <div class="dg-chips"><span class="dg-chip bypass">没有网络能力位</span><span class="dg-chip">外连走随包自带的后台进程</span></div>
+                  <p class="dg-why">窗口不发请求：要连外部服务的应用随包带一份 <code>backend.js</code>，请求由那个独立进程发，CSP 与同源策略一概不放宽。"有没有后台"是包形状的事实，不是授权（见开发文档的后端一节）。</p>
                 </div>
               </div>
             </div>
@@ -281,7 +281,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
                 <div class="dg-cell rt"><b>主进程</b>从 argv 注册包 → <strong>活动包表</strong>（只装这次指来的那几份，不扫磁盘）· 按契约表实现每个方法 · 包协议 <code>airship://</code> · 单实例转发 · 关窗收子进程与托盘</div>
                 <div class="dg-cell rt"><b>不认识具体应用</b>名单来自命令行指来的包，不是写死的 id 表；契约层 <code>AppId = string</code>，运行期校验（AP-010 扫产品代码里的应用 id 字面量）</div>
                 <div class="dg-cell world"><b>磁盘</b><code>%APPDATA%\airship\apps\&lt;id&gt;\</code> 各家数据 · <code>library\</code> 共享书库 · 包落 <code>%LOCALAPPDATA%\airship\apps\&lt;id&gt;\</code></div>
-                <div class="dg-cell world"><b>外部</b>子进程 <code>ffmpeg</code> / <code>wslc</code> · 系统托盘 · 通知 · 剪贴板 · S3 兼容端点（<code>net</code> 那一档）</div>
+                <div class="dg-cell world"><b>外部</b>子进程 <code>ffmpeg</code> / <code>wslc</code> · 系统托盘 · 通知 · 剪贴板 · 外部服务（由随包自带的后台进程连，窗口不发请求）</div>
               </div>
             </div>
 
@@ -369,13 +369,13 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
               <tr><td><code>notify</code></td><td>系统通知</td><td>发系统通知</td></tr>
               <tr><td><code>clipboard</code></td><td>剪贴板</td><td>读写剪贴板</td></tr>
               <tr><td><code>log</code></td><td>写日志（按应用分命名空间）</td><td>写日志</td></tr>
-              <tr><td><code>net</code></td><td>应用在自己的窗口里发网络请求（唯一一个不经过桥的能力位，见下）</td><td>自己连外部服务</td></tr>
             </tbody>
           </table>
-          <h3><code>net</code> 为什么不经过桥</h3>
+          <h3>网络在哪里</h3>
           <p>
-            对象存储的响应里没有跨源许可（要按桶配 CORS，S3 与阿里云 OSS 都这样），runtime 代发就得伪造响应头，而把传输交回渲染侧才能保住流式上传与分块下载。所以请求由应用的文档自己发（<code>fetch</code>），runtime
-            只做两件事——产包时按清单给它那条放宽了 <code>connect-src</code> 的 CSP，建窗口时按清单给它豁免同源策略。边界仍由清单钉住：没声明的应用拿到的还是收紧那条 CSP，同源策略照旧。
+            能力表里没有网络这一行，也没有"不经桥"的例外：窗口不发请求。要连外部服务的应用随包带一份后端程序（<code>backend.js</code>），
+            runtime 为它单独起进程，请求从那个进程出去——对象存储的响应里没有跨源许可这类事实在因此与 runtime 无关，
+            CSP 与同源策略不为任何应用放宽。（这一族从前由 <code>net</code> 能力位开在渲染侧，2026-11-24 整族搬进后端进程。）
           </p>
           <h3>路径授权</h3>
           <p>
@@ -672,7 +672,7 @@ it('SH-006 只杀这个应用的任务，别人的任务一条都不碰', async 
             <li><strong>jsdom 没有 2D canvas</strong>：画布类判据只断言文字、状态与几何数字，"真画出来了"归 <code>just shot</code>。</li>
             <li><strong>整面 <code>vi.mock('@airship/sdk', ...)</code> 会把 SDK 的其他导出一起抹掉</strong>（踩过：<code>useTheme</code> 凭空不见）。要部分替换就用 <code>vi.mock('@airship/sdk', async (importOriginal) =&gt; ({ ...(await importOriginal()), ... }))</code>。</li>
             <li><strong>真素材跟着用例走</strong>，放在该区 <code>tests/fixtures/</code>；仓库根不留 <code>fixtures/</code>。</li>
-            <li><strong>需要真环境的用例门控</strong>：按环境变量跳过（<code>VCP_E2E=1</code>、<code>AIRSHIP_WSLD_INTEGRATION=1</code>），标题里照样带编号——静态扫描算它已实现，跑没跑由那档变量决定。外部服务的替身要<strong>被证明真接住了请求</strong>：S3 那条链路起一个真跑在 <code>127.0.0.1</code> 上的假 S3 服务，因为换 <code>globalThis.fetch</code> 拦不到 AWS SDK，早期版本因此把请求发到了真端点。</li>
+            <li><strong>需要真环境的用例门控</strong>：按环境变量跳过（<code>VCP_E2E=1</code>、<code>AIRSHIP_WSLD_INTEGRATION=1</code>），标题里照样带编号——静态扫描算它已实现，跑没跑由那档变量决定。外部服务的替身要<strong>被证明真接住了请求</strong>：S3 那条链路起一个真跑在 <code>127.0.0.1</code> 上的假 S3 服务——网络活在包自带后端进程里的 AWS SDK 上过，拦调用方全局对象的 <code>fetch</code> 拦不到它，早期版本因此把请求发到了真端点。</li>
           </ul>
 
           <h2 class="sub" id="verify">三档验证</h2>

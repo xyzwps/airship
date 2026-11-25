@@ -49,4 +49,12 @@ describe('渲染侧拿不到 ipcRenderer', () => {
     expect(preloadSource).not.toContain('airshipShell')
     expect(preloadSource).toContain("ipcRenderer.on('airship:event'")
   })
+
+  it('BR-012 拖放文件换路径只调 webUtils，桥的这一侧不通主进程', () => {
+    // 实现就一行：webUtils.getPathForFile 就地算。一旦它变成 ipcRenderer.invoke，
+    // "读出的只是浏览器已经给你的对象的名字"就变味成了一条要过闸门的通道。
+    expect(preloadSource).toMatch(/pathForFile:\s*\(file: File\) => webUtils\.getPathForFile\(file\)/)
+    const ipcSource = readFileSync(join(__dirname, '..', 'main', 'ipc.ts'), 'utf8')
+    expect(ipcSource, '主进程不该登记这条通道').not.toMatch(/pathForFile/)
+  })
 })

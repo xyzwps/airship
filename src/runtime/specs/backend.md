@@ -65,6 +65,11 @@
 - **WHEN** vcp 的后端主动推一条事件
 - **THEN** vcp 的窗口收到一条 `backend:event`，method 与 payload 原样；别的应用的窗口一条都收不到
 
+#### Scenario: BE-014 后端进程退出，归属窗口收到 backend:exited
+- **WHEN** 后端进程带着还在途的事件任务退出了（崩的或被收的都算）
+- **THEN** 归属窗口收到一条 `backend:exited`
+- **AND** 在途的回话型调用各自听到的还是 BE-009 那句，两路互不顶替
+
 <!--
   BE-006 于 2026-11-23 删除：backend 退出能力位与清单字段，改走 src/backend.ts|js → 包根 backend.js 的约定
   （package.md PK-040 / PK-041），"声明了能力却没写入口"这条配对契约失去了对象；

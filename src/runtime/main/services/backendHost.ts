@@ -189,6 +189,8 @@ function beginStart(app: AppId, wakeMethod: string): Promise<LiveBackend> {
       if (live.get(app) === be) live.delete(app)
       for (const p of be.pending.values()) p.reject(new Error(backendExited(p.method)))
       be.pending.clear()
+      // 事件任务型调用没有回话可等（提交就已应答）——靠这个事件让渲染侧把在途的活儿就地判死
+      emit?.(app, { kind: 'backend:exited' })
       if (!started) {
         started = true
         reject(new Error(backendExited(wakeMethod)))

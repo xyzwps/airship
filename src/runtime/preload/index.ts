@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AirshipBridge,
   AppId,
@@ -104,7 +104,9 @@ const bridge: AirshipBridge = {
     copy: (src: string, dest: string) => call<void>('fs:copy', needApp(), src, dest),
     resolveInData: (...segments: string[]) => call<string>('fs:resolveInData', needApp(), segments),
     resolveInShared: (ns: SharedNamespace, ...segments: string[]) =>
-      call<string>('fs:resolveInShared', needApp(), ns, segments)
+      call<string>('fs:resolveInShared', needApp(), ns, segments),
+    // 就地算，不过桥：webUtils 是 Electron 给 sandbox 渲染侧的 API（contextBridge 函数收 File 原对象，见官方用法）
+    pathForFile: (file: File) => webUtils.getPathForFile(file)
   },
 
   proc: {

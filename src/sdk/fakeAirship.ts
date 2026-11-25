@@ -16,6 +16,7 @@ import type {
   AppPaths,
   Capability,
   DirEntry,
+  DroppedFile,
   FileStat,
   NotifyOptions,
   OpenFilesOptions,
@@ -83,8 +84,20 @@ export interface FakeOptions {
   /**
    * 假后端的应答：按 method 给值（可异步）。不装的话 invoke 会喊出来——
    * 缺什么要响亮，别把"没装后端"吞成"后端回了 undefined"。
+   * ctl.event 模拟后端主动推事件（backend:event 只给本窗口，与 backendHost 同一条通道）。
    */
-  backend?: (method: string, payload: unknown) => unknown | Promise<unknown>
+  backend?: (method: string, payload: unknown, ctl: BackendCtl) => unknown | Promise<unknown>
+  /**
+   * 拖放名 → 本机路径的对照表，喂给 fs.pathForFile：
+   * 真 runtime 里这个名字由浏览器在 drop 事件里给（webUtils.getPathForFile），
+   * 表里没有的就是空字符串——与"JS 自造的 File 没有盘上真身"同形。
+   */
+  dropPaths?: Record<string, string>
+}
+
+/** 用例模拟后端主动行为的把手 */
+export interface BackendCtl {
+  event(method: string, payload?: unknown): void
 }
 
 export class FakeAirship implements AirshipBridge {
@@ -223,7 +236,12 @@ export class FakeAirship implements AirshipBridge {
 
   /* ---------------- 契约实现 ---------------- */
 
-  async paths(): Promise<AppPaths> {
+  /**
+   * `on`/`paths`/`theme`/`setTheme` 写成箭头字段而不是类方法：
+   * `get api()` 是 `{ ...this }`——原型方法不会被展开带走，
+   * 应用从 `api.on(...)` 订事件时丢的就是这条通道。
+   */
+  readonly paths = async (): Promise<AppPaths> => {
     const shared: Partial<Record<SharedNamespace, string>> = {}
     for (const ns of this.sharedNamespaces) shared[ns] = this.sharedDir(ns)
     return {
@@ -236,15 +254,13 @@ export class FakeAirship implements AirshipBridge {
     }
   }
 
-  async theme(): Promise<ThemeSnapshot> {
-    return this.themeSnapshot()
-  }
+  readonly theme = async (): Promise<ThemeSnapshot> => this.themeSnapshot()
 
   /**
    * 改本应用的主题档。窗口观感族，**不占 settings 能力**——
    * 与主进程 theme:set 同一套规矩：写 'theme'/'lastResolved' 两个键，不广播。
    */
-  async setTheme(mode: ThemeSnapshot['mode'], resolvedHint?: 'light' | 'dark'): Promise<ThemeSnapshot> {
+  readonly setTheme = async (mode: ThemeSnapshot['mode'], resolvedHint?: 'light' | 'dark'): Promise<ThemeSnapshot> => {
     this.needString(mode, 'mode')
     if (!['light', 'dark', 'system'].includes(mode)) throw new Error(`不认识的主题档：${mode}`)
     this.settingsStore['theme'] = { mode }
@@ -419,7 +435,8 @@ export class FakeAirship implements AirshipBridge {
       const target = [base, ...clean].join('/')
       if (!FakeAirship.inside(base, target)) throw new Error(pathEscape(clean, `共享命名空间 ${namespace}`))
       return target
-    }
+    },
+    pathForFile: (file: DroppedFile): string => this.opts.dropPaths?.[file.name] ?? ''
   }
 
   readonly proc = {
@@ -479,7 +496,10 @@ export class FakeAirship implements AirshipBridge {
       // 与真机同判据：有没有后端看"包"，不看能力位——替身里 options.backend 没装就等于包里没有 backend.js
       if (!this.opts.backend) throw new Error(backendAbsent(this.id))
       this.backendCalls.push({ method: m, payload })
-      return (await this.opts.backend(m, payload)) as T
+      const ctl: BackendCtl = {
+        event: (em, ep) => this.emit({ kind: 'backend:event', method: em, payload: ep })
+      }
+      return (await this.opts.backend(m, payload, ctl)) as T
     }
   }
 
@@ -543,7 +563,7 @@ export class FakeAirship implements AirshipBridge {
     }
   }
 
-  on(listener: ShellEventListener): () => void {
+  readonly on = (listener: ShellEventListener): (() => void) => {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
   }

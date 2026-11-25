@@ -188,7 +188,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 `AppPaths.runtimeVersion` 是 runtime 版本。`SettingsScope = AppId`——runtime 自己不持有设置屏，
 主题这类窗口观感也落在应用自己那份设置文件里（由 `theme:set` 这条窗口面通道写，不占 settings 能力）。
 
-事件频道 `ShellEvent`：`proc:chunk` / `proc:exit` / `tray:click` / `window:maximized` / `backend:event`。
+事件频道 `ShellEvent`：`proc:chunk` / `proc:exit` / `tray:click` / `window:maximized` / `backend:event` / `backend:exited`。
 **没有 `theme:changed` 全局广播**——主题按应用各记各的（见 §10），不需要广播。
 
 ### 5.2 preload（`src/runtime/preload/`）
@@ -232,12 +232,11 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 | `notify` | 系统通知 |
 | `clipboard` | 剪贴板 |
 | `log` | 写日志（按应用分命名空间） |
-| `net` | 应用在自己窗口里发网络请求（唯一一个不经过桥的能力位，见下） |
 
-**`net` 为什么不经过桥**：对象存储的响应里没有跨源许可（要按桶配 CORS，S3 与阿里云 OSS 都这样），
-runtime 代发就得伪造响应头，而把传输交回渲染侧才能保住 SDK 的流式上传与分块下载。
-所以请求由应用的文档自己发（fetch），runtime 只做两件事——产包时按清单给它那条放宽了 `connect-src` 的 CSP，
-建窗口时按清单给它豁免同源策略。边界仍由清单钉住：没声明的应用拿到的还是收紧那条 CSP，同源策略照旧。
+**`net` 能力位已于 2026-11-24 整族退场**（连同按它放宽的 CSP 档与窗口同源豁免，判据注记见 `bridge.md` BR-011
+与 `app-model.md` AP-017 末尾）。它当初是为对象存储一个应用开的口子：端点响应里没有跨源许可，runtime 代发就得伪造响应头。
+退场的路线不是把口子收紧，而是把整段网络活搬出窗口——应用随包自带后端进程（下面一段），
+SDK 的流式上传与分块下载在后端进程的 HTTPS 模块上照跑，渲染侧既不发请求也不碰盘，CSP 与同源策略一概不需要为谁放宽。
 
 **后台程序不是能力位，也不进清单**：能力位收的是宿主代管的资源（文件、剪贴板、进程……），
 而"随包自带一段 Node 代码"是包的构成物——像原生应用自带的线程，不是向外求的授权。
@@ -334,12 +333,15 @@ runtime 侧不再有扫包、拖装、启动器卸载的代码。
 |---|---|---|---|---|---|---|
 | `books` | 墨读 | fs.read, fs.write, dialog, settings, shared, notify, clipboard, log | — | 全 | 是 | 600×800 |
 | `pdf` | PDF | fs.read, fs.write, dialog, settings, shared, notify, clipboard, log | — | 全 | 是 | 默认 |
-| `dagogo` | 打勾勾 | fs.read, fs.write, dialog, settings, tray, notify, log | — | 全 | 是 | 600×800 |
+| `dagogo` | 打勾勾 | dialog, settings, tray, notify, log | — | 全 | 是 | 600×800 |
 | `life` | 生命游戏 | （空） | — | 全 | 是 | 1000×720 |
 | `vcp` | vcp | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | ffmpeg | 全 | 是 | 默认 |
 | `wsld` | wsld | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | wslc | windows | 是 | 默认 |
 | `albedo` | Albedo | settings, dialog, fs.read, fs.write, clipboard | — | 全 | 是 | 1440×900 |
-| `s3` | S3 | net, settings, dialog, fs.read, fs.write, clipboard | — | 全 | 是 | 1180×760 |
+| `s3` | S3 | settings, dialog, clipboard | — | 全 | 是 | 1180×760 |
+
+`dagogo` 与 `s3` 各自带一份 `backend.ts`，产包后进包根 `backend.js`：盘的活与网络活都在自带的后端进程里做，
+窗口的清单不再为它们要 fs 或外连的口子（§6 末尾与 `backend.md`）。
 
 books 与 pdf 都声明 `sharedNamespaces: ['library']`，共用同一份书库。
 "默认"尺寸 = runtime 的 1100×740。`flush` 是 SDK 宿主给不留白（应用自己铺满整窗）。
@@ -352,7 +354,7 @@ books 与 pdf 都声明 `sharedNamespaces: ['library']`，共用同一份书库�
 
 **CSP 的一个坑**：`airship://` 下 `blob:` 的 URL 不再被 `'self'` 覆盖——foliate 注入的章节样式表是
 `blob:airship://books/…`，`style-src` 不写 `blob:` 就被拦掉（2026-11-07 截图走查抓到过一次）。
-CSP 由 SDK 产包时按清单注入（`net` 能力放宽 `connect-src`），应用的 `index.html` 里不写 CSP。
+CSP 由 SDK 产包时注入（产包一条、开发一条，不再按清单分档——`net` 退场的事，见 §6），应用的 `index.html` 里不写 CSP。
 
 归档读取用 fflate（`@airship/runtime` 的依赖）：`unzipSync(data, { filter })` 只解需要的那个条目，
 列条目名时 filter 一律返回 false，不解压内容。别改成整包 `unzipSync`——八个包全展开是白给的内存。

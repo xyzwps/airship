@@ -7,13 +7,15 @@ import DagogoApp from '../DagogoApp'
 import { isToday } from '../time'
 import { normalizeImportedTasks } from '../types'
 import { loadTasks } from '../storage'
+import { handle, type BackendIo } from '../backendStore'
 import type { Task } from '../types'
 
 /**
  * DG 册子（docs/specs/dagogo.md）。
  *
- * 打勾勾的全部数据都在应用自己的 data 目录里（dagogo.json），导出文件与手机版互读，
- * 托盘徽标与提示文字交给 runtime——三条都拿 FakeAirship 断言。
+ * 打勾勾的全部数据都在应用自己的 data 目录里（dagogo.json），写它的是应用自带的后端。
+ * 用例把**真后端的那份 `handle`** 接在 FakeAirship 的卷上跑——测的是盘上逻辑本身，
+ * 不是另抄的一份；导出文件与手机版互读，托盘徽标与提示文字交给 runtime——都拿 FakeAirship 断言。
  *
  * 托盘那张图是渲染侧用 canvas 画的（jsdom 没有 2D 上下文，图上的字归 `just shot`），
  * 所以只把它换成一张假图，断言仍落在假 runtime 收到的 `tray.set` 入参上。
@@ -25,11 +27,42 @@ vi.mock('@airship/sdk', async (importOriginal) => ({
   renderTrayIcon: async (text: string): Promise<string> => `data:image/png;base64,FAKE${text}`
 }))
 
-const DATA = '/fake/userData/apps/dagogo/data/dagogo.json'
-const CAPS = ['fs.read', 'fs.write', 'dialog', 'settings', 'tray', 'notify', 'log'] as const
+const DATA_DIR = '/fake/userData/apps/dagogo/data'
+const DATA = `${DATA_DIR}/dagogo.json`
+const CAPS = ['dialog', 'settings', 'tray', 'notify', 'log'] as const
+
+/** 后端的盘上事接到替身的卷上：同一份 vol，用例的 seed/text 断言照旧好使 */
+function fakeIo(fake: FakeAirship): BackendIo {
+  return {
+    dataPath: (name) => `${DATA_DIR}/${name}`,
+    readText: async (path) => {
+      const hit = fake.vol.get(path)
+      if (hit === undefined) return null
+      return typeof hit === 'string' ? hit : new TextDecoder().decode(hit)
+    },
+    writeText: async (path, text) => {
+      fake.vol.set(path, text)
+    },
+    copyFile: async (source, target) => {
+      const hit = fake.vol.get(source)
+      if (hit === undefined) throw new Error(`读不到 ${source}`)
+      fake.vol.set(target, hit)
+    },
+    removeFile: async (path) => {
+      fake.vol.delete(path)
+    }
+  }
+}
 
 function shell(files?: Record<string, string>, picks?: Array<string[] | string | null>): FakeAirship {
-  return new FakeAirship({ id: 'dagogo', capabilities: [...CAPS], files, picks })
+  const fake = new FakeAirship({
+    id: 'dagogo',
+    capabilities: [...CAPS],
+    files,
+    picks,
+    backend: (method, payload) => handle(method, payload, fakeIo(fake))
+  })
+  return fake
 }
 
 /** 按本地时刻造 ISO 串：换天判的是本地日历日，不是 UTC */

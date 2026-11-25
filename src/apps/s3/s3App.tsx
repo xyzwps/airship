@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
-import type { S3Client } from '@aws-sdk/client-s3'
 import type { AppApi } from '@airship/contract'
 import { useAppAutotest, useTheme } from '@airship/sdk'
 import { Icon } from '@iconify/react'
@@ -19,25 +18,14 @@ import {
 } from './connection.ts'
 import {
   COPY_SOURCE_LIMIT,
-  copyObject,
+  contentTypeOf,
   copyTooBigText,
-  createBucket,
-  createClient,
-  deleteObject,
-  dirMarkerExists,
-  errorText,
-  listBuckets,
-  listObjects,
-  presignGet,
-  putDirMarker,
+  joinKey,
   validateBucketName,
   validateDirName,
-  validateRename,
-  type BucketRow,
-  type ObjectPage,
-  type ObjectRow
-} from './client.ts'
-import { contentTypeOf, downloadObject, joinKey, sourceFromFile, sourceFromPath, uploadLocal, type ByteSource } from './transfer.ts'
+  validateRename
+} from './display.ts'
+import type { BucketRow, ObjectPage, ObjectRow } from './backendStore.ts'
 import './s3.css'
 
 /**
@@ -46,8 +34,14 @@ import './s3.css'
  * 三栏：左边一列桶，中间当前这一层的对象，右边选中那个对象的详情与预览。
  * 顶部一条选项栏：当前是哪个源、连接设置、刷新、上传、新建桶、新建目录。
  *
+ * 网络与磁盘都不在这个窗口里：每一次端点对话都是递给包自带后端进程的一次
+ * `backend.invoke`（连接那五个格子随载荷一起带过去，后端自己不记会话）。
+ * 从前这里靠 `net` 能力位在窗口里直连端点，2026-11-24 整族搬走——
+ * 传输两条来路（对话框选来的、拖进来松手的）也在这一步收成同一条：都换成本机路径。
+ *
  * 拖进来松手与「上传」那颗键是同一条路：落点都是当前那一层（判据见 `specs/s3.md` OS-041~045）。
  * 拖放听在窗口上而不是某一栏上，因为不接住的话 Electron 会自己去打开那个文件——整扇界面就没了。
+ * 那颗 File 只用来换本机路径（`api.fs.pathForFile`，不过桥、不占能力位），字节由后端自己按路径读。
  *
  * 连接卡与改名模态都是居中模态（盖在三栏之上）：那五个格子摊在栏下会把三栏整体往下推，
  * 而填一次连接是"改设置"那类动作，本来就该跟眼前的对象表隔开。
@@ -57,9 +51,8 @@ import './s3.css'
  * 源在前、「添加源」在最后，点一枚就换端点；「连接设置」改与删的都是当前这一个。
  *
  * 措辞是契约的一部分（见 `specs/s3.md`）：哪一句跟着哪个状态写死在这里，
- * 用例逐句比对，所以改一句话等于改一次契约。
- *
- * 一切网络请求由这个窗口自己发（清单里的 `net`），runtime 不代发也不改包里的东西。
+ * 用例逐句比对，所以改一句话等于改一次契约。后端抛回来的 error 已经是要念的那句人话，
+ * 这里原样上屏，不再过一遍翻译。
  */
 export default function S3App({ api }: { api: AppApi }): JSX.Element {
   const { resolved } = useTheme()
@@ -92,25 +85,89 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
   /** 拖着一份文件停在窗口里、还没松手时念的那句落点；空串就是没在拖 */
   const [dropHint, setDropHint] = useState('')
 
-  const client = useMemo(() => (current ? createClient(current) : null), [current])
+  /**
+   * 在途的传输任务：job → 结算。
+   * 后端对上传/下载是先回执、后干活，结局只从 backend:event 来；
+   * 后端进程半路没了（backend:exited）也在这里统一判失败，不留永远转圈的进度。
+   */
+  const jobSeq = useRef(0)
+  const jobs = useRef(new Map<string, (outcome: { ok: boolean; message?: string }) => void>())
+
+  useEffect(() => {
+    return api.on((ev) => {
+      if (ev.kind === 'backend:exited') {
+        for (const settle of [...jobs.current.values()]) settle({ ok: false, message: '后端程序中途退出，正在传的东西没传完' })
+        jobs.current.clear()
+        return
+      }
+      if (ev.kind !== 'backend:event') return
+      const p = (ev.payload ?? {}) as {
+        job?: string
+        name?: string
+        done?: number
+        total?: number
+        message?: string
+      }
+      const settle = p.job === undefined ? undefined : jobs.current.get(p.job)
+      if (!settle) return
+      switch (ev.method) {
+        case 'upload:part':
+          if (p.total !== undefined && p.total > 1) setBusy(`正在上传 ${p.name}（${p.done}/${p.total} 段）`)
+          return
+        case 'upload:done':
+        case 'download:done':
+          settle({ ok: true })
+          return
+        case 'upload:error':
+        case 'download:error':
+          settle({ ok: false, message: p.message ?? '传输失败' })
+      }
+    })
+  }, [api])
+
+  /** 交一件长活给后端：先回执（回执失败＝当场抛错），结局等事件 */
+  function askJob(method: 'upload' | 'download', payload: Record<string, unknown>): Promise<void> {
+    const job = `j${(jobSeq.current += 1)}`
+    return new Promise<void>((resolve, reject) => {
+      jobs.current.set(job, (outcome) => {
+        jobs.current.delete(job)
+        if (outcome.ok) resolve()
+        else reject(new Error(outcome.message ?? '传输失败'))
+      })
+      api.backend
+        .invoke(method, { ...payload, job })
+        .catch((e: unknown) => {
+          jobs.current.delete(job)
+          reject(e)
+        })
+    })
+  }
+
+  /** 抛到这里的东西都该已经是要念的那句中文（后端 errorText 一族），原样上屏 */
+  function why(e: unknown): string {
+    return e instanceof Error ? e.message : String(e)
+  }
 
   /** 列桶：换端点、换源、刷新、新建完都走这一条 */
-  const refreshBuckets = useCallback(async (next: S3Client | null): Promise<BucketRow[]> => {
-    if (!next) return []
-    setBusy('正在列桶…')
-    setError('')
-    try {
-      const list = await listBuckets(next)
-      setBuckets(list)
-      return list
-    } catch (e) {
-      setError(errorText(e))
-      setBuckets([])
-      return []
-    } finally {
-      setBusy('')
-    }
-  }, [])
+  const refreshBuckets = useCallback(
+    async (next: Source | null): Promise<BucketRow[]> => {
+      if (!next) return []
+      setBusy('正在列桶…')
+      setError('')
+      try {
+        const list = await api.backend.invoke<BucketRow[]>('listBuckets', { conn: next })
+        setBuckets(list)
+        return list
+      } catch (e) {
+        setError(why(e))
+        setBuckets([])
+        return []
+      } finally {
+        setBusy('')
+      }
+    },
+    [api]
+  )
 
   /** 列层在跑的那一段时刻；盖在表上的转圈晚 200ms 才出现——快网下数据回来得早，一闪都不闪 */
   const [listing, setListing] = useState(false)
@@ -122,12 +179,17 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
    * 把这一段交回去，自动凭据与删目录那两条路要用 */
   const openObjects = useCallback(
     async (target: string, at: string, index: number): Promise<ObjectPage | null> => {
-      if (!client) return null
+      if (!current) return null
       setBusy('正在列对象…')
       setListing(true)
       setError('')
       try {
-        const page = await listObjects(client, target, at, index === 0 ? undefined : tokens.current[index - 1])
+        const page = await api.backend.invoke<ObjectPage>('listObjects', {
+          conn: current,
+          bucket: target,
+          prefix: at,
+          token: index === 0 ? undefined : tokens.current[index - 1]
+        })
         tokens.current = tokens.current.slice(0, index)
         if (page.nextToken !== null) tokens.current[index] = page.nextToken
         setRows(page.rows)
@@ -135,7 +197,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
         setPageIndex(index)
         return page
       } catch (e) {
-        setError(errorText(e))
+        setError(why(e))
         setRows([])
         return null
       } finally {
@@ -143,7 +205,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
         setListing(false)
       }
     },
-    [client]
+    [api, current]
   )
 
   /** 刷新停在当前段：删掉一个、传完一批之后人不该被弹回第一段 */
@@ -166,43 +228,45 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
       setSources(stored)
       const chosen = stored.find((s) => s.name === wanted) ?? stored[0]!
       setCurrent(chosen)
-      await refreshBuckets(createClient(chosen))
+      await refreshBuckets(chosen)
     })()
     return () => {
       cancelled = true
     }
+    // refreshBuckets 每轮都是新的（api 进依赖），挂载只做一次——effect 的依赖表本来就是这个形状
   }, [api, refreshBuckets])
 
   /**
    * 截图模式的凭据：给一个本地路径，把它传到当前这一层，列表里看得见结果。
    *
    * `useAppAutotest` 只在挂载时注册一次 handler，闭包里的状态会停在首帧——
-   * 首帧还没有源、也没有 client，所以这里每次都从 `live` 里取当下那一份。
+   * 首帧还没有源，所以这里每次都从 `live` 里取当下那一份。
    */
-  const live = useRef({ client, bucket, buckets, prefix, editing, renaming, openObjects, reloadPage })
-  live.current = { client, bucket, buckets, prefix, editing, renaming, openObjects, reloadPage }
+  const live = useRef({ current, bucket, buckets, prefix, editing, renaming, openObjects, reloadPage })
+  live.current = { current, bucket, buckets, prefix, editing, renaming, openObjects, reloadPage }
   useAppAutotest(
     's3',
     async (path) => {
       // 主进程一等到"组件挂了监听"就推事件，那一刻第一次列桶往往还在路上；
       // 抢跑的结果是一句红字"这个端点上还没有桶"。等它把桶列出来，别猜时机。
       let now = live.current
-      for (let i = 0; i < 100 && (!now.client || now.buckets.length === 0); i += 1) {
+      for (let i = 0; i < 100 && (!now.current || now.buckets.length === 0); i += 1) {
         await new Promise((r) => setTimeout(r, 50))
         now = live.current
       }
       const target = now.bucket ?? now.buckets[0]?.name ?? ''
-      if (!now.client || target === '') throw new Error('这个端点上还没有桶')
+      if (!now.current || target === '') throw new Error('这个端点上还没有桶')
       setBucket(target)
       setPrefix('')
       const name = baseName(path)
-      await uploadLocal(
-        now.client,
-        target,
-        joinKey('', name),
-        await sourceFromPath(api, path),
-        contentTypeOf(name)
-      )
+      await askJob('upload', {
+        conn: now.current,
+        bucket: target,
+        key: joinKey('', name),
+        path,
+        name,
+        contentType: contentTypeOf(name)
+      })
       const page = await now.openObjects(target, '', 0)
       const hit = page?.rows.find((r) => r.kind === 'object' && r.key === name)
       if (hit) setSelected(hit)
@@ -226,7 +290,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     /** 落点那句话里要念的那一段；还没得传的时候是空串（模态摊着时也是——往背后传东西没人会看见） */
     function landing(): string {
       const now = live.current
-      if (now.editing || now.renaming !== null || now.client === null || now.bucket === null) return ''
+      if (now.editing || now.renaming !== null || now.current === null || now.bucket === null) return ''
       return now.prefix === '' ? `${now.bucket} 根下` : `${now.bucket}/${now.prefix}`
     }
     function onDragOver(e: DragEvent): void {
@@ -287,7 +351,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     setCurrent(next)
     await saveSources(api, list)
     await saveCurrent(api, next.name)
-    await refreshBuckets(createClient(next))
+    await refreshBuckets(next)
   }
 
   /** 换到那一排里的另一个源：桶、路径、预览整个跟着端点走 */
@@ -303,7 +367,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     setSelected(null)
     setCurrent(next)
     await saveCurrent(api, next.name)
-    await refreshBuckets(createClient(next))
+    await refreshBuckets(next)
   }
 
   /** 删掉一个源（从连接卡里按）：这台机器上存的那把钥匙也跟着没了，所以先问一句 */
@@ -329,7 +393,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     if (next) {
       await saveCurrent(api, next.name)
       setEditing(false)
-      await refreshBuckets(createClient(next))
+      await refreshBuckets(next)
       return
     }
     // 一个都不剩：这张卡转成"新增源"的样子，接着填下一个
@@ -365,49 +429,47 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
   }
 
   /**
-   * 一批本地来源传到某一层。
+   * 一批本地文件传到某一层。
    *
-   * 「上传」那颗键选来的路径与拖进来松手的那几颗都走这一条：落点都是按下那一下眼前的那一层，
-   * 回执也是那一句（册子 OS-012 与 OS-042 比的是同一句话）。
+   * 「上传」那颗键选来的与拖进来松手的走同一条：都先换成本机路径，再一份一份交给后端。
+   * 落点是按下那一下眼前的那一层，回执也是那一句（册子 OS-012 与 OS-042 比的是同一句话）。
    */
   async function putAll(
-    target: { client: S3Client; bucket: string; at: string },
-    items: Array<{ name: string; open: () => Promise<ByteSource> }>
+    target: { conn: Source; bucket: string; at: string },
+    items: Array<{ name: string; path: string; dropped?: boolean }>
   ): Promise<void> {
     setBusy(`正在上传 ${items.length} 个…`)
     setError('')
     try {
       for (const it of items) {
-        const source = await it.open()
-        await uploadLocal(
-          target.client,
-          target.bucket,
-          joinKey(target.at, it.name),
-          source,
-          contentTypeOf(it.name),
-          (done, total) => {
-            setBusy(total > 1 ? `正在上传 ${it.name}（${done}/${total} 段）` : `正在上传 ${it.name}`)
-          }
-        )
+        await askJob('upload', {
+          conn: target.conn,
+          bucket: target.bucket,
+          key: joinKey(target.at, it.name),
+          path: it.path,
+          name: it.name,
+          contentType: contentTypeOf(it.name),
+          dropped: it.dropped ?? false
+        })
       }
       setNote(`已上传 ${items.length} 个对象`)
-      // 从窗口监听里进来时，这一条链上的闭包停在首帧——那一刻还没有 client，
-      // 首帧那几份会直接返回 null，列表就永远停在拖进来之前的样子。取当下的那一份。
+      // 从窗口监听里进来时，这一条链上的闭包停在首帧——那一刻还没有源，
+      // 首帧那几份会直接返回，列表就永远停在拖进来之前的样子。取当下的那一份。
       await live.current.reloadPage()
     } catch (e) {
-      setError(errorText(e))
+      setError(why(e))
     } finally {
       setBusy('')
     }
   }
 
   async function upload(): Promise<void> {
-    if (!client || bucket === null) return
+    if (!current || bucket === null) return
     const picked = await api.dialog.openFiles({ title: '选要上传的文件', multiple: true })
     if (!picked || picked.length === 0) return
     await putAll(
-      { client, bucket, at: prefix },
-      picked.map((path) => ({ name: baseName(path), open: () => sourceFromPath(api, path) }))
+      { conn: current, bucket, at: prefix },
+      picked.map((path) => ({ name: baseName(path), path }))
     )
   }
 
@@ -416,59 +478,61 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
    *
    * 没选桶就把缺的那一步说出来；连接卡或改名模态摊着时什么都不动——眼前正等着填东西，
    * 这时候往背后传东西没人会看见（册子 OS-043 与 OS-044）。
+   * 换不出本机路径的那一颗（拖到的是文件夹那一类）照样交下去：
+   * 后端在它的盘上读不到，回执就是那句"读不出来，没上传"（判据 OS-045）。
    */
   async function putDropped(files: File[]): Promise<void> {
     const now = live.current
     if (files.length === 0 || now.editing || now.renaming !== null) return
-    if (now.client === null || now.bucket === null) {
+    if (now.current === null || now.bucket === null) {
       setError('左边先选一个桶，拖进来的文件才有落点')
       return
     }
     await putAll(
-      { client: now.client, bucket: now.bucket, at: now.prefix },
-      files.map((file) => ({ name: file.name, open: async () => sourceFromFile(file) }))
+      { conn: now.current, bucket: now.bucket, at: now.prefix },
+      files.map((file) => ({ name: file.name, path: api.fs.pathForFile(file), dropped: true }))
     )
   }
 
   async function download(row: ObjectRow): Promise<void> {
-    if (!client || bucket === null) return
+    if (!current || bucket === null) return
     const dest = await api.dialog.saveFile({ title: '存到哪里', defaultPath: row.label })
     if (!dest) return
     setBusy(`正在下载 ${row.label}`)
     setError('')
     try {
-      await downloadObject(api, client, bucket, row.key, dest)
+      await askJob('download', { conn: current, bucket, key: row.key, destPath: dest, name: row.label })
       setNote(`已下载 ${row.label}`)
     } catch (e) {
-      setError(errorText(e))
+      setError(why(e))
     } finally {
       setBusy('')
     }
   }
 
   async function copyLink(row: ObjectRow): Promise<void> {
-    if (!client || bucket === null) return
+    if (!current || bucket === null) return
     setError('')
     try {
-      const url = await presignGet(client, bucket, row.key)
+      const url = await api.backend.invoke<string>('presignGet', { conn: current, bucket, key: row.key })
       await api.clipboard.writeText(url)
       setNote('临时链接已复制，一小时内有效')
     } catch (e) {
-      setError(errorText(e))
+      setError(why(e))
     }
   }
 
   async function remove(row: ObjectRow): Promise<void> {
-    if (!client || bucket === null) return
+    if (!current || bucket === null) return
     if (!window.confirm(`删掉 ${row.label}？端点上这份就没了。`)) return
     setError('')
     try {
-      await deleteObject(client, bucket, row.key)
+      await api.backend.invoke('deleteObject', { conn: current, bucket, key: row.key })
       if (selected?.key === row.key) setSelected(null)
       setNote(`已删掉 ${row.label}`)
       await reloadPage()
     } catch (e) {
-      setError(errorText(e))
+      setError(why(e))
     }
   }
 
@@ -502,7 +566,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
    * 同名与形状不合都在本地先判——CopyObject 对已存在的目标不拒绝，它会直接盖上去。
    */
   async function submitRename(): Promise<void> {
-    if (!client || bucket === null || renaming === null) return
+    if (!current || bucket === null || renaming === null) return
     const row = renaming
     // 同名那一档比的是这一层里已经列出来的对象行（不含自己）
     const siblings = rows.filter((r) => r.kind === 'object' && r.key !== row.key).map((r) => r.label)
@@ -518,20 +582,20 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     setBusy(`正在重命名 ${oldLabel}…`)
     try {
       const newKey = joinKey(prefix, name)
-      await copyObject(client, bucket, row.key, newKey)
-      await deleteObject(client, bucket, row.key)
+      await api.backend.invoke('copyObject', { conn: current, bucket, sourceKey: row.key, destKey: newKey })
+      await api.backend.invoke('deleteObject', { conn: current, bucket, key: row.key })
       if (selected?.key === row.key) setSelected(null)
       setNote(`已重命名 ${oldLabel} → ${name}`)
       await reloadPage()
     } catch (e) {
-      setError(errorText(e))
+      setError(why(e))
     } finally {
       setBusy('')
     }
   }
 
   async function submitNewBucket(): Promise<void> {
-    if (!client) return
+    if (!current) return
     const bad = validateBucketName(newName)
     if (bad !== '') {
       setError(bad)
@@ -540,18 +604,18 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     setError('')
     setCreating(false)
     try {
-      await createBucket(client, newName)
+      await api.backend.invoke('createBucket', { conn: current, bucket: newName })
       setNewName('')
       setNote(`已建好桶 ${newName}`)
-      await refreshBuckets(client)
+      await refreshBuckets(current)
     } catch (e) {
-      setError(errorText(e))
+      setError(why(e))
     }
   }
 
   /** 建目录 = 存一个以 `/` 结尾的零字节对象；有了它，空的那一格才在列表里占得住一行 */
   async function submitNewDir(): Promise<void> {
-    if (!client || bucket === null) return
+    if (!current || bucket === null) return
     // 同名那一档比的是这一层里已经列出来的目录行（端点侧没有"目录已存在"这种拒绝）
     const siblings = rows.filter((r) => r.kind === 'prefix').map((r) => r.label.replace(/\/$/, ''))
     const bad = validateDirName(newName, siblings)
@@ -563,12 +627,12 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
     setError('')
     setCreating(false)
     try {
-      await putDirMarker(client, bucket, joinKey(prefix, `${name}/`))
+      await api.backend.invoke('putDirMarker', { conn: current, bucket, key: joinKey(prefix, `${name}/`) })
       setNewName('')
       setNote(`已建好目录 ${name}`)
       await reloadPage()
     } catch (e) {
-      setError(errorText(e))
+      setError(why(e))
     }
   }
 
@@ -580,16 +644,17 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
    * 删完之后按"这一行还在不在"决定念哪句：里面还挂着对象的，行会因为聚合而留下来。
    */
   async function removeDir(row: ObjectRow): Promise<void> {
-    if (!client || bucket === null) return
+    if (!current || bucket === null) return
     const name = row.label.replace(/\/$/, '')
     setError('')
     try {
-      if (!(await dirMarkerExists(client, bucket, row.key))) {
+      const marker = await api.backend.invoke<boolean>('dirMarkerExists', { conn: current, bucket, key: row.key })
+      if (!marker) {
         setError(`${name} 是从里面的对象读出来的目录，没有单独的标记可删`)
         return
       }
       if (!window.confirm(`删掉目录 ${name}？只去掉这个目录标记，里面已有的对象不动。`)) return
-      await deleteObject(client, bucket, row.key)
+      await api.backend.invoke('deleteObject', { conn: current, bucket, key: row.key })
       const page = await reloadPage()
       const stillThere = (page?.rows ?? []).some((r) => r.kind === 'prefix' && r.key === row.key)
       setNote(
@@ -598,7 +663,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
           : `已删掉目录 ${name}`
       )
     } catch (e) {
-      setError(errorText(e))
+      setError(why(e))
     }
   }
 
@@ -652,10 +717,10 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
         >
           <Icon icon="lucide:settings" width="16" height="16" aria-hidden="true" />
         </button>
-        <button type="button" className="icon-btn" title="刷新" aria-label="刷新" onClick={() => void refreshBuckets(client)} disabled={client === null || busy !== ''}>
+        <button type="button" className="icon-btn" title="刷新" aria-label="刷新" onClick={() => void refreshBuckets(current)} disabled={current === null || busy !== ''}>
           <Icon icon="lucide:refresh-cw" width="16" height="16" aria-hidden="true" />
         </button>
-        <button type="button" className="icon-btn" title="新建桶" aria-label="新建桶" onClick={() => openBar('bucket')} disabled={client === null || creating}>
+        <button type="button" className="icon-btn" title="新建桶" aria-label="新建桶" onClick={() => openBar('bucket')} disabled={current === null || creating}>
           <Icon icon="lucide:archive" width="16" height="16" aria-hidden="true" />
         </button>
         <span className="s3__busy">{busy !== '' ? busy : note}</span>
@@ -763,7 +828,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
       <div className="s3__body">
         <nav className="s3__buckets">
           <div className="s3__pane-title">桶</div>
-          {client !== null && busy === '' && error === '' && buckets.length === 0 ? (
+          {current !== null && busy === '' && error === '' && buckets.length === 0 ? (
             <p className="s3__empty">这个端点上还没有桶</p>
           ) : null}
           <ul className="s3__bucket-list">
@@ -808,7 +873,7 @@ export default function S3App({ api }: { api: AppApi }): JSX.Element {
           />
         )}
 
-        <PreviewPane api={api} client={client} bucket={bucket ?? ''} row={selected} onClose={() => setSelected(null)} />
+        <PreviewPane api={api} conn={current} bucket={bucket ?? ''} row={selected} onClose={() => setSelected(null)} />
       </div>
 
       {/* 拖进来还没松手时盖在整窗上的那一句落点：只说，不吃鼠标——事件本来就听在窗口上 */}
