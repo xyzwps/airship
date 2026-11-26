@@ -45,11 +45,11 @@ import type {
  * 它**不是**主进程的复刻：runtime 自己的规则（授权、越界、路由）另有对真实模块跑的用例
  * （tests/runtime/*）。这里只求给应用一个可信的 runtime，让应用的册子能钉住"用户看得见什么"。
  *
- * 路径一律用正斜杠的假路径（`/fake/userData/...`），大小写敏感——
+ * 路径一律用正斜杠的假路径（`/fake/.airship/...`，与真布局同形状：家目录 = `~/.airship`），大小写敏感——
  * 真 runtime 在 Windows 上不区分大小写，但用例里的路径都由用例自己写出来，不存在歧义。
  */
 
-const ROOT = '/fake/userData'
+const ROOT = '/fake/.airship'
 
 type Content = string | Uint8Array
 
@@ -149,11 +149,11 @@ export class FakeAirship implements AirshipBridge {
   /* ---------------- 测试侧的手脚 ---------------- */
 
   get dataDir(): string {
-    return `${ROOT}/apps/${this.id}/data`
+    return `${ROOT}/data/${this.id}`
   }
 
   get cacheDir(): string {
-    return `${ROOT}/apps/${this.id}/cache`
+    return `${ROOT}/data/${this.id}/cache`
   }
 
   sharedDir(ns: SharedNamespace): string {

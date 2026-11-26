@@ -5,15 +5,15 @@
 规则原文见 [架构](../../../docs/architecture.md) §6.2，这本册子把它钉成可执行的结果。
 
 ### Requirement: 应用自己的地盘自由读写
-每个应用在 userData 下有 `data/` 与 `cache/` 两份目录。
+每个应用的数据目录是 `~\.airship\data\<id>\`（它自己那一族，可直接放文件），缓存是它下面的 `cache\`。
 
 #### Scenario: GR-001 自己目录里的文件直接读得到
-- **WHEN** 应用读自己 `data/` 里一个存在的文件
-- **THEN** 拿到内容；读 `cache/` 同样直接给
+- **WHEN** 应用读自己数据目录里一个存在的文件
+- **THEN** 拿到内容；读它的 `cache\` 同样直接给
 - **AND** 没声明 `dialog` 也能读写自己目录，两条不互相牵扯
 
 #### Scenario: GR-002 别的应用的地盘读不到也写不进
-- **WHEN** airship-ffmpeg 试着读写 `apps/airship-s3/data/` 下的路径
+- **WHEN** airship-ffmpeg 试着读写 `~\.airship\data\airship-s3\` 下的路径
 - **THEN** 拒，原因读得到「没有读取权限：<路径>（只能读应用数据目录，或先用文件对话框选中它）」
 - **AND** 写同样被拒，原因是「没有写入权限：<路径>（只能写应用数据目录，或用另存为对话框选定目标）」
 
@@ -25,7 +25,7 @@
 ### Requirement: 共享命名空间声明了才碰得到
 #### Scenario: GR-004 声明过的共享区可读写，未声明的拒
 - **WHEN** 一个声明了 `library` 的应用解析共享区里的路径
-- **THEN** 给出 `<userData>/shared/library/...` 且能读写
+- **THEN** 给出 `~\.airship\shared\library\...` 且能读写
 - **AND** 没 `shared` 能力或没声明这个命名空间的应用走同一条路会被拒（措辞见 `bridge.md` BR-007）
 
 ### Requirement: 其余路径必须本次会话里用户显式选中

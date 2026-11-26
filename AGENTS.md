@@ -1,6 +1,6 @@
 # airship · 给代理的说明
 
-飞船是一个 **airship runtime**（一个 Electron 运行时，像 JVM / .NET 那样装一次大家共用），
+飞船是一个 **airship runtime**（一个 Electron 运行时，像 JVM / .NET 那样装一次、你这个用户的应用都共用它），
 外面挂着八个自用应用（airship-reader · airship-dago · airship-life-game · airship-ffmpeg · airship-wsld · airship-svg-editor · airship-s3 · airship-icon）。
 一个应用一个窗口一个渲染进程，**一个应用是一个 airship 包（zip 归档 `<id>.airship`），由命令行指给 runtime 注册**——
 runtime 的产物里没有应用代码，runtime 自己也没有界面。多个应用共用一个 runtime 进程，第二次启动转发包路径。
@@ -121,12 +121,12 @@ Node 脚本走软链读的就是那份 JS；这两区**源码里**的相对 impo
 两个分发物，互不包含：
 
 - `just build-runtime` = 清场 → 编译 runtime → NSIS → 自检 + 写 `.sha256`。安装包是**纯 runtime**，
-  `perMachine: true`（要管理员），落点钉死 `C:\Program Files\airship\runtime`（目录唯一真源在
+  `perMachine: false`（不要管理员，2026-11-26 从 Program Files 挪来），落点钉死 `~\.airship\runtime`（目录唯一真源在
   `src/runtime/build/installer.nsh` 的 `customInit`）。项目根是 `src/runtime`（`--projectDir`），
   所以**安装包文件名只由 `src/runtime/package.json` 的 `version` 决定**（`airship-runtime-Setup-<版本>-x64.exe`，
   主 exe 叫 `airship.exe`）。runtime 自己没有界面，不留快捷方式，只留控制面板卸载项。
 - `just app-installer id` = 先产它那份包，再裹成**每用户**安装器（`RequestExecutionLevel user`，不要管理员），
-  落 `%LOCALAPPDATA%\airship\apps\<id>\`，桌面 + 开始菜单各一枚快捷方式（目标 runtime 的 `airship.exe` + 引号包路径 + 应用 `icon.ico`）。
+  落 `~\.airship\apps\<id>\`，桌面 + 开始菜单各一枚快捷方式（目标 runtime 的 `airship.exe` + 引号包路径 + 应用 `icon.ico`）。
   版本读 `src/apps/<id>/package.json`。
 - `just installers` = 先 `build-apps`，再对**全部**应用各产一枚安装器（不给 id 就是全部，名单与产包同源
   `code/app-dirs.mjs`）。应用安装器用的 makensis 是 electron-builder 缓存里那份，所以**这台机器上第一次要先跑过
@@ -140,7 +140,7 @@ Node 脚本走软链读的就是那份 JS；这两区**源码里**的相对 impo
 
 **装包只有一条路：跑应用自己的安装器**（契约 PK-031~035）。从前"把归档拖到启动器上"那一族随启动器退场了
 （PK-015~019、PK-021~026 已显式删除，见 package.md 末尾注记）。安装器 `.onInit` 先找 runtime
-（`AIRSHIP_PATH` > `C:\Program Files\airship\runtime`，找不到念 `runtimeNotFound` 中止），再念能力清单确认。
+（`AIRSHIP_PATH` > `~\.airship\runtime`，找不到念 `runtimeNotFound` 中止），再念能力清单确认。
 能力措辞由 `@airship/contract` 供（`CAPABILITY_LABEL` / `capabilitiesPhrase` / `installConfirmMessage`），
 **别在界面或 NSI 里另写一份**——安装器安装页念的就是契约层这一份。
 路径只能由 preload 的 `webUtils.getPathForFile(file)` 换出来——渲染侧拿不到绝对路径，也拿不到 ipcRenderer。
@@ -186,7 +186,12 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
   runtime 的 `icon.ico` / `icon.png` / `tray.png`（`icon-master.png` 是母版，只当素材留着）。
   改了源图要自己在外部工具里重出对应的那张 `.ico`（多尺寸 16~256），否则包里与源图会各说各话——
   这条是这轮决定接受的风险，**别再往产包或安装流水里加转换步骤**。
-- 系统级动作（重启 explorer、清图标缓存、覆盖安装、**把 runtime 装进 Program Files**）**只给命令，由使用者执行**，别自己跑。
+- 系统级动作（重启 explorer、清图标缓存、覆盖安装、**删 `~\.airship` 下的旧数据**）**只给命令，由使用者执行**，别自己跑。
+- **落点只有一棵树：`~\.airship`**（runtime 装 `runtime\`、应用装 `apps\<id>\`、数据装 `data\<id>\`，
+  另有 `shared\`、`logs\`、`icons\` 和 Electron 自己的浏览器档 `profile\`）。真源分三处：runtime 的落点在
+  `src/runtime/build/installer.nsh`，应用的落点在 `src/cli/lib/installer.mjs`，数据布局在
+  `src/runtime/main/services/paths.ts`。整棵树可以换家：`AIRSHIP_HOME`（dev 指到项目里的 `.airship-dev/<id>`）
+  与截图模式的 `~\.airship-shot`——要改落点就改这三处，别在第四个地方再写一遍。
 - 工具脚本一律放 `code/`（现成有 `make-jingang-epub.py`、`make-mobi.py`、
   `make-rustfs-demo.mjs`、`clean-installer.mjs`、`verify-installer.mjs`、`pack-app.mjs`、`build-apps.mjs`、
   `make-app-installer.mjs`、`app-dirs.mjs`（应用名单的唯一判据，产包与产安装器共用）、`new-app.mjs`、`app.vite.config.mts`）；中间产物写到系统临时目录，别落在仓库里。
@@ -209,8 +214,10 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
   vitest 的 `server.deps.inline: [/^@airship\//]` 仍要留着（`@airship/library` 与 SDK 的 CSS 还是源码消费）。
 - 这台机器 npm 默认 registry 是 **npmmirror（只读镜像）**：`npm publish` 会撞"requires you to be logged in to
   https://registry.npmmirror.com"——真要发布得 `--registry https://registry.npmjs.org` 且先 `npm login` 到官方源。
-- `app.setName('airship')` 是必须的：Electron 的 userData 默认取 package.json 的 name，
-  而 runtime 的 name 现在是 `@airship/runtime`——不钉住的话 `%APPDATA%/airship` 里的书架与设置会"凭空消失"。
+- 落点由主进程开头那两句钉死：`app.setName('airship')`（Electron 的默认名会取包名 `@airship/runtime`，
+  留着它是为了日志与外壳身份念得对）+ `app.setPath('userData', profileDir())`（浏览器档单独一区
+  `~\.airship\profile`）。**数据布局不跟 userData 走**——paths.ts 从 `airshipHome()` 派生，
+  改任何一边都要想到另一边。
 - runtime 的 `package.json` 里 electron 必须写**固定版本**（`45.2.3`，不带 `^`）：
   electron-builder 要按它下载对应平台的二进制，写范围会直接报 `is a range, not a fixed version`。
 - workspace 软链进 `node_modules` 后，rollup 的 commonjs 互操作会把 `react` 各包一遍，
@@ -225,7 +232,7 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
   与 `src/runtime/tests/setup.ts`（每个用例文件开局逐个 `registerPackageAt` 铺活动包表）。
   runtime 现在运行期注册命令行指来的包，没有这一步所有问注册表的用例全空——**空表不算通过**，`AP-008` 钉着这条。
 - 单实例锁要在 `whenReady` 之前抢，抢不到时 `whenReady` 里一步都不走（不然第二实例开出一扇重复窗再退出）。
-  截图模式（`AIRSHIP_SHOT=1 --shot`）用独立 userData、不参与单实例，且 `window-all-closed` 要直接 return——
+  截图模式（`AIRSHIP_SHOT=1 --shot`）整份家换到 `~\.airship-shot`（数据与浏览器档都不碰日常那一份）、不参与单实例，且 `window-all-closed` 要直接 return——
   它逐个开窗关窗，跟着 quit 就只截得到第一个（启动器退场后抓到的一次回归）。
 - `templates/app/` 是给别人复制的范本，**不参与** `just casecov` 的双向差集，也不被 vitest 跑
   （两处都按目录名 `templates` 排除）；复制进 `src/apps/<id>/` 之后才归这套规矩管。

@@ -2,6 +2,7 @@ import { app, dialog, ipcMain, type WebContents } from 'electron'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { registerIpc } from './ipc'
+import { profileDir } from './services/paths'
 import { registerAirshipScheme, serveAirshipPackages } from './services/packageProtocol'
 import { log } from './services/logging'
 import { proc, setProcEmitter } from './services/proc'
@@ -34,12 +35,22 @@ import {
  * 都等渲染侧报就绪再 capturePage——"真的跑起来看到了"才算交付。
  */
 
-// 数据目录的名字钉死为 airship：Electron 的 userData 默认取 package.json 的 name，
-// 而那个 name 现在是 @airship/runtime——不钉住的话，%APPDATA%/airship 里的书架与设置
-// 会在某次升级后突然"空了"，其实是换了一个目录。这个名字是用户数据的一部分，不是包名。
+// 应用的名字钉死为 airship：Electron 的默认路径与外壳身份都取 package.json 的 name，
+// 而那个 name 现在是 @airship/runtime。落点由下面那一句显式钉住，这个名字留着是让
+// 日志、通知与外壳身份念得对——它是用户数据的一部分，不是包名。
 app.setName('airship')
 
 const SHOT_MODE = process.env.AIRSHIP_SHOT === '1' && process.argv.includes('--shot')
+
+/**
+ * Electron 自己的浏览器档单独一区：`~/.airship/profile`（见 paths.ts 的布局）。
+ *
+ * 家目录整份由 `airshipHome()` 定——dev 时 CLI 给 `AIRSHIP_HOME` 指到项目里的 `.airship-dev/<id>`，
+ * 截图模式换到 `~/.airship-shot`，两者都不碰日常那一份，也不会你正开着应用看界面时
+ * 我跑一次截图就静默退出（抢不到锁）或刷一堆"Unable to move the cache"。
+ * 验证工装不该踩在正在使用的人身上。
+ */
+app.setPath('userData', profileDir())
 
 /** 命令行指来的包路径，可以有多份；相对路径按 cwd 解（手敲才给相对，快捷方式给绝对） */
 const ARCHIVES = archivesFromArgv(process.argv, process.cwd())
@@ -49,17 +60,6 @@ const ARCHIVES = archivesFromArgv(process.argv, process.cwd())
  * 处理器在 `whenReady` 里挂（Electron 要求协议注册与窗口创建都在 ready 之后）。
  */
 registerAirshipScheme()
-
-/**
- * 截图模式用独立的 userData，且不参与单实例。
- *
- * 否则你正开着应用看界面时，我跑一次截图会静默退出（抢不到锁），
- * 还会跟你的实例抢同一份 Chromium 缓存目录、刷一堆"Unable to move the cache"。
- * 验证工装不该踩在正在使用的人身上。
- */
-if (SHOT_MODE) {
-  app.setPath('userData', join(app.getPath('userData'), '..', 'airship-shot-profile'))
-}
 
 /* ---------------- 跑一个包：开窗 ---------------- */
 
@@ -217,7 +217,7 @@ async function capture(sender: WebContents, file: string): Promise<void> {
 // 抢不到锁不是错误——argv 会由 Electron 自动交给第一实例的 second-instance。
 // **锁要在 whenReady 之前抢，且抢不到时 whenReady 里一步都不走**：
 // 不然第二实例也会把启动跑完、开出一扇重复的窗再退出（真机抓到过：两扇 dagogo 各开一次）。
-// 截图模式自己有独立 userData，不参与这把锁。
+// 截图模式整份家换到 `~/.airship-shot`，不参与这把锁。
 const GOT_LOCK = SHOT_MODE || app.requestSingleInstanceLock()
 if (!GOT_LOCK) {
   console.error('[airship] 已有一个 airship runtime 在运行，这次的包路径转发给它。')

@@ -8,7 +8,7 @@
 还没做的那一段（SDK 独立发布、包的来源信任与更新）在 [待办](../../../docs/todo.md) TD-013 与 TD-014。
 
 ### Requirement: 包是一个自带清单的归档，文件名由 id 定
-依据：id 同时是包文件名前段、userData 下的数据目录名、`airship://<id>/…` 里的那一段，
+依据：id 同时是包文件名前段、`~\.airship\data` 下的数据目录名、`airship://<id>/…` 里的那一段，
 以及 `relaunchCommand` 里的一个命令行 token——这几处对字符的硬性要求叠在一起，
 就是下面这条形状（实测的四类坏法见 `src/shared/app.ts` 的注释）。
 
@@ -96,19 +96,19 @@ runtime 见到那个条目才起进程（通道侧契约见 `src/runtime/specs/b
 - **AND** 两种都拿不到包外的内容，也不回落到入口文档
 
 ### Requirement: 应用安装器自己找 runtime，装完留一个快捷方式
-依据：runtime 是全机器共享的运行时（perMachine，固定 `C:\Program Files\airship\runtime`）；
-应用是每用户自己的东西（装进 `%LOCALAPPDATA%\airship\apps\<id>\`，不要管理员）。
+依据：runtime 与应用的落点在同一棵树里——runtime 装 `~\.airship\runtime`，应用装 `~\.airship\apps\<id>\`
+（都是每用户、不要管理员，PK-035）；数据在第三族 `~\.airship\data\<id>\`，由 runtime 管（见 `src/runtime/specs/storage.md`）。
 安装器由 `code/make-app-installer.mjs` 从归档生成，能力措辞产安装器时从契约层烘进脚本。
 安装与卸载真机走查归 `just app-installer`；这里钉的是生成出来的安装脚本里读得到的判据。
 
 #### Scenario: PK-031 找 runtime 按顺序，找不到念原话不装
 - **WHEN** 安装器启动，`AIRSHIP_PATH` 指着一个有 `airship.exe` 的目录，或没设它但固定目录里有
-- **THEN** 用先找到的那一个；两处都没有时念「找不到 airship runtime：先装 runtime（固定装在 C:\Program Files\airship\runtime），或把 AIRSHIP_PATH 指到它所在的目录。」
+- **THEN** 用先找到的那一个；两处都没有时念「找不到 airship runtime：先装 runtime（固定装在 %USERPROFILE%\.airship\runtime），或把 AIRSHIP_PATH 指到它所在的目录。」
 - **AND** 念完就中止，一个文件都不写
 
 #### Scenario: PK-032 落点与快捷方式的命令行
 - **WHEN** 安装完成
-- **THEN** 归档落在 `%LOCALAPPDATA%\airship\apps\<id>\<id>.airship`，桌面快捷方式的目标是那个 runtime 目录里的 `airship.exe`，参数是归档的绝对路径，两段都带引号
+- **THEN** 归档落在 `~\.airship\apps\<id>\<id>.airship`，桌面快捷方式的目标是那个 runtime 目录里的 `airship.exe`，参数是归档的绝对路径，两段都带引号
 - **AND** 快捷方式的图标用包内那份 `icon.ico`（PK-036 随包备好的那一份），不是 runtime 的图标
 
 #### Scenario: PK-033 装之前念能力清单
@@ -120,12 +120,12 @@ runtime 见到那个条目才起进程（通道侧契约见 `src/runtime/specs/b
 #### Scenario: PK-034 卸载删归档留数据
 - **WHEN** 走控制面板的卸载项或安装目录里的卸载器
 - **THEN** 安装目录（归档、图标、卸载器）与桌面快捷方式被删掉
-- **AND** `%APPDATA%\airship\apps\<id>` 里的设置与数据一个字节都不碰——安装脚本里根本不出现那个目录
+- **AND** `~\.airship\data\<id>` 里的设置与数据一个字节都不碰——安装脚本里读不到 `.airship\data` 这一段路径
 
-#### Scenario: PK-035 两个安装器各要各的权限
+#### Scenario: PK-035 两个安装器都装进 ~/.airship，都不要管理员
 - **WHEN** 看生成出来的应用安装脚本与 runtime 的安装配置
-- **THEN** 应用那份 `RequestExecutionLevel user`、落点在 `$LOCALAPPDATA` 下；runtime 那份 perMachine、落点钉死 `$PROGRAMFILES64\airship\runtime`
-- **AND** 应用安装器不往 `Program Files` 写任何东西，runtime 安装包不带任何应用归档
+- **THEN** 应用那份 `RequestExecutionLevel user`、落点 `$PROFILE\.airship\apps\<id>`；runtime 那份 perMachine 为假、落点钉死 `$PROFILE\.airship\runtime`，且不给换目录
+- **AND** 两个安装器都不往 `Program Files` 写任何东西，runtime 安装包不带任何应用归档
 
 <!--
   PK-027~030 于 2026-11-19 删除：首次直跑陌生包的能力确认卡片退场（使用者反馈双击应用先弹一张卡片太烦）。

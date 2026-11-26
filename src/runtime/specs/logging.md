@@ -6,7 +6,7 @@
 ### Requirement: 一天一个文件，行形状固定
 #### Scenario: LG-001 日志按天落到一个文件里
 - **WHEN** 今天记下一条日志
-- **THEN** 它落在 `<userData>/logs/airship-YYYY-MM-DD.log`（本地日期的年月日），文件名里带这一天的日期
+- **THEN** 它落在 `~\.airship\logs\airship-YYYY-MM-DD.log`（本地日期的年月日），文件名里带这一天的日期
 - **AND** 目录不存在时自动建出来
 
 #### Scenario: LG-002 一行的形状是"时间 级别 [来源] 消息 详情"

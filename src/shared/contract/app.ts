@@ -18,7 +18,7 @@ import type { Capability, PlatformId, SharedNamespace, ToolName } from './protoc
 /**
  * 应用 id 的唯一形状。
  *
- * id 同时是包文件名前段（`<id>.airship`）、userData 下数据目录名、`airship://<id>/…` 里的那一段，
+ * id 同时是包文件名前段（`<id>.airship`）、`~/.airship/data` 下的数据目录名、`airship://<id>/…` 里的那一段，
  * 以及 `relaunchCommand` 里的一个命令行 token（见 docs/todo.md TD-001）。
  * 这四处的硬性要求实测下来只有四条会坏：
  *   `#` 与 `?` 把 URL 里的 id 截断（错到别的应用上，且看不见）；

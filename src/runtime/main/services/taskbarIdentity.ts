@@ -17,7 +17,7 @@ import type { InstalledPackage } from './packageRegistry'
  *   1. **身份是逐窗口给的**——`win.setAppDetails()` 内部是 `ITaskbarList3::SetAppUserModelID`。
  *      `app.setAppUserModelId()` 是进程级的，八个应用共用一个 runtime 进程，那一句只能给出一个身份。
  *   2. **图标走磁盘**——外壳读 `appIconPath` 时只认文件系统路径，既不认 asar 也不认 `airship://`。
- *      所以包根那份 `icon.ico`（PK-036，随源图一起备好的那一份）先由 runtime 摊平落到 `<userData>/icons/`，
+ *      所以包根那份 `icon.ico`（PK-036，随源图一起备好的那一份）先由 runtime 摊平落到 `~/.airship/icons/`，
  *      落盘按字节比对：包换了才重写，没换就不动磁盘。
  *   3. **命令行要同形**——固定到任务栏那颗按钮点下去跑的是 `relaunchCommand`，
  *      它与快捷方式一样是 `airship.exe "<归档绝对路径>"`。第二实例会把包路径转给活着的进程，

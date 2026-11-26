@@ -35,8 +35,9 @@ interface FakeAppDetails {
 
 let nextContentsId = 1
 
-/** 替身 electron 的 userData 根：落盘的图标要在这里找 */
-const FAKE_USER_DATA = join(__dirname, '.tmp', 'create-userData')
+/** 替身 electron 的主目录：airship 的家是它下面的 `.airship`，落盘的图标与日志都在那里面 */
+const FAKE_HOME = join(__dirname, '.tmp', 'create-home')
+const FAKE_AIRSHIP = join(FAKE_HOME, '.airship')
 
 class FakeBrowserWindow {
   static created: FakeBrowserWindow[] = []
@@ -103,7 +104,7 @@ class FakeBrowserWindow {
 vi.mock('electron', async () => {
   const { join: p } = await import('node:path')
   const { rmSync: rm, mkdirSync: mk } = await import('node:fs')
-  const root = FAKE_USER_DATA
+  const root = FAKE_HOME
   rm(root, { recursive: true, force: true })
   mk(root, { recursive: true })
   return {
@@ -256,7 +257,7 @@ describe('任务栏上每个应用是自己的那颗按钮', () => {
     const details = lastWindow().appDetails!
     const inArchive = readArchiveEntry(join(packageFixtureRoot(), 'airship-dago.airship'), WINDOWS_ICON_NAME)
     expect(inArchive, '工装包就该带 icon.ico，否则这条钉不到东西').not.toBeNull()
-    expect(details.appIconPath, '外壳只认磁盘路径').toBe(join(FAKE_USER_DATA, 'icons', 'airship-dago.ico'))
+    expect(details.appIconPath, '外壳只认磁盘路径').toBe(join(FAKE_AIRSHIP, 'icons', 'airship-dago.ico'))
     expect(existsSync(details.appIconPath!)).toBe(true)
     expect(Buffer.compare(readFileSync(details.appIconPath!), Buffer.from(inArchive!))).toBe(0)
 
@@ -279,7 +280,7 @@ describe('任务栏上每个应用是自己的那颗按钮', () => {
 
     const day = new Date()
     const logFile = join(
-      FAKE_USER_DATA,
+      FAKE_AIRSHIP,
       'logs',
       `airship-${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}.log`
     )
@@ -299,12 +300,12 @@ describe('任务栏上每个应用是自己的那颗按钮', () => {
     // 命令行本身的形状与这台机器的 argv 无关，纯函数两侧各钉一次
     expect(
       relaunchCommandFor({
-        execPath: 'C:\\Program Files\\airship\\runtime\\airship.exe',
+        execPath: 'C:\\Users\\me\\.airship\\runtime\\airship.exe',
         runtimeDir: null,
-        archive: 'C:\\Users\\me\\AppData\\Local\\airship\\apps\\airship-life-game\\airship-life-game.airship'
+        archive: 'C:\\Users\\me\\.airship\\apps\\airship-life-game\\airship-life-game.airship'
       })
     ).toBe(
-      '"C:\\Program Files\\airship\\runtime\\airship.exe" "C:\\Users\\me\\AppData\\Local\\airship\\apps\\airship-life-game\\airship-life-game.airship"'
+      '"C:\\Users\\me\\.airship\\runtime\\airship.exe" "C:\\Users\\me\\.airship\\apps\\airship-life-game\\airship-life-game.airship"'
     )
     expect(
       relaunchCommandFor({

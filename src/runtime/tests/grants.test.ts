@@ -33,8 +33,8 @@ describe('应用自己的地盘', () => {
     const cache = join(appCacheDir('airship-ffmpeg'), 'sub.srt')
     expect(grants.canRead('airship-ffmpeg', data)).toBe(true)
     expect(grants.canWrite('airship-ffmpeg', cache)).toBe(true)
-    expect(slash(appDataDir('airship-ffmpeg'))).toMatch(/apps\/airship-ffmpeg\/data$/)
-    expect(slash(appCacheDir('airship-ffmpeg'))).toMatch(/apps\/airship-ffmpeg\/cache$/)
+    expect(slash(appDataDir('airship-ffmpeg'))).toMatch(/\.airship\/data\/airship-ffmpeg$/)
+    expect(slash(appCacheDir('airship-ffmpeg'))).toMatch(/\.airship\/data\/airship-ffmpeg\/cache$/)
   })
 
   it('GR-002 别的应用的地盘读不到也写不进', () => {

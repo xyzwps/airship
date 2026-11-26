@@ -5,16 +5,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 /**
  * ST-001 ~ ST-007：设置与数据的落盘规矩。
  *
- * 跑的是真 settings.ts，配一个每次清空的临时 userData——
+ * 跑的是真 settings.ts，配一个每次清空的临时主目录（airship 的家是它下面的 .airship）——
  * "写坏了怎么办"这类契约只能对着真实文件系统验，替身里磁盘永远是好的。
  */
 
-const ROOT = join(__dirname, '.tmp', 'settings-userData')
+const ROOT = join(__dirname, '.tmp', 'settings-home')
+/** 替身 electron 的 getPath('home') 给出的家：布局真源在这里派生（paths.ts） */
+const AIRSHIP = join(ROOT, '.airship')
 
 vi.mock('electron', async () => {
   const { join: p } = await import('node:path')
   return {
-    app: { getPath: () => p(__dirname, '.tmp', 'settings-userData'), getVersion: () => '0.0.0-test' }
+    app: { getPath: () => p(__dirname, '.tmp', 'settings-home'), getVersion: () => '0.0.0-test' }
   }
 })
 
@@ -22,11 +24,11 @@ const { settings } = await import('../main/services/settings')
 const { appSettingsFile } = await import('../main/services/paths')
 
 function resetDisk(app: string): void {
-  // 只清这个应用自己的那份文件：整棵 ROOT 删掉会连带把 logs/ 端了，
+  // 只清这个应用自己的那份文件：整棵 AIRSHIP 删掉会连带把 logs/ 端了，
   // 而 ST-004 那条正读同一天的日志——套件偶发红就是这么来的。
   // settings 的内存缓存没法按用例重置，所以每条用例占一个应用、键名也各自独立。
-  rmSync(join(ROOT, 'apps', app), { recursive: true, force: true })
-  mkdirSync(join(ROOT, 'apps'), { recursive: true })
+  rmSync(join(AIRSHIP, 'data', app), { recursive: true, force: true })
+  mkdirSync(join(AIRSHIP, 'data'), { recursive: true })
 }
 
 function fileOf(app: string): string {
@@ -44,9 +46,9 @@ describe('每应用一份设置，runtime 自己不持有', () => {
 
     expect(existsSync(fileOf('airship-ffmpeg'))).toBe(true)
     expect(existsSync(fileOf('airship-s3'))).toBe(false)
-    expect(join(fileOf('airship-ffmpeg')).replace(/\\/g, '/')).toMatch(/apps\/airship-ffmpeg\/settings\.json$/)
-    // runtime 自己没有设置文件：根上不许出现 settings.json
-    expect(existsSync(join(ROOT, 'settings.json'))).toBe(false)
+    expect(join(fileOf('airship-ffmpeg')).replace(/\\/g, '/')).toMatch(/\.airship\/data\/airship-ffmpeg\/settings\.json$/)
+    // runtime 自己没有设置文件：家的根上不许出现 settings.json
+    expect(existsSync(join(AIRSHIP, 'settings.json'))).toBe(false)
   })
 
   it('ST-002 写 undefined 等于删掉这个键', () => {
@@ -72,7 +74,7 @@ describe('落盘是"临时文件 + 改名"', () => {
 describe('坏文件不致命', () => {
   it('ST-004 解析失败就改名留证、记日志、从空开始', () => {
     resetDisk('airship-dago')
-    mkdirSync(join(ROOT, 'apps', 'airship-dago'), { recursive: true })
+    mkdirSync(join(AIRSHIP, 'data', 'airship-dago'), { recursive: true })
     writeFileSync(fileOf('airship-dago'), '{ 残缺', 'utf8')
 
     expect(settings.get('airship-dago', 'anything', '回落')).toBe('回落')
@@ -80,14 +82,14 @@ describe('坏文件不致命', () => {
     expect(existsSync(`${fileOf('airship-dago')}.bad`)).toBe(true)
 
     const day = new Date()
-    const logFile = join(ROOT, 'logs', `airship-${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}.log`)
+    const logFile = join(AIRSHIP, 'logs', `airship-${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}.log`)
     const log = existsSync(logFile) ? readFileSync(logFile, 'utf8') : ''
     expect(log).toContain('设置文件解析失败，已重置')
   })
 
   it('ST-005 顶层是数组时同样从空开始', () => {
     resetDisk('airship-s3')
-    mkdirSync(join(ROOT, 'apps', 'airship-s3'), { recursive: true })
+    mkdirSync(join(AIRSHIP, 'data', 'airship-s3'), { recursive: true })
     writeFileSync(fileOf('airship-s3'), '[1,2,3]', 'utf8')
     expect(settings.get('airship-s3', 'k', '回落')).toBe('回落')
     expect(settings.dump('airship-s3')).toEqual({})
@@ -128,7 +130,7 @@ describe('连续写与副本', () => {
     expect(before.shared['library'], '共享区照旧在').toBeTruthy()
 
     const data = appDataDir(late)
-    expect(data).toBe(join(before.root, 'apps', late, 'data'))
+    expect(data).toBe(join(before.root, 'data', late))
     expect(existsSync(data), '目录要当场建出来').toBe(true)
     expect(existsSync(appCacheDir(late)), 'cache 同理').toBe(true)
 

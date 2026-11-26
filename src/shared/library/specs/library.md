@@ -21,7 +21,7 @@ PDF 应用连同 `pdf` 格式位已于 2026-11-26 退场，共享区这个形状
 #### Scenario: LB-003 版本对不上时报出该删哪个文件
 - **WHEN** 索引文件里写着的 `version` 是 1
 - **THEN** 读不出书目，错误原文以「书库索引是 v1，本包只认 v2。」开头
-- **AND** 同一句里读得到「删掉 userData/shared/library/library.json」与「书本体和封面不用动」
+- **AND** 同一句里读得到「删掉 ~/.airship/shared/library/library.json」与「书本体和封面不用动」
 - **AND** 没写 `version` 的索引同样被拒，念出来的是「书库索引是 v?，本包只认 v2。」
 
 #### Scenario: LB-004 索引里 books 不是列表时单独报错

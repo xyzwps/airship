@@ -24,7 +24,7 @@ import { log } from './logging'
  * （源项目里的 `src/backend.ts|js` 由产包流水按约定编进来）。
  *
  * 为什么不直接 fork 包里的路径：fork 要的是磁盘上的真文件，而包是一个 zip 归档。
- * 所以启动前把包根那份 `backend.js` 落到 `<userData>/apps/<id>/backend/backend.cjs`——
+ * 所以启动前把包根那份 `backend.js` 落到 `~/.airship/data/<id>/backend/backend.cjs`——
  * 单文件是因为产包期已经把它 import 的东西全 bundle 进去了；
  * 影子叫 `.cjs` 是因为扩展名自带 CommonJS 声明：dev 模式的落点在作者项目树里，
  * 项目根 package.json 的 `"type": "module"` 会顺着目录找上来，`.js` 会被当 ESM 加载，
@@ -62,7 +62,7 @@ function backendEnv(id: AppId): NodeJS.ProcessEnv {
   }
 }
 
-/** 后端程序在磁盘上的落点根：`<userData>/apps/<id>/backend` */
+/** 后端程序在磁盘上的落点根：`~/.airship/data/<id>/backend` */
 export function backendRootDir(id: AppId): string {
   return join(appBaseDir(id), 'backend')
 }

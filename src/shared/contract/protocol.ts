@@ -134,7 +134,7 @@ export interface AppPaths {
   data: string
   /** 本应用缓存目录，可随时整体删除重建 */
   cache: string
-  /** runtime 的全局数据根目录 */
+  /** airship 的家目录（`~/.airship`）：这一族的数据、共享区、日志都在它下面 */
   root: string
   /** 本应用有权访问的共享命名空间根目录 */
   shared: Partial<Record<SharedNamespace, string>>

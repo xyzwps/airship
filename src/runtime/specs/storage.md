@@ -8,7 +8,7 @@
 #### Scenario: ST-001 应用之间看不到彼此的设置
 - **WHEN** airship-ffmpeg 写一条自己的设置，airship-s3 读同一个键名
 - **THEN** airship-s3 读不到 airship-ffmpeg 那笔（它拿到自己的回落值）
-- **AND** 磁盘上是两份文件：`apps/airship-ffmpeg/settings.json` 与 `apps/airship-s3/settings.json`，根上没有 runtime 自己的设置文件
+- **AND** 磁盘上是两份文件：`~\.airship\data\airship-ffmpeg\settings.json` 与 `~\.airship\data\airship-s3\settings.json`，`~\.airship` 根上没有 runtime 自己的设置文件
 
 #### Scenario: ST-002 写 undefined 等于把这个键删掉
 - **WHEN** 应用把某个键设成 `undefined`
@@ -42,5 +42,5 @@
 
 #### Scenario: ST-008 注册之后第一次读写就能落进自己的目录，不看启动时刻
 - **WHEN** runtime 已经跑起来了，第二实例才转发进来一个新包，它头一次读写自己的数据
-- **THEN** 读到的路径落在 `userData/apps/<id>/data`，目录不存在就当场建出来，设置文件同样可写
+- **THEN** 读到的路径落在 `~\.airship\data\<id>`，目录不存在就当场建出来，设置文件同样可写
 - **AND** 不出现 `Cannot read properties of undefined (reading 'data')` 这类"目录表里没有它"的失败

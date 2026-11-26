@@ -1,18 +1,18 @@
 # 飞船（airship）
 
-飞船是一套装在自己电脑上的小工具：一个共享的 **airship runtime**（一个 Electron 运行时，像 JVM / .NET 那样装一次、大家共用），外面挂着八个各管一件事的应用——看电子书、读 PDF、勾待办、跑生命游戏、编排 FFmpeg、看 WSL 容器、编辑 SVG、浏览 S3 对象存储。
+飞船是一套装在自己电脑上的小工具：一个共享的 **airship runtime**（一个 Electron 运行时，像 JVM / .NET 那样装一次、你这个用户的应用都共用它），外面挂着八个各管一件事的应用——看电子书、读 PDF、勾待办、跑生命游戏、编排 FFmpeg、看 WSL 容器、编辑 SVG、浏览 S3 对象存储。
 
 它想解决的是自用工具的那个老问题：每写一个小工具就得装一个 Electron、开一份仓库、配一遍构建，用两次就懒得再开。在飞船里，运行时只装一份，工具是**一个自己就能安装、装完有个快捷方式的小包**。
 
 ## 三个基本想法
 
-**运行时和应用是分开的两件事。** runtime 装一次，钉死在 `C:\Program Files\airship\runtime`（要管理员）。应用打包成 `<id>.airship`（其实是一个 zip 换了扩展名），由**它自己的安装器**装进每用户目录 `%LOCALAPPDATA%\airship\apps\<id>\`（不要管理员），并在桌面和开始菜单留一枚快捷方式。快捷方式的目标就是 runtime 的 `airship.exe` 加上那份包的路径——双击它，runtime 就开出这个应用的窗口。
+**运行时和应用是分开的两件事。** runtime 装一次，钉死在 `~\.airship\runtime`（装进你自己的主目录，不要管理员）。应用打包成 `<id>.airship`（其实是一个 zip 换了扩展名），由**它自己的安装器**装进同一棵树里的 `~\.airship\apps\<id>\`（不要管理员），并在桌面和开始菜单留一枚快捷方式。快捷方式的目标就是 runtime 的 `airship.exe` 加上那份包的路径——双击它，runtime 就开出这个应用的窗口。
 
 **runtime 不认识任何具体应用。** 跑哪些包由命令行决定（`airship.exe <id>.airship`，可以一次指多份），注册一份、开一个窗口。安装包的产物里没有一行应用代码，runtime 自己也没有界面。所以加一个应用、更新一个应用、卸掉一个应用，都不需要重新出 runtime 的安装包——runtime 是纯的，应用是外挂的。
 
 **一个应用一个窗口一个渲染进程。** 应用只能通过 `window.airship` 这一面碰系统，而且能碰什么必须先写在自己的清单里声明；没声明的一律拒绝，并给出读得懂的原因。于是改一个应用不用管其余七个，一个应用崩了也不带崩别人。多个应用共用一个 runtime 进程：第二次启动会把包路径转发给已在跑的那一份，同 id 同包只是把窗口唤到前面。
 
-数据由 runtime 统一托管在各应用自己的目录里（`%APPDATA%\airship\apps\<id>\`）。应用安装器卸载时只删安装目录、快捷方式与卸载项，**不动**这份数据。
+数据由 runtime 统一托管在各应用自己的目录里（`~\.airship\data\<id>\`）。应用安装器卸载时只删安装目录、快捷方式与卸载项，**不动**这份数据。
 
 ## 里面装着什么
 
@@ -29,8 +29,8 @@
 
 ## 怎么用
 
-1. **装 runtime**：双击 `airship-runtime-Setup-<版本>-x64.exe`，它一定装进 `C:\Program Files\airship\runtime`（要管理员）。装完没有界面、没有快捷方式——runtime 是给人双击应用快捷方式时在背后跑起来的，不是单独打开的。
-2. **装应用**：双击某个应用的 `<id>-Setup-<版本>.exe`。它先去找 runtime（`AIRSHIP_PATH` 环境变量优先，否则 `C:\Program Files\airship\runtime`），找不到就念一句"没找到 airship runtime"中止；找到了就把包放进 `%LOCALAPPDATA%\airship\apps\<id>\`，留好快捷方式。
+1. **装 runtime**：双击 `airship-runtime-Setup-<版本>-x64.exe`，它一定装进 `~\.airship\runtime`（不要管理员，每个 Windows 用户各装自己那一份）。装完没有界面、没有快捷方式——runtime 是给人双击应用快捷方式时在背后跑起来的，不是单独打开的。
+2. **装应用**：双击某个应用的 `<id>-Setup-<版本>.exe`。它先去找 runtime（`AIRSHIP_PATH` 环境变量优先，否则 `~\.airship\runtime`），找不到就念一句"没找到 airship runtime"中止；找到了就把包放进 `~\.airship\apps\<id>\`，留好快捷方式。
 3. **开应用**：双击桌面或开始菜单那枚快捷方式。第一次直跑一个陌生包，runtime 会先把它要的能力念给你听（"读你的文件、跑外部程序……"），点"跑"才开窗口；点取消就不开。之后同一个包不再问。
 
 没有代码签名，第一次运行会被 SmartScreen 拦一道，点"仍要运行"。

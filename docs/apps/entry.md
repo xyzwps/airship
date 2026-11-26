@@ -36,7 +36,7 @@ fs 除能力位外还要过一层路径表：自己数据目录内天然可读�
 要连外部服务、流式读写大文件、跑长任务的应用自带一份 Node 进程（现成两份：S3 与 airship-dago）。
 
 - 有没有它看**包形状**：归档根有 `backend.js` 才有。源项目应用目录里的 `backend.ts` / `backend.js` 有且只有一处，产包时 bundle 成那一份。
-- 起进程前落到 `<userData>/apps/<id>/backend/backend.cjs`——`.cjs` 让扩展名自带 CommonJS 声明，不受外层 `"type": "module"` 影响。
+- 起进程前落到 `~\.airship\data\<id>\backend\backend.cjs`——`.cjs` 让扩展名自带 CommonJS 声明，不受外层 `"type": "module"` 影响。
 - 写这个文件要守的对话形状：runtime 发 `{ seq, method, payload }`；后端启动后**第一件事**回 `{ ready: true }`，之后每条回 `{ seq, ok, value | error }`，主动推走 `{ event: true, method, payload }`。等就绪 10 秒，单次回话 30 秒。
 - 生命周期跟着窗口：开窗预热（起不来只进日志）、关窗收掉；它崩了不拖累窗口，下一次 invoke 再拉起新的。
 - 交给它的位置只有 env 三件套 `AIRSHIP_APP_ID` / `AIRSHIP_DATA_DIR` / `AIRSHIP_CACHE_DIR`，数据只该落在这两个目录里。

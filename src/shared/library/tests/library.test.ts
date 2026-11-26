@@ -20,7 +20,7 @@ import { FakeAirship } from '@airship/sdk/testing'
  * 所有断言读的都是那份内存卷与索引文件的原文，不看内部实现。
  */
 
-const SHARED = '/fake/userData/shared/library'
+const SHARED = '/fake/.airship/shared/library'
 const INDEX = `${SHARED}/library.json`
 
 /**
@@ -91,7 +91,7 @@ describe('索引文件自己带版本', () => {
     fake.seed(INDEX, '{"version":1,"books":[]}')
     await expect(loadBooks(fake.api)).rejects.toThrow('书库索引是 v1，本包只认 v2。')
     const message = await loadBooks(fake.api).catch((e: unknown) => String(e))
-    expect(message).toContain('删掉 userData/shared/library/library.json')
+    expect(message).toContain('删掉 ~/.airship/shared/library/library.json')
     expect(message).toContain('书本体和封面不用动')
 
     // 没写版本的同样被拒，念出来的是 v?

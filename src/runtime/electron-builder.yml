@@ -1,7 +1,7 @@
 # 打包配置（Windows 安装包）——**这个文件属于 runtime 那个包**：项目根是 src/runtime，
 # 版本号读 src/runtime/package.json，安装包落仓库根的 release/。
 #
-# runtime 是全机器共享的运行时：perMachine（要管理员），落点钉死 C:\Program Files\airship\runtime
+# runtime 装的是你这个用户的一份：perMachine: false（不要管理员），落点钉死 ~\.airship\runtime
 # （目录的唯一真源在 build/installer.nsh 的 customInit）。产物名是 runtime 口径：
 # airship-runtime-Setup-<版本>-x64.exe，主 exe 叫 airship.exe（应用快捷方式的目标就是它）。
 # 向导双语（按系统界面语言自动选）；runtime 自己没有界面，不留快捷方式，只留控制面板里的卸载项。
@@ -46,9 +46,10 @@ nsis:
   # 装完不该弹一个"要不要运行 airship"的提示——双击一个没带包的 runtime 只会念用法。
   # false → electron-builder 定义 HIDE_RUN_AFTER_FINISH，去掉完成页的 StartApp。
   runAfterFinish: false
-  # runtime 是全机器共享的运行时：装一次要管理员，落点钉死 C:\Program Files\airship\runtime
-  # （目录的唯一真源在 build/installer.nsh 的 customInit，这里只负责提权与去掉换目录页）
-  perMachine: true
+  # runtime 装进当前用户的主目录（2026-11-26 从 Program Files 挪来）：~\.airship\runtime，不要管理员。
+  # 「一台机器一份、大家共用」让位给「一个用户一份」：省掉 UAC，也不往 Program Files 写东西。
+  # 目录的唯一真源在 build/installer.nsh 的 customInit，这里只负责不提权与去掉换目录页
+  perMachine: false
   allowToChangeInstallationDirectory: false
   include: installer.nsh
   # runtime 自己没有界面：不留桌面/开始菜单快捷方式（双击一个没带包的 runtime 只会念用法）。
@@ -56,7 +57,7 @@ nsis:
   createDesktopShortcut: false
   createStartMenuShortcut: false
   uninstallDisplayName: airship runtime
-  # 卸载不动用户数据：%APPDATA%/airship 里是书架与设置，删掉太狠
+  # 卸载不动用户数据：~\.airship 下的 data 与 shared 里是书架与设置，删掉太狠
   deleteAppDataOnUninstall: false
   installerLanguages:
     - zh_CN

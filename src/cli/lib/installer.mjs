@@ -48,9 +48,9 @@ export function installerScript({ id, name, version, capabilities, hasBackend = 
 Unicode true
 Name "${displayName}"
 OutFile "${id}-Setup-${version}.exe"
-; 每用户安装（PK-035）：不提权，落点在 $LOCALAPPDATA 下
+; 每用户安装（PK-035）：不提权，落点在 $PROFILE\.airship\apps\<id>（与 runtime、数据同一棵树）
 RequestExecutionLevel user
-InstallDir "$LOCALAPPDATA\\airship\\apps\\${id}"
+InstallDir "$PROFILE\\.airship\\apps\\${id}"
 
 ; ---- MUI2 向导 ----
 ; 欢迎页念安装目录与能力清单，进度页干净不刷日志，完成页点「完成」直接关窗（不带「运行」勾选）。
@@ -82,7 +82,7 @@ Function .onInit
   StrCpy $RuntimeDir $0
   Goto found
   try_fixed:
-  StrCpy $0 "$PROGRAMFILES64\\airship\\runtime"
+  StrCpy $0 "$PROFILE\\.airship\\runtime"
   IfFileExists "$0\\airship.exe" 0 not_found
   StrCpy $RuntimeDir $0
   Goto found
@@ -114,7 +114,7 @@ Section "Uninstall"
   Delete "$DESKTOP\\${displayName}.lnk"
   Delete "$SMPROGRAMS\\${displayName}.lnk"
   DeleteRegKey HKCU "${regKey}"
-  ; 只删安装目录（PK-034）：设置与数据在别的目录，这里一个字节都不碰。
+  ; 只删安装目录 apps\<id>（PK-034）：设置与数据在同一棵树的 data\<id> 下，这里一个字节都不碰。
   RMDir /r "$INSTDIR"
 SectionEnd
 `

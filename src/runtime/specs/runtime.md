@@ -53,7 +53,7 @@ runtime 没有启动器、没有格子：`airship.exe <id>.airship` 注册一份
 
 #### Scenario: SH-034 任务栏那颗按钮带的是应用自己的图标
 - **WHEN** 一个自带 `icon.ico`（PK-036）的包的窗口开起来
-- **THEN** 交给外壳的图标是磁盘上的 `<userData>/icons/<id>.ico`，字节与包内那份相同；包换了才重写
+- **THEN** 交给外壳的图标是磁盘上的 `~\.airship\icons\<id>.ico`，字节与包内那份相同；包换了才重写
 - **AND** 包里没有 `icon.ico` 时窗口照样开、身份照样是应用那一个，只是不交图标，日志念一句回落
 
 #### Scenario: SH-035 固定到任务栏的按钮点得开对的那个应用

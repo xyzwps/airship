@@ -10,7 +10,7 @@ import { REAL_APPS } from '../../runtime/tests/helpers/realApps'
  *
  * 真装一遍、快捷方式真双击归真机走查（just app-installer airship-life-game）；
  * 这里钉的是生成器的纯函数输出：找 runtime 的顺序、落点、快捷方式命令行、
- * 能力措辞（与契约层逐字一致）、卸载带走什么、两个安装器各要各的权限。
+ * 能力措辞（与契约层逐字一致）、卸载带走什么、两个安装器都装进 ~/.airship 且都不提权。
  */
 
 const REPO = join(__dirname, '..', '..', '..')
@@ -26,7 +26,7 @@ describe('安装器找 runtime', () => {
     const script = scriptOf(game)
     // AIRSHIP_PATH 在前，固定目录在后（与 tools.ts 同一套顺序）
     const envAt = script.indexOf('ReadEnvStr $0 "AIRSHIP_PATH"')
-    const fixedAt = script.indexOf('$PROGRAMFILES64\\airship\\runtime')
+    const fixedAt = script.indexOf('$PROFILE\\.airship\\runtime')
     expect(envAt).toBeGreaterThan(-1)
     expect(fixedAt).toBeGreaterThan(envAt)
     // 两处都按 airship.exe 在不在判
@@ -41,7 +41,7 @@ describe('安装器找 runtime', () => {
 describe('装完留下什么', () => {
   it('PK-032 落点与快捷方式的命令行', () => {
     const script = scriptOf(game)
-    expect(script).toContain('InstallDir "$LOCALAPPDATA\\airship\\apps\\airship-life-game"')
+    expect(script).toContain('InstallDir "$PROFILE\\.airship\\apps\\airship-life-game"')
     expect(script).toContain('SetOutPath "$INSTDIR"')
     expect(script).toContain('File "airship-life-game.airship"')
     // 目标与参数两段都带引号；图标是包内那张转的 .ico
@@ -78,24 +78,24 @@ describe('卸载带走什么', () => {
     expect(uninstall).toContain(`Delete "$DESKTOP\\${game.name}.lnk"`)
     expect(uninstall).toContain('DeleteRegKey HKCU')
     expect(uninstall).toContain('RMDir /r "$INSTDIR"')
-    // 设置与数据在 %APPDATA%\airship\apps\<id>：整份脚本根本不出现那个目录
-    expect(script).not.toMatch(/\$APPDATA|%APPDATA%/i)
+    // 设置与数据在同一棵树的 data\<id> 下：整份脚本读不到那一段路径
+    expect(script).not.toMatch(/\.airship\\data|%APPDATA%|\$APPDATA/i)
   })
 })
 
-describe('两个安装器各要各的权限', () => {
-  it('PK-035 应用每用户不提权，runtime 全机器钉死目录', () => {
+describe('两个安装器都装进 ~/.airship，都不要管理员', () => {
+  it('PK-035 应用每用户不提权，runtime 每用户钉死目录', () => {
     const script = scriptOf(game)
     expect(script).toContain('RequestExecutionLevel user')
-    expect(script).toContain('InstallDir "$LOCALAPPDATA\\airship\\apps\\airship-life-game"')
-    // 应用安装器只往 $INSTDIR（$LOCALAPPDATA 下）写，不往 Program Files 写
+    expect(script).toContain('InstallDir "$PROFILE\\.airship\\apps\\airship-life-game"')
+    // 应用安装器只往 $INSTDIR（$PROFILE\.airship\apps 下）写，不往 Program Files 写
     expect(script).not.toMatch(/SetOutPath "\$PROGRAMFILES/)
 
-    // runtime 那份：perMachine + 固定目录的唯一真源在 installer.nsh
+    // runtime 那份：每用户 + 固定目录的唯一真源在 installer.nsh
     const nsh = readFileSync(join(REPO, 'src', 'runtime', 'build', 'installer.nsh'), 'utf8')
-    expect(nsh).toContain('StrCpy $INSTDIR "$PROGRAMFILES64\\airship\\runtime"')
+    expect(nsh).toContain('StrCpy $INSTDIR "$PROFILE\\.airship\\runtime"')
     const yml = readFileSync(join(REPO, 'src', 'runtime', 'electron-builder.yml'), 'utf8')
-    expect(yml).toMatch(/perMachine: true/)
+    expect(yml).toMatch(/perMachine: false/)
     expect(yml).toMatch(/allowToChangeInstallationDirectory: false/)
     // runtime 安装包不带任何应用归档（没有 extraResources 那一档）
     expect(yml).not.toContain('extraResources')

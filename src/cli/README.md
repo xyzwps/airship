@@ -28,4 +28,4 @@ npm run installer   把包裹成每用户安装器 exe（这台机器要先有 N
 --makensis <路径>  指到 makensis.exe；也可用环境变量 AIRSHIP_MAKENSIS 或让它进 PATH
 ```
 
-runtime 不用你操心从哪来：命令自己按 `AIRSHIP_PATH` > `C:\Program Files\airship\runtime` 去找，找不到会把话说到脸上。
+runtime 不用你操心从哪来：命令自己按 `AIRSHIP_PATH` > `~\.airship\runtime` 去找，找不到会把话说到脸上。

@@ -8,11 +8,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * 真写磁盘：日志这件事的判据就是文件里那一行长什么样。
  */
 
-const ROOT = join(__dirname, '.tmp', 'logs-userData')
+const ROOT = join(__dirname, '.tmp', 'logs-home')
+const AIRSHIP = join(ROOT, '.airship')
 
 vi.mock('electron', async () => {
   const { join: p } = await import('node:path')
-  return { app: { getPath: () => p(__dirname, '.tmp', 'logs-userData') } }
+  return { app: { getPath: () => p(__dirname, '.tmp', 'logs-home') } }
 })
 
 const { log } = await import('../main/services/logging')
@@ -34,11 +35,12 @@ describe('一天一个文件，行形状固定', () => {
     rmSync(ROOT, { recursive: true, force: true })
     mkdirSync(ROOT, { recursive: true })
     // paths() 把目录缓存住了，重新建出来即可
-    mkdirSync(join(ROOT, 'logs'), { recursive: true })
+    mkdirSync(AIRSHIP, { recursive: true })
+    mkdirSync(join(AIRSHIP, 'logs'), { recursive: true })
   })
 
   it('LG-001 日志落在按天的文件里，目录不存在时自动建', () => {
-    rmSync(join(ROOT, 'logs'), { recursive: true, force: true })
+    rmSync(join(AIRSHIP, 'logs'), { recursive: true, force: true })
     log.info('shell', '按天落盘')
     expect(existsSync(todayFile())).toBe(true)
     expect(todayFile()).toMatch(/logs[\\/]airship-\d{4}-\d{2}-\d{2}\.log$/)
@@ -81,7 +83,7 @@ describe('一天一个文件，行形状固定', () => {
   })
 
   it('LG-005 日志写不进去不能把应用带崩', () => {
-    const dir = join(ROOT, 'logs')
+    const dir = logDir()
     rmSync(dir, { recursive: true, force: true })
     writeFileSync(dir, '这是个占位的文件，不是目录', 'utf8')
     const spy = vi.spyOn(console, 'log').mockImplementation(() => undefined)

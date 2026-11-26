@@ -61,7 +61,7 @@ afterEach(() => {
 function todayLog(): string {
   const d = new Date()
   const name = `airship-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.log`
-  const file = join(ROOT, 'logs', name)
+  const file = join(ROOT, '.airship', 'logs', name)
   return existsSync(file) ? readFileSync(file, 'utf8') : ''
 }
 

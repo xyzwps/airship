@@ -109,8 +109,8 @@ describe('调用只返回信封，失败必须是中文句子', () => {
     const res = await call<{ data: string }>('runtime:paths', VCP, 'airship-ffmpeg')
     expect(res.ok).toBe(true)
     const value = (res as { value: { data: string; cache: string; platform: string } }).value
-    expect(value.data.replace(/\\/g, '/')).toMatch(/apps\/airship-ffmpeg\/data$/)
-    expect(value.cache.replace(/\\/g, '/')).toMatch(/apps\/airship-ffmpeg\/cache$/)
+    expect(value.data.replace(/\\/g, '/')).toMatch(/\.airship\/data\/airship-ffmpeg$/)
+    expect(value.cache.replace(/\\/g, '/')).toMatch(/\.airship\/data\/airship-ffmpeg\/cache$/)
   })
 
   it('BR-002 被拒时应用拿到的是中文原因，不是 Electron 的内部措辞', async () => {

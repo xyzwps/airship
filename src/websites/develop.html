@@ -122,7 +122,7 @@ $ npm run pack
 
           <h2 class="sub" id="run">第一扇窗口</h2>
           <pre><code>$ npm run start
-[airship] C:\Users\…\dist-apps\my-todo.airship → C:\Program Files\airship\runtime\airship.exe
+[airship] C:\Users\…\dist-apps\my-todo.airship → C:\Users\…\.airship\runtime\airship.exe
 2026-11-24T13:53:13.523Z INFO  [runtime] 命令行指来的包 {"id":"my-todo","archive":"…\\dist-apps\\my-todo.airship"}
 2026-11-24T13:53:13.528Z INFO  [runtime] 启动 {"version":"0.4.3",…}
 …
@@ -213,7 +213,7 @@ parent.postMessage({ ready: true })</code></pre>
             airship 里"有没有后端"是包形状的事实，不是授权：应用目录里有这份文件，产包流水就把它编成包根那份 <code>backend.js</code>；runtime 在包里看到那个条目，
             才把它起成<strong>它自己的一份进程</strong>（Electron utilityProcess），前后端走消息做请求-回话；它崩了不拖累窗口，窗口关掉它也退出。（<code>npx create-airship-app &lt;目录&gt; --template todo</code> 就是这三份文件的成品版，拿来对照最方便。）
           </p>
-          <p>界面上加一条待办，它就落进 <code>%APPDATA%\airship\apps\my-todo\data\todos.json</code>——每个应用独享 data 目录（后端进程里就是 <code>AIRSHIP_DATA_DIR</code>），别的应用碰不到，卸载也不跟着删。</p>
+          <p>界面上加一条待办，它就落进 <code>~\.airship\data\my-todo\todos.json</code>——每个应用独享 <code>data\&lt;id&gt;</code> 那一族（后端进程里就是 <code>AIRSHIP_DATA_DIR</code>），别的应用碰不到，卸载也不跟着删。</p>
 
           <h2 class="sub" id="todoapp">后端靠约定，不进清单</h2>
           <p>清单只把显示名和描述换成待办那两行，能力位照旧空数组：能力位收的是宿主代管的资源（读写设置、开文件…），"随包自带一段 Node 代码"是这个包自己的构成物——从起点到待办，它都不占能力位、也不写进清单。</p>
@@ -522,10 +522,10 @@ icon.ico,  icon.png,  index.html,  manifest.json</code></pre>
           <pre><code>$ npm run dev
 [airship] 构建 my-todo 的包（注册期只读清单与图标）
 [airship] dev server http://127.0.0.1:5177 —— 改 C:\Users\…\my-todo\src 下的源码，窗口里刷新即见
-[airship] runtime C:\Program Files\airship\runtime\airship.exe（窗口数据在 .airship-dev/my-todo，不碰日常那套 userData）</code></pre>
+[airship] runtime C:\Users\…\.airship\runtime\airship.exe（窗口数据在 .airship-dev/my-todo，不碰日常的 ~/.airship）</code></pre>
           <p>
             这条路上同时有 dev server、被拉起的 runtime、一扇加载 dev server 源码的窗口。<strong>终端别急着关</strong>——它退出时窗口与 dev server 一起收，留着就是为了看报错。
-            窗口数据在项目里的 <code>.airship-dev/my-todo</code>，不抢日常那套 userData 的单实例锁。
+            窗口数据在项目里的 <code>.airship-dev/my-todo</code>（换的是整个家，不抢日常那一份的单实例锁）。
           </p>
 
           <h2 class="sub" id="devrules">哪样走包、哪样走源码</h2>
@@ -568,7 +568,7 @@ SHA256 26bf86dab56782fcf170c4c25286b30fe2fe2b417caae3045b3917b05cb701f9
           <h2 class="sub" id="installer">安装器都干了什么</h2>
           <ul>
             <li>
-              <strong>每用户，不要管理员</strong>：装进 <code>%LOCALAPPDATA%\airship\apps\my-todo\</code>，桌面与开始菜单各一枚快捷方式（目标是 runtime 的 <code>airship.exe</code> + 包路径）。
+              <strong>每用户，不要管理员</strong>：装进 <code>~\.airship\apps\my-todo\</code>（runtime 在同一棵树的 <code>runtime\</code> 下），桌面与开始菜单各一枚快捷方式（目标是 runtime 的 <code>airship.exe</code> + 包路径）。
               它先找 runtime，找不到就中止念出来——装应用不重新送 runtime。
             </li>
             <li>
@@ -581,7 +581,7 @@ SHA256 26bf86dab56782fcf170c4c25286b30fe2fe2b417caae3045b3917b05cb701f9
           </ul>
 
           <h2 class="sub" id="ship">分发出去之后</h2>
-          <p>收到 <code>my-todo-Setup-0.1.0.exe</code> 的人只需装过 runtime。他的数据在 <code>%APPDATA%\airship\apps\my-todo\data\todos.json</code>，卸载应用不删它，重装回来待办还在。</p>
+          <p>收到 <code>my-todo-Setup-0.1.0.exe</code> 的人只需装过 runtime。他的数据在 <code>~\.airship\data\my-todo\todos.json</code>，卸载应用不删它，重装回来待办还在。</p>
 
           <h2 class="sub" id="errors">报错对照表</h2>
           <p>本轮实走撞出的，原文照录：</p>

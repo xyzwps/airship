@@ -3,9 +3,9 @@
 飞船有**两个分发物**，互不包含：
 
 1. **runtime 安装包**——一个 `airship-runtime-Setup-<版本>-x64.exe`，装一次、大家共用，
-   钉死装进 `C:\Program Files\airship\runtime`（要管理员）。它是**纯 runtime**：一个应用都不带。
+   钉死装进 `~\.airship\runtime`（每用户，不要管理员）。它是**纯 runtime**：一个应用都不带。
 2. **应用安装器**——每个应用一个 `<id>-Setup-<版本>.exe`，每用户安装（不要管理员），
-   把那份 `<id>.airship` 装进 `%LOCALAPPDATA%\airship\apps\<id>\`，留一枚快捷方式当启动程序。
+   把那份 `<id>.airship` 装进同一棵树的 `~\.airship\apps\<id>\`，留一枚快捷方式当启动程序。
 
 **客户机不需要装 Node、不需要装 Electron。** runtime 安装包自带 Electron；应用安装器只裹一个归档，
 跑起来靠已装好的 runtime。
@@ -69,12 +69,12 @@ just installers           # 只重出全部应用的安装器（先产全部的�
    - `resources/` 里只有 `app.asar` 与 NSIS 的 `elevate.exe`：**没有任何 airship 包**（纯 runtime）。
      根 package.json 已经没有 dependencies（foliate-js 记在 airship-reader 名下，是
      devDependencies，构建期打进包；pdfjs-dist 随 PDF 应用于 2026-11-26 一并退场），所以不再需要"排除某个 node_modules 目录"那几条。
-   - `perMachine: true`（要管理员），落点钉死 `C:\Program Files\airship\runtime`——目录的唯一真源在
-     `installer.nsh` 的 `customInit`（`StrCpy $INSTDIR "$PROGRAMFILES64\airship\runtime"`），
+   - `perMachine: false`（每用户，不要管理员），落点钉死 `~\.airship\runtime`——目录的唯一真源在
+     `installer.nsh` 的 `customInit`（`StrCpy $INSTDIR "$PROFILE\.airship\runtime"`），
      `allowToChangeInstallationDirectory: false` 去掉换目录页。升级时读到的旧 InstallLocation 同样被覆盖。
    - 主 exe 叫 `airship.exe`（`productName: airship`），应用快捷方式的目标就是它。
    - runtime 自己没有界面：不留桌面/开始菜单快捷方式，只留控制面板卸载项（`airship runtime`）。
-     卸载**不动**用户数据（`deleteAppDataOnUninstall: false`，`%APPDATA%/airship` 里是书架与设置）。
+     卸载**不动**用户数据（`deleteAppDataOnUninstall: false`，`~\.airship` 下的 data 与 shared 里是书架与设置）。
    - 欢迎页（`installer.nsh` 的 `customWelcomePage`）把固定安装目录念给人看——安装过程能查看装哪，
      但目录仍钉死、不给改（`allowToChangeInstallationDirectory: false`）。
    - 完成页不带「运行」勾选、点「完成」直接关窗（`runAfterFinish: false` → `HIDE_RUN_AFTER_FINISH`）：
@@ -85,11 +85,11 @@ just installers           # 只重出全部应用的安装器（先产全部的�
    - 界面走 MUI2 向导（欢迎 / 进度 / 完成 + 卸载三页，简中+英文，图标用包内那张 `.ico`）：
      欢迎页念安装目录，进度页不刷日志，完成页点「完成」直接关窗。
    - `.onInit` 先念能力清单（措辞从 `@airship/contract` 烘进脚本，单一真源），取消就中止、一个文件都不写；
-     再找 runtime（`AIRSHIP_PATH` > `C:\Program Files\airship\runtime`），找不到念一句"没找到 airship runtime"中止。
-   - 落点 `$LOCALAPPDATA\airship\apps\<id>`，放进归档与包内那张图转成的 `icon.ico`。
+     再找 runtime（`AIRSHIP_PATH` > `~\.airship\runtime`），找不到念一句"没找到 airship runtime"中止。
+   - 落点 `$PROFILE\.airship\apps\<id>`，放进归档与包内那张 `icon.ico`。
    - 桌面 + 开始菜单各一枚快捷方式：目标 `"<runtime>\airship.exe"`，参数 `"<安装目录>\<id>.airship"`，
      两段都带引号，图标用应用自己那张 `.ico`（不是 runtime 的）。
-   - HKCU 卸载项。卸载删安装目录、两处快捷方式、注册表，**不碰** `%APPDATA%` 里的设置与数据。
+   - HKCU 卸载项。卸载删安装目录、两处快捷方式、注册表，**不碰**同一棵树里 `~\.airship\data\<id>` 的设置与数据。
    - 这个 `.mjs` 直接 import `@airship/contract`（Node 24 的类型剥离吃得下契约包），措辞与 id 形状只有一份。
 
 ## 版本号
@@ -124,12 +124,13 @@ just installers           # 只重出全部应用的安装器（先产全部的�
   完成页点「完成」直接关窗（`runAfterFinish: false`）；应用安装器套 MUI2 向导；首次直跑的能力确认卡片删除
   （授权只在安装期，PK-033）。验证到：`just check` 全绿（558 过 / 10 跳过，casecov 零差集）、runtime 安装包重出六检全绿、
   八个应用安装器带 MUI2 真编译产出。**真机安装走查**（欢迎页真念出路径、完成真不弹窗、双击应用真不再弹卡片）
-  要装一遍才算数——把 runtime 装进 Program Files 是系统级动作，由使用者执行。
+  要装一遍才算数——装 runtime、动 `~\.airship` 下的旧数据是系统级动作，由使用者执行。
 - **应用安装器真装真卸过**（第三档样件，airship-life-game）：双击快捷方式跑得起（日志 `[airship-life-game] 应用窗口已打开`）；
-  卸载把安装目录、两处快捷方式、HKCU 注册表删净，`%APPDATA%` 里的数据 SHA256 前后相同。
-- 打包版与开发版共用 `%APPDATA%/airship`，装上去书架是同一份。这个目录名靠主进程开头一句
-  `app.setName('airship')` 钉住——runtime 的包名是 `@airship/runtime`，不钉的话 Electron 会把数据写进
-  `%APPDATA%/@airship/`，老用户的书架看着就像空了。
+  卸载把安装目录、两处快捷方式、HKCU 注册表删净，`~\.airship\data\airship-life-game` 里的数据 SHA256 前后相同。
+- 落点只有一棵树：日常那一份在 `~\.airship`（runtime `runtime\`、包 `apps\<id>\`、数据 `data\<id>\`）。
+  仓内 `just dev` 不再与它共用数据——配方把整个家经 `AIRSHIP_HOME` 指到项目里的 `.airship-dev/<id>`；
+  截图模式整份落到 `~\.airship-shot`。Electron 自己的浏览器档单独一区 `~\.airship\profile`（主进程开局钉过去），
+  `app.setName('airship')` 只为日志与外壳身份念得对，**数据布局不跟 userData 走**（paths.ts 从 `airshipHome()` 派生）。
 
 ## 没做的事（实话）
 
@@ -137,7 +138,7 @@ just installers           # 只重出全部应用的安装器（先产全部的�
 要先装 Inno 6、TD-013 SDK 独立发布与版本协商、TD-014 装包的来源信任与更新链路。
 
 对拿到安装包的人来说只有一条要预告：**没有签名，第一次运行会被 SmartScreen 拦一道"未知发布者"**，
-点"仍要运行"就过去了。runtime 安装包要管理员（装进 Program Files）；应用安装器不要（每用户）。
+点"仍要运行"就过去了。两个安装器都不要管理员（每用户，都装进 `~\.airship` 那一棵树）。
 
 ## 客户机要求
 

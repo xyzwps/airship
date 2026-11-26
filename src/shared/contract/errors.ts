@@ -75,7 +75,7 @@ export const sameIdDifferentArchive = (id: string, active: string, incoming: str
 
 /** 安装器找不到 runtime：念清装哪、怎么指，然后中止，一个文件都不写 */
 export const runtimeNotFound = (): string =>
-  '找不到 airship runtime：先装 runtime（固定装在 C:\\Program Files\\airship\\runtime），' +
+  '找不到 airship runtime：先装 runtime（固定装在 %USERPROFILE%\\.airship\\runtime），' +
   '或把 AIRSHIP_PATH 指到它所在的目录。'
 
 /** 装应用前的能力确认念的那两句（与直跑那份同一套人话摘要；后台事实从包形状来） */

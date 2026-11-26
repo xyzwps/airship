@@ -21,8 +21,8 @@ airship runtime（一个 Electron 进程，src/runtime/，@airship/runtime）
   每个应用 = <id>.airship 归档 + 它自己的每用户安装器 + 一枚快捷方式
 ```
 
-runtime 装一次，钉死在 `C:\Program Files\airship\runtime`（perMachine，要管理员）。
-应用由**它自己的安装器**装进每用户目录 `%LOCALAPPDATA%\airship\apps\<id>\`（不要管理员），
+runtime 装一次，钉死在 `~\.airship\runtime`（每用户，不要管理员）。
+应用由**它自己的安装器**装进同一棵树的 `~\.airship\apps\<id>\`（同样不要管理员），
 安装器在桌面与开始菜单留一枚快捷方式，目标就是 runtime 的 `airship.exe` 加上那份包的绝对路径。
 双击快捷方式 → runtime 注册那份包 → 开出这个应用的窗口。
 
@@ -54,7 +54,7 @@ runtime 装一次，钉死在 `C:\Program Files\airship\runtime`（perMachine，
   能碰什么由清单 `capabilities` 声明，没声明的一律拒绝并给出读得懂的原因（措辞在 `@airship/contract`）。
 - **I-3 身份由 runtime 绑定注入，应用冒充不了别人。** preload 从启动参数注入 id，
   主进程再用 `event.sender` 反查归属二次确认。应用代码从不传自己的 id。
-- **I-4 数据由 runtime 统一托管。** 各应用的数据落在 `%APPDATA%\airship\apps\<id>\` 下它自己那一族，
+- **I-4 数据由 runtime 统一托管。** 各应用的数据落在 `~\.airship\data\<id>\` 下它自己那一族，
   应用不自己挑落盘位置。共享数据区（书库）由 runtime 创建与托管。
 - **I-5 加一个应用不改 runtime 侧任何文件。** 名单来自命令行指来的包，不是写死的 id 表。
   契约层刻意不维护 id 名单（`AppId = string`，运行期校验）。这条有 AP-010 守着：
@@ -71,8 +71,9 @@ runtime 装一次，钉死在 `C:\Program Files\airship\runtime`（perMachine，
 
 **启动流程**（`src/runtime/main/index.ts`）：
 
-1. `app.setName('airship')` 钉死数据目录名（Electron 的 userData 默认取 package.json 的 name，
-   而那个 name 是 `@airship/runtime`——不钉住的话书架与设置会在某次升级后"凭空消失"，其实是换了目录）。
+1. `app.setName('airship')`（否则 Electron 的默认名取 package.json 的 `@airship/runtime`，日志与外壳身份都念得难看）
+   + `app.setPath('userData', profileDir())` 把浏览器档单独钉到 `~\.airship\profile`。
+   **数据布局不跟 userData 走**——paths.ts 是从 `airshipHome()` 派生的，改任何一边都要想到另一边。
 2. 抢单实例锁，**在 `whenReady` 之前**：`const GOT_LOCK = SHOT_MODE || app.requestSingleInstanceLock()`。
    抢不到不是错误——argv 会由 Electron 自动交给第一实例的 `second-instance`，这次直接 `app.quit()`。
    `whenReady` 首行 `if (!GOT_LOCK) return`：不然第二实例也会把启动跑完、开出一扇重复的窗再退出
@@ -110,7 +111,7 @@ runtime 装一次，钉死在 `C:\Program Files\airship\runtime`（perMachine，
 relaunchDisplayName })`（win32 专有；后两条必须成对，否则外壳两条一起忽略）。从前那句
 `window.setAppUserModelId?.(...)` 是假绿——方法只挂在 `app`（进程级）上，BrowserWindow 没有，可选链把失败
 吞成空操作，八个应用仍共用 `dev.xyzwp.airship` 一个身份。现在 `appId` 是 `dev.xyzwp.airship.<id>`，
-图标取包根那份随包备好的 `icon.ico`（PK-036）落到 `%APPDATA%\airship\icons\<id>.ico` 交给外壳——
+图标取包根那份随包备好的 `icon.ico`（PK-036）落到 `~\.airship\icons\<id>.ico` 交给外壳——
 外壳只认磁盘上的 `.ico`，asar 与 `airship://` 它不认；包里缺那一份时身份照样分开、只回落 runtime 的图标并在日志念一句。
 判据在 `runtime.md` 的 SH-010 / SH-034 / SH-035。**还没做的那半件**：`.lnk` 上没有 per-app 的 AUMID
 （NSIS 裸 `CreateShortCut` 写不了 `System.AppUserModel.ID`，那要 ShellLink 插件），记在 todo.md TD-001。
@@ -126,7 +127,7 @@ relaunchDisplayName })`（win32 专有；后两条必须成对，否则外壳两
 性能按**用户可感知的指标**报，并且要有实测数字。`just shot` 逐窗口截图时顺手打两行：
 `[metrics]` 是每窗口的工作集（趁窗口还开着采样，关掉之后就没有这个数字），
 `[perf]` 是首屏挂载耗时（`mountMs`，从开窗口到渲染侧报就绪）与若干标记。
-截图模式用独立 userData（`airship-shot-profile`），逐个开窗、按下快门、关掉再下一个，
+截图模式整份家换到 `~\.airship-shot`（数据与浏览器档都不碰日常那一份），逐个开窗、按下快门、关掉再下一个，
 所以每个数字是那一扇窗在隔离状态下的，不是八扇全开的累计。
 
 本轮（2026-11-19，`just shot`，编译后的 runtime 产物直跑，DPI 1.5）：
@@ -308,12 +309,12 @@ sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `iconPath`
 **应用安装器**（`code/make-app-installer.mjs`，PK-031~035）：每个应用一个每用户的 `setup.exe`
 （`release/apps/<id>-Setup-<版本>.exe`），NSIS `RequestExecutionLevel user`（不要管理员）：
 
-- 落点 `$LOCALAPPDATA\airship\apps\<id>`，把那份 `<id>.airship` 放进去。
-- `.onInit` 先找 runtime：`AIRSHIP_PATH` 环境变量优先，否则 `$PROGRAMFILES64\airship\runtime`；
+- 落点 `$PROFILE\.airship\apps\<id>`，把那份 `<id>.airship` 放进去（runtime 与应用同在一棵 `~\.airship` 树下）。
+- `.onInit` 先找 runtime：`AIRSHIP_PATH` 环境变量优先，否则 `$PROFILE\.airship\runtime`；
   找不到就念一句"没找到 airship runtime"（`runtimeNotFound`，措辞在契约层）中止，不装。
 - 安装页念这个应用要的能力清单（`capabilitiesPhrase`，契约层单一真源），`MB_OKCANCEL` 确认。
 - `CreateShortcut` 桌面 + 开始菜单各一枚：目标 runtime 的 `airship.exe` + 引号包路径 + 应用的 `icon.ico`。
-- HKCU 卸载项。`Section Uninstall` 删安装目录、两处快捷方式、注册表，**不碰** `%APPDATA%` 里的数据。
+- HKCU 卸载项。`Section Uninstall` 删安装目录、两处快捷方式、注册表，**不碰**同一棵树里 `~\.airship\data\<id>` 的数据。
 - 界面走 MUI2 向导（欢迎 / 进度 / 完成 + 卸载三页，简中+英文）：欢迎页念安装目录，进度页不刷日志，
   完成页点「完成」直接关窗；图标用包内那张 `.ico`。能力确认仍是 `.onInit` 里那张 `MB_OKCANCEL`。
 
@@ -361,20 +362,27 @@ CSP 由 SDK 产包时注入（产包一条、开发一条，不再按清单分�
 
 ## 9. 数据与存储
 
-全部在 Electron 的 userData（`%APPDATA%\airship`）下：
+全部在 `~\.airship` 这一棵树里（布局真源 `src/runtime/main/services/paths.ts`；整棵树可换家：
+`AIRSHIP_HOME` 指哪就是哪，dev 用它把窗口数据隔离到项目里的 `.airship-dev/<id>`，截图模式整份落到 `~\.airship-shot`）：
 
 ```
-userData/
-  apps/<appId>/settings.json   应用私有设置（含它自己的主题档）
-  apps/<appId>/data/           应用私有数据
-  apps/<appId>/cache/          可随时整体删除重建
-  library/                     共享书库（Reader 的那一份）
+~\.airship/
+  runtime/                     runtime 自己的安装（主 exe 是 airship.exe）
+  apps/<id>/<id>.airship       应用安装器放进去的那份包
+  data/<id>/settings.json      应用私有设置（含它自己的主题档）
+  data/<id>/                   应用私有数据（扁平：文件直接放这一层）
+  data/<id>/cache/             可随时整体删除重建（所以 cache 是保留名）
+  data/<id>/backend/           随包后端的影子 backend.cjs
+  shared/library/              共享书库（Reader 的那一份）
+  icons/<id>.ico               交给外壳的那张任务栏图标
+  logs/                        按日期的日志
+  profile/                     Electron 自己的浏览器档（userData 开局就钉到这里）
 ```
 
 **没有 runtime 级的 settings.json 了**：从前壳级那份（全局主题、工具手动路径）随启动器退场——
-主题按应用各记各的（落在 `apps/<id>/settings.json`），工具手动路径那一档整档删了（要显式指走环境变量）。
+主题按应用各记各的（落在 `data/<id>/settings.json`），工具手动路径那一档整档删了（要显式指走环境变量）。
 
-目录布局只依赖 userData 根与 id，**不需要知道"现在有哪些应用"**。这条是踩过来的：
+目录布局只依赖 airship 家的根与 id，**不需要知道"现在有哪些应用"**。这条是踩过来的：
 原来 `build()` 会遍历当时的注册表建一张 `apps` 表并缓存，一开机就读失败。
 
 落盘原子写（写暂存名再改名），坏文件挪成 `.bad` 不致命（ST 册）。
@@ -423,8 +431,8 @@ runtime 自己没有界面。应用窗口的 DOM 只有 SDK 那一份宿主：�
 不清就会一直躺着冒充产物（verify-installer 反过来钉 `out/renderer` 不该存在）。
 
 **runtime 安装包**（`src/runtime/electron-builder.yml` + `build/installer.nsh`）：
-`perMachine: true`（要管理员），落点钉死 `C:\Program Files\airship\runtime`——
-目录的唯一真源在 `installer.nsh` 的 `customInit`（`StrCpy $INSTDIR "$PROGRAMFILES64\airship\runtime"`，
+`perMachine: false`（每用户，不要管理员），落点钉死 `~\.airship\runtime`——
+目录的唯一真源在 `installer.nsh` 的 `customInit`（`StrCpy $INSTDIR "$PROFILE\.airship\runtime"`，
 插在 initMultiUser 之后所以覆盖生效，升级时读到的旧 InstallLocation 同样被覆盖，"一定装在这个目录下"不向历史让步）；
 `allowToChangeInstallationDirectory: false` 去掉换目录页。
 产物名 `airship-runtime-Setup-<版本>-x64.exe`，主 exe 叫 `airship.exe`（`productName: airship`，应用快捷方式的目标就是它）。
@@ -496,7 +504,7 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
 
 **已定**（这轮 runtime 化）：
 
-- 不再有壳 / 启动器，取而代之的是 airship runtime，钉死装进 `C:\Program Files\airship\runtime`。
+- 不再有壳 / 启动器，取而代之的是 airship runtime，钉死装进 `~\.airship\runtime`（每用户，不要管理员）。
 - 应用自己安装（每用户安装器），自动去 `AIRSHIP_PATH` 或固定目录找 runtime；装完留一枚快捷方式当启动程序。
 - 单 runtime 进程 + second-instance 转发；启动程序是快捷方式（.lnk，不是 stub exe）。
 - 设置页与 runtime 级主题切换整族退场；主题按应用各记各的，由 SDK 标题栏那颗键改（决定 A）。

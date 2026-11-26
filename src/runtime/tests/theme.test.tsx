@@ -15,7 +15,9 @@ import type { ThemeSnapshot } from '@airship/contract'
  * 窗口归属用一张固定的 sender.id → 应用映射替掉台账（theme:set 只问归属，不开窗口）。
  */
 
-const ROOT = join(__dirname, '.tmp', 'theme-userData')
+const ROOT = join(__dirname, '.tmp', 'theme-home')
+/** 替身 electron 的 getPath('home') 给出的家：应用那族目录在它下面的 data/<id> */
+const AIRSHIP = join(ROOT, '.airship')
 
 const ipc = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<{ ok: boolean; value?: unknown; error?: string }>>(),
@@ -24,7 +26,7 @@ const ipc = vi.hoisted(() => ({
 
 vi.mock('electron', async () => {
   const { join: p } = await import('node:path')
-  const root = p(__dirname, '.tmp', 'theme-userData')
+  const root = p(__dirname, '.tmp', 'theme-home')
   return {
     app: { getPath: () => root, getVersion: () => '0.0.0-test' },
     ipcMain: {
@@ -64,12 +66,12 @@ function setTheme(senderId: number, mode: string, hint?: 'light' | 'dark'): Prom
 
 function resetDisk(app: string): void {
   // 只清这个应用自己那份：settings 的内存缓存没法按用例重置，所以每条用例占一个应用
-  rmSync(join(ROOT, 'apps', app), { recursive: true, force: true })
-  mkdirSync(join(ROOT, 'apps'), { recursive: true })
+  rmSync(join(AIRSHIP, 'data', app), { recursive: true, force: true })
+  mkdirSync(join(AIRSHIP, 'data'), { recursive: true })
 }
 
 function fileOf(app: string): string {
-  return join(ROOT, 'apps', app, 'settings.json')
+  return join(AIRSHIP, 'data', app, 'settings.json')
 }
 
 /** 记下主题键发给 runtime 的每一次请求 */

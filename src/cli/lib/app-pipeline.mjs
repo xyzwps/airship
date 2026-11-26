@@ -134,7 +134,7 @@ export async function buildAndPack({ projectRoot, id, packagesOut }) {
 
 /**
  * 开发模式：构建装包（注册期读清单与图标）→ 起 vite dev server → 拉起装好的 runtime。
- * 窗口加载的是 dev server 那份源码，改一行刷新即见；runtime 用独立的 userData 目录，
+ * 窗口加载的是 dev server 那份源码，改一行刷新即见；runtime 的家整份指到项目里的 `.airship-dev/<id>`，
  * 不与日常使用的应用抢单实例锁。
  */
 export async function runDev({ projectRoot, id, port = 5177, packagesOut = 'dist-apps' }) {
@@ -155,16 +155,18 @@ export async function runDev({ projectRoot, id, port = 5177, packagesOut = 'dist
 
   const { findRuntime } = await import('./runtime.mjs')
   const exe = findRuntime()
-  const userDataDir = join(projectRoot, '.airship-dev', id)
+  // dev 换的是整个家（AIRSHIP_HOME），不是只换 Electron 的 userData：
+  // 数据、设置、书库与浏览器档一起落进项目里的 .airship-dev/<id>，日常那一份一个字节都不动。
+  const airshipHome = join(projectRoot, '.airship-dev', id)
   // 完整文档 URL 交给 runtime——它不再猜目录形状（AIRSHIP_DEV_URL 就是那扇窗口该加载的地址）
   const rel = relative(projectRoot, appDir).split(sep).join('/')
   const devDoc = `${url}/${rel === '' ? '' : `${rel}/`}index.html`
   console.log(`[airship] dev server ${url} —— 改 ${appDir} 下的源码，窗口里刷新即见`)
-  console.log(`[airship] runtime ${exe}（窗口数据在 .airship-dev/${id}，不碰日常那套 userData）`)
-  const child = spawn(exe, [file, `--user-data-dir=${userDataDir}`], {
+  console.log(`[airship] runtime ${exe}（窗口数据在 .airship-dev/${id}，不碰日常的 ~/.airship）`)
+  const child = spawn(exe, [file], {
     cwd: projectRoot,
     stdio: 'ignore',
-    env: { ...process.env, AIRSHIP_DEV_URL: devDoc }
+    env: { ...process.env, AIRSHIP_DEV_URL: devDoc, AIRSHIP_HOME: airshipHome }
   })
 
   let closing = false

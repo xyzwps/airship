@@ -27,7 +27,7 @@ vi.mock('@airship/sdk', async (importOriginal) => ({
   renderTrayIcon: async (text: string): Promise<string> => `data:image/png;base64,FAKE${text}`
 }))
 
-const DATA_DIR = '/fake/userData/apps/airship-dago/data'
+const DATA_DIR = '/fake/.airship/data/airship-dago'
 const DATA = `${DATA_DIR}/dagogo.json`
 const CAPS = ['dialog', 'settings', 'tray', 'notify', 'log'] as const
 
@@ -181,7 +181,7 @@ describe('与手机版互读的导出文件', () => {
     await m.press('数据')
     await m.press('导出到文件')
 
-    expect([...fake.vol.keys()].filter((p) => p.endsWith('.json') && !p.startsWith('/fake/userData'))).toEqual([])
+    expect([...fake.vol.keys()].filter((p) => p.endsWith('.json') && !p.startsWith('/fake/.airship'))).toEqual([])
     expect(m.text()).not.toContain('已导出')
     m.unmount()
   })

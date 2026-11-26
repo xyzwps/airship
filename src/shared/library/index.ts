@@ -99,7 +99,7 @@ export async function loadBooks(api: AppApi): Promise<BookRecord[]> {
   if (parsed.version !== DATA_VERSION) {
     throw new Error(
       `书库索引是 v${parsed.version ?? '?'}，本包只认 v${DATA_VERSION}。` +
-        '删掉 userData/shared/library/library.json 后重新导入书籍即可（书本体和封面不用动）。'
+        '删掉 ~/.airship/shared/library/library.json 后重新导入书籍即可（书本体和封面不用动）。'
     )
   }
 
