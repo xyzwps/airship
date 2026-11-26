@@ -9,7 +9,7 @@ import './airship-svg-editor.css'
  *
  * 布局五块：顶部选项条（保存态/撤销重做/文件动作/语言）、左侧竖排图标工具条、
  * 中间画布区（辅助条 + 深灰画布面 + 底部状态条）、右侧停靠面板（上属性、下图层）。
- * 外壳固定深色——深灰金属就是这套工具的样子，不跟标题栏那颗主题键走（画布纸色不受影响）。
+ * 外壳固定深色——深灰金属就是这套工具的样子；开局把主题落 dark，标题栏跟着外壳走（画布纸色不受影响）。
  *
  * 三处与网页原版的有意差异（各自在册子里钉着）：
  *   1. 字体模态整族删除：文字层点「选择字体」直接开系统文件框挑 .ttf/.otf/.ttc；
@@ -20,6 +20,7 @@ export default function AlbedoApp({ api }: { api: AppApi }): JSX.Element {
   const rootRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    void api.setTheme('dark')
     const host = rootRef.current
     if (!host) return
     const ws = new AlbedoWorkspace(host, api)
