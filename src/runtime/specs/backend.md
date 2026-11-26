@@ -14,8 +14,8 @@
 - **THEN** 拒，原因原样读得到「<id> 没有自带后台程序：包根要有 backend.js——源项目里放一个 src/backend.ts 或 src/backend.js，产包就会带上」
 
 #### Scenario: BE-002 冒充别的应用名义调用被拒
-- **WHEN** vcp 的窗口以 `pdf` 的名义发起后端调用
-- **THEN** 拒，原因读得到「身份不匹配：这个窗口属于 vcp，不能以 pdf 的名义调用」
+- **WHEN** airship-ffmpeg 的窗口以 `airship-s3` 的名义发起后端调用
+- **THEN** 拒，原因读得到「身份不匹配：这个窗口属于 airship-ffmpeg，不能以 airship-s3 的名义调用」
 
 #### Scenario: BE-003 method 不合法时把收到的值原样念出来
 - **WHEN** 调用传的 method 是空串或数字
@@ -62,8 +62,8 @@
 
 ### Requirement: 后端主动推的东西只回它自己那扇窗
 #### Scenario: BE-013 后端推事件，只有归属窗口收得到
-- **WHEN** vcp 的后端主动推一条事件
-- **THEN** vcp 的窗口收到一条 `backend:event`，method 与 payload 原样；别的应用的窗口一条都收不到
+- **WHEN** airship-ffmpeg 的后端主动推一条事件
+- **THEN** airship-ffmpeg 的窗口收到一条 `backend:event`，method 与 payload 原样；别的应用的窗口一条都收不到
 
 #### Scenario: BE-014 后端进程退出，归属窗口收到 backend:exited
 - **WHEN** 后端进程带着还在途的事件任务退出了（崩的或被收的都算）

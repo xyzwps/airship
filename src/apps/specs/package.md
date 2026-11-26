@@ -91,7 +91,7 @@ runtime 见到那个条目才起进程（通道侧契约见 `src/runtime/specs/b
 可达范围必须钉在那一个归档里：条目名越界一律拒，也不给"抹掉前缀再试一次"的回落。
 
 #### Scenario: PK-014 越界与没注册的读取各有各的原话
-- **WHEN** 有人请求 `airship://life/../../windows/win.ini`，或请求一个没注册的 id
+- **WHEN** 有人请求 `airship://airship-life-game/../../windows/win.ini`，或请求一个没注册的 id
 - **THEN** 前者解不出任何包外条目（`..`、`%2e%2e`、反斜杠三种写法都验过），后者念「没有注册这个应用：<id>」
 - **AND** 两种都拿不到包外的内容，也不回落到入口文档
 

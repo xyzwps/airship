@@ -20,8 +20,8 @@
 应用侧根本没有"传 id"这个动作；主进程还按来源窗口反查一次。
 
 #### Scenario: BR-003 以别的应用名义调用被拒
-- **WHEN** vcp 的窗口拿 PDF 的名义调一条应用接口
-- **THEN** 拒，原因读得到「身份不匹配：这个窗口属于 vcp，不能以 pdf 的名义调用」
+- **WHEN** airship-ffmpeg 的窗口拿 airship-s3 的名义调一条应用接口
+- **THEN** 拒，原因读得到「身份不匹配：这个窗口属于 airship-ffmpeg，不能以 airship-s3 的名义调用」
 - **AND** 这一笔被记进日志（身份不匹配，已拒绝）
 
 #### Scenario: BR-004 没登记过的来源一律拒
@@ -60,13 +60,13 @@ preload 用 Electron 的 `webUtils.getPathForFile` 读浏览器已经交出来�
 - **AND** 没有任何一处把 `ipcRenderer` 整个交出去
 
 #### Scenario: BR-010 别的应用收不到这个应用的事件
-- **WHEN** vcp 名下子进程的输出回流
-- **THEN** 只有 vcp 自己的窗口收到；PDF 的窗口一条都收不到
-- **AND** vcp 窗口没开时事件被丢弃，不广播兜底
+- **WHEN** airship-ffmpeg 名下子进程的输出回流
+- **THEN** 只有 airship-ffmpeg 自己的窗口收到；airship-s3 的窗口一条都收不到
+- **AND** airship-ffmpeg 窗口没开时事件被丢弃，不广播兜底
 
 <!--
   BR-005 于 2026-11-19 删除：启动器退场，桥只剩应用这一套面，"两套面各走各的"失去对象。
   BR-011 于 2026-11-24 删除：`net` 能力位整族退场（连同 CSP 的 net 变体与窗口 webSecurity 豁免）。
   直连外部服务的唯一来路改成应用随包自带的后端进程（backend.md），那不在渲染侧授权面里；
-  此前只有 s3 用过这一位，迁移后没有任何应用需要豁免同源策略。编号不复用、不重排。
+  此前只有 airship-s3 用过这一位，迁移后没有任何应用需要豁免同源策略。编号不复用、不重排。
 -->

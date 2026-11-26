@@ -44,7 +44,7 @@ const { registerPackage } = await import('../main/services/appRegistry')
 const { packageFor, registerPackageAt, validateArchive } = await import('../main/services/packageRegistry')
 const { resolvePackageEntry } = await import('../main/services/packageProtocol')
 
-const life = REAL_APPS.find((m) => m.id === 'life')!
+const life = REAL_APPS.find((m) => m.id === 'airship-life-game')!
 
 /** 造一份最小清单（直跑判据用，不借任何真应用的名字） */
 function minimalMeta(id: string, capabilities: AppMeta['capabilities'] = []): AppMeta {
@@ -64,11 +64,11 @@ describe('命令行里挑包', () => {
   it('SH-031 相对包路径按交来那一侧的 cwd 解', () => {
     // 第二实例转发：按转发方的 cwd 拼，不是第一实例自己的
     const forwarderCwd = join(tmpdir(), 'airship-forwarder-cwd')
-    expect(archivesFromArgv(['airship.exe', `life${PACKAGE_SUFFIX}`], forwarderCwd)).toEqual([
-      resolve(forwarderCwd, `life${PACKAGE_SUFFIX}`)
+    expect(archivesFromArgv(['airship.exe', `airship-life-game${PACKAGE_SUFFIX}`], forwarderCwd)).toEqual([
+      resolve(forwarderCwd, `airship-life-game${PACKAGE_SUFFIX}`)
     ])
     // 快捷方式交来的绝对路径原样保留，不受 cwd 影响
-    const absolute = join(packageFixtureRoot(), `life${PACKAGE_SUFFIX}`)
+    const absolute = join(packageFixtureRoot(), `airship-life-game${PACKAGE_SUFFIX}`)
     expect(archivesFromArgv(['airship.exe', absolute], 'C:/somewhere/else')).toEqual([absolute])
   })
 })
@@ -102,39 +102,39 @@ describe('注册失败的包逐条拒', () => {
   })
 
   it('SH-033 同 id 同归档返回表里那一份，异归档拒并念清两份各在哪', () => {
-    const active = join(packageFixtureRoot(), `life${PACKAGE_SUFFIX}`)
-    expect(packageFor('life')?.archive).toBe(active)
+    const active = join(packageFixtureRoot(), `airship-life-game${PACKAGE_SUFFIX}`)
+    expect(packageFor('airship-life-game')?.archive).toBe(active)
 
     // 同一份归档再指一次：还是表里那一份（窗口侧据此聚焦，见 windows.test.ts）
     const again = registerPackageAt(active)
     expect(again.problems).toEqual([])
-    expect(again.pkg).toBe(packageFor('life'))
+    expect(again.pkg).toBe(packageFor('airship-life-game'))
 
     // 同 id 另一份归档：拒，不顶替
     const elsewhere = mkdtempSync(join(tmpdir(), 'airship-other-'))
     const other = installPackageAt(elsewhere, life)
     const res = registerPackageAt(other)
     expect(res.pkg).toBeUndefined()
-    expect(res.problems).toEqual([sameIdDifferentArchive('life', active, other)])
+    expect(res.problems).toEqual([sameIdDifferentArchive('airship-life-game', active, other)])
     expect(res.problems[0]).toContain('先关掉它的窗口再跑这一份。')
-    expect(packageFor('life')?.archive, '旧归档不许被顶替').toBe(active)
+    expect(packageFor('airship-life-game')?.archive, '旧归档不许被顶替').toBe(active)
   })
 })
 
 describe('airship:// 的可达范围钉死在这一个包里', () => {
   it('PK-014 越界与没注册的读取各有各的原话', () => {
-    const lifeArchive = join(packageFixtureRoot(), `life${PACKAGE_SUFFIX}`)
+    const lifeArchive = join(packageFixtureRoot(), `airship-life-game${PACKAGE_SUFFIX}`)
     const lookup = (id: string): { archive: string; entry: string } | null =>
-      id === 'life' ? { archive: lifeArchive, entry: DEFAULT_ENTRY } : null
+      id === 'airship-life-game' ? { archive: lifeArchive, entry: DEFAULT_ENTRY } : null
 
     // 没注册的 id：念主进程那句原话，不回落入口文档
     expect(resolvePackageEntry('airship://ghost/index.html', lookup)).toEqual({ reason: notRegistered('ghost') })
 
     // 三种越界写法：都解不出任何包外条目
     for (const url of [
-      'airship://life/../../windows/win.ini',
-      'airship://life/%2e%2e/%2e%2e/windows/win.ini',
-      'airship://life/..\\..\\windows\\win.ini'
+      'airship://airship-life-game/../../windows/win.ini',
+      'airship://airship-life-game/%2e%2e/%2e%2e/windows/win.ini',
+      'airship://airship-life-game/..\\..\\windows\\win.ini'
     ]) {
       const res = resolvePackageEntry(url, lookup)
       if ('reason' in res) {

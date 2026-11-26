@@ -63,27 +63,27 @@ function last(): TrayInstance {
 
 describe('一个托盘图标，占用者唯一', () => {
   it('TR-001 谁设置的就是谁占着，提示文字按它给的来', () => {
-    trayService.set('dagogo', { tooltip: '打勾勾 · 今天勾掉 2 个，共 5 条' }, () => undefined)
-    expect(trayService.owner).toBe('dagogo')
+    trayService.set('airship-dago', { tooltip: '打勾勾 · 今天勾掉 2 个，共 5 条' }, () => undefined)
+    expect(trayService.owner).toBe('airship-dago')
     expect(trayService.active).toBe(true)
     expect(last().tooltips.at(-1)).toBe('打勾勾 · 今天勾掉 2 个，共 5 条')
-    trayService.clear('dagogo')
+    trayService.clear('airship-dago')
   })
 
   it('TR-002 只有占用者能清掉托盘，别人调是空操作', () => {
-    trayService.set('dagogo', { tooltip: '打勾勾' }, () => undefined)
+    trayService.set('airship-dago', { tooltip: '打勾勾' }, () => undefined)
 
-    trayService.clear('vcp')
-    expect(trayService.owner).toBe('dagogo')
+    trayService.clear('airship-ffmpeg')
+    expect(trayService.owner).toBe('airship-dago')
     expect(trayService.active).toBe(true)
 
-    trayService.clear('dagogo')
+    trayService.clear('airship-dago')
     expect(trayService.owner).toBeNull()
     expect(trayService.active).toBe(false)
   })
 
   it('TR-003 退出时不分归属一律清掉', () => {
-    trayService.set('dagogo', { tooltip: '打勾勾' }, () => undefined)
+    trayService.set('airship-dago', { tooltip: '打勾勾' }, () => undefined)
     trayService.clearForShutdown()
     expect(trayService.owner).toBeNull()
     expect(trayService.active).toBe(false)
@@ -92,28 +92,28 @@ describe('一个托盘图标，占用者唯一', () => {
 
   it('TR-004 提示文字截到 120 字', () => {
     const long = '今'.repeat(200)
-    trayService.set('dagogo', { tooltip: long }, () => undefined)
+    trayService.set('airship-dago', { tooltip: long }, () => undefined)
     expect(last().tooltips.at(-1)).toBe('今'.repeat(120))
     expect(last().menus.at(-1)![0]!.label).toBe('今'.repeat(60))
     trayService.clearForShutdown()
   })
 
   it('TR-005 应用画好的数字图标交上来就用，画不了就用 runtime 默认的', () => {
-    trayService.set('dagogo', { tooltip: '打勾勾 · 2/5' }, () => undefined)
+    trayService.set('airship-dago', { tooltip: '打勾勾 · 2/5' }, () => undefined)
     // 默认图标那张在本机是空的（替身里 createFromPath 给空图）
     expect((last().images[0] as unknown as { isEmpty: () => boolean }).isEmpty()).toBe(true)
 
-    trayService.set('dagogo', { tooltip: '打勾勾 · 2/5', iconDataUrl: 'data:image/png;base64,AAAA' }, () => undefined)
+    trayService.set('airship-dago', { tooltip: '打勾勾 · 2/5', iconDataUrl: 'data:image/png;base64,AAAA' }, () => undefined)
     expect(last().images.at(-1)).toMatchObject({ url: 'data:image/png;base64,AAAA' })
 
     // 只给徽标文字：不报错，图标保持上一张
-    trayService.set('dagogo', { tooltip: '打勾勾 · 2/5', badge: '2/5' }, () => undefined)
+    trayService.set('airship-dago', { tooltip: '打勾勾 · 2/5', badge: '2/5' }, () => undefined)
     expect(last().tooltips.at(-1)).toBe('打勾勾 · 2/5')
     trayService.clearForShutdown()
   })
 
   it('TR-006 右键菜单里有点得动的两项', () => {
-    trayService.set('dagogo', { tooltip: '打勾勾 · 今天勾掉 2 个' }, () => undefined)
+    trayService.set('airship-dago', { tooltip: '打勾勾 · 今天勾掉 2 个' }, () => undefined)
     const items = last().menus.at(-1)!
     expect(items.map((i) => i.label)).toEqual(['打勾勾 · 今天勾掉 2 个', undefined, '打开应用', '退出'])
     expect(items[0]!.enabled).toBe(false)
@@ -128,18 +128,18 @@ describe('一个托盘图标，占用者唯一', () => {
       brought.push(1)
     }
 
-    trayService.set('dagogo', { tooltip: '打勾勾' }, front)
+    trayService.set('airship-dago', { tooltip: '打勾勾' }, front)
     sent.length = 0
     last().handlers['click']!()
-    expect(sent).toEqual([{ owner: 'dagogo', event: { kind: 'tray:click' } }])
+    expect(sent).toEqual([{ owner: 'airship-dago', event: { kind: 'tray:click' } }])
     expect(brought.length).toBe(1)
 
     // 应用说不要唤自己的窗口
-    trayService.set('dagogo', { tooltip: '打勾勾', focusOnClick: false }, front)
+    trayService.set('airship-dago', { tooltip: '打勾勾', focusOnClick: false }, front)
     sent.length = 0
     last().handlers['click']!()
     expect(brought.length).toBe(1)
-    expect(sent.map((s) => s.owner)).toEqual(['dagogo'])
+    expect(sent.map((s) => s.owner)).toEqual(['airship-dago'])
 
     // 没设过托盘时点它什么也不发生
     trayService.clearForShutdown()

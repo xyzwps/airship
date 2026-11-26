@@ -185,8 +185,8 @@ for (const [id, name] of [
 
 beforeEach(async () => {
   shellState.owners.clear()
-  shellState.owners.set(VCP, 'vcp')
-  shellState.owners.set(DAGOGO, 'dagogo')
+  shellState.owners.set(VCP, 'airship-ffmpeg')
+  shellState.owners.set(DAGOGO, 'airship-dago')
   shellState.owners.set(TODO, 'todo')
   shellState.owners.set(NOTE, 'note')
   fake.children.length = 0
@@ -204,12 +204,12 @@ afterEach(() => {
 
 describe('后端有没有由包形状判，身份与来源照旧过同一道闸', () => {
   it('BE-001 包根没有 backend.js，调用被拒并念出这条约定', async () => {
-    expect(reason(await call('backend:invoke', DAGOGO, 'dagogo', 'echo'))).toBe(backendAbsent('dagogo'))
+    expect(reason(await call('backend:invoke', DAGOGO, 'airship-dago', 'echo'))).toBe(backendAbsent('airship-dago'))
     expect(fake.children.length, '没有那个条目就不该起进程').toBe(0)
   })
 
   it('BE-002 冒充别的应用名义调用被拒', async () => {
-    expect(reason(await call('backend:invoke', VCP, 'todo', 'echo'))).toBe(identityMismatch('vcp', 'todo'))
+    expect(reason(await call('backend:invoke', VCP, 'todo', 'echo'))).toBe(identityMismatch('airship-ffmpeg', 'todo'))
   })
 
   it('BE-003 method 不合法时把收到的值原样念出来', async () => {

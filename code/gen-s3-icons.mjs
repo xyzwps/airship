@@ -1,4 +1,4 @@
-// 从 @iconify-json/lucide 裁出 S3 用到的那十几颗图标，生成 src/apps/s3/icons.ts。
+// 从 @iconify-json/lucide 裁出 S3 用到的那十几颗图标，生成 src/apps/airship-s3/icons.ts。
 //
 // 为什么不整集 import：@iconify-json 一份 icons.json 两千多个图形（几百 KB），
 // 打进包就是每窗口的常驻内存；用到的只有十几颗，裁出来落成一个源码文件，
@@ -43,14 +43,14 @@ function resolve(name) {
 }
 
 function readLucide() {
-  for (const dir of [path.join(root, 'node_modules'), path.join(root, 'src/apps/s3/node_modules')]) {
+  for (const dir of [path.join(root, 'node_modules'), path.join(root, 'src/apps/airship-s3/node_modules')]) {
     try {
       return require(path.join(dir, '@iconify-json/lucide/icons.json'))
     } catch {
       // 换下一个落点再试
     }
   }
-  throw new Error('找不到 @iconify-json/lucide——先 `npm install`（它是 @airship/s3 的 devDependency）')
+  throw new Error('找不到 @iconify-json/lucide——先 `npm install`（它是 @airship/airship-s3 的 devDependency）')
 }
 
 const picked = {}
@@ -80,6 +80,6 @@ export const S3_ICONS: IconifyJSON = {
 addCollection(S3_ICONS)
 `
 
-const dest = path.join(root, 'src/apps/s3/icons.ts')
+const dest = path.join(root, 'src/apps/airship-s3/icons.ts')
 writeFileSync(dest, out, 'utf8')
 console.log(`已写 ${path.relative(root, dest)}（${Object.keys(picked).length} 颗，${out.length} 字节）`)

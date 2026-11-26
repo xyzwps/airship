@@ -81,7 +81,7 @@
 
 ## 应用与能力：原版有、这里先没有
 
-这三块都属 wsld。册子索引里"先不开的册子"那几本与它们一一对应，内容以这里为准。
+这三块都属 airship-wsld。册子索引里"先不开的册子"那几本与它们一一对应，内容以这里为准。
 
 ### TD-008 registry mirror（`registry-mirror`）
 
@@ -93,7 +93,7 @@
 而本项目 `proc` 只有管道分块——没有 TTY 就没有那一层。要么以后给 `proc` 加伪终端能力，
 要么按普通管道输出重做进度呈现。来源：`docs/architecture.md` §14。
 
-### TD-010 wsld 自己的设置页（`settings`）
+### TD-010 airship-wsld 自己的设置页（`settings`）
 
 本期只留镜像列表那几颗键，走 runtime 的 `src/runtime/specs/storage.md`。来源：`docs/specs/index.md`。
 

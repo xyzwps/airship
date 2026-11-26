@@ -16,8 +16,8 @@ airship runtime（一个 Electron 进程，src/runtime/，@airship/runtime）
   └─ 没有自己的界面：不画启动器，不扫磁盘找应用
 
 应用（八个，src/apps/<id>/，各自一个 airship 包）
-  books 墨读 · pdf PDF · dagogo 打勾勾 · life 生命游戏
-  vcp · wsld · albedo Albedo · s3 S3
+  airship-reader Reader · airship-dago Dago · airship-life-game Life Game
+  airship-ffmpeg FFmpeg · airship-wsld WSLD · airship-svg-editor SVG Editor · airship-s3 S3 · airship-icon 图标工坊
   每个应用 = <id>.airship 归档 + 它自己的每用户安装器 + 一枚快捷方式
 ```
 
@@ -41,7 +41,7 @@ runtime 装一次，钉死在 `C:\Program Files\airship\runtime`（perMachine，
 | `src/sdk` | `@airship/sdk` | 宿主（标题栏 / 主题落地 / 留白 / 占位）、图标键、CSP、工装钩子；将来独立发布的那一份 |
 | `src/apps/<id>` | `@airship/<id>` | 八个应用，各自自持 `index.html` + `main.tsx` |
 | `src/shared/contract` | `@airship/contract` | 契约、清单类型、拒绝措辞、注册与包形状的规矩 |
-| `src/shared/library` | `@airship/library` | 共享书库（墨读与 PDF 同一份数据） |
+| `src/shared/library` | `@airship/library` | 共享书库（Reader 管的那一份） |
 | `src/shared/textdecode` | `@airship/textdecode` | 中文解码 |
 
 ## 2. 七条不变量
@@ -76,7 +76,7 @@ runtime 装一次，钉死在 `C:\Program Files\airship\runtime`（perMachine，
 2. 抢单实例锁，**在 `whenReady` 之前**：`const GOT_LOCK = SHOT_MODE || app.requestSingleInstanceLock()`。
    抢不到不是错误——argv 会由 Electron 自动交给第一实例的 `second-instance`，这次直接 `app.quit()`。
    `whenReady` 首行 `if (!GOT_LOCK) return`：不然第二实例也会把启动跑完、开出一扇重复的窗再退出
-   （真机抓到过：两扇 dagogo 各开一次）。
+   （真机抓到过：两扇 airship-dago 各开一次）。
 3. `whenReady` 里：挂包协议处理器、注册 IPC、把子进程事件接到"只投归属窗口"的路由上。
 4. 从 argv 挑出 `.airship` 结尾的包路径（`archivesFromArgv`，相对路径按 cwd 解）。
    一份都没有 → 念用法（`usageLine()`）+ `app.exit(1)`，不开任何界面。
@@ -133,17 +133,16 @@ relaunchDisplayName })`（win32 专有；后两条必须成对，否则外壳两
 
 | 窗口 | 工作集 | 首屏挂载 |
 |---|---|---|
-| 打勾勾 | 86 MB | 155 ms |
-| 墨读 | 100 MB | 507 ms |
-| wsld | 99 MB | —（wslc 定位 535 ms） |
-| 生命游戏 | 102 MB | — |
-| Albedo | 112 MB | — |
-| PDF | 100 MB | 575 ms |
+| Dago | 86 MB | 155 ms |
+| Reader | 100 MB | 507 ms |
+| WSLD | 99 MB | —（wslc 定位 535 ms） |
+| Life Game | 102 MB | — |
+| SVG Editor | 112 MB | — |
 | S3 | 102 MB | 540 ms |
-| vcp | 102 MB | 540 ms |
+| FFmpeg | 102 MB | 540 ms |
 
-工作集八扇都有；首屏挂载只有报了就绪标记的那几扇有数字（生命游戏 / Albedo / wsld 本轮没报挂载标记，
-wsld 报的是"wslc 已定位"那条）。EPUB 翻页延迟没单独采样（TD-012）——现在只有"打开到首屏"的数字。
+工作集八扇都有；首屏挂载只有报了就绪标记的那几扇有数字（Life Game / SVG Editor / WSLD 本轮没报挂载标记，
+WSLD 报的是"wslc 已定位"那条）。EPUB 翻页延迟没单独采样（TD-012）——现在只有"打开到首屏"的数字。
 界面观感（真排版好不好看）靠 `just shot` 截图走查，产物不入代码库。
 
 ## 4. 分层与依赖方向
@@ -217,7 +216,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 
 ## 6. 能力与授权
 
-`capabilities` 是唯一授权面，没声明的一律拒绝；用不到就写 `[]`（生命游戏就是这么起的）。
+`capabilities` 是唯一授权面，没声明的一律拒绝；用不到就写 `[]`（airship-life-game 就是这么起的）。
 用了 `api.settings.` / `api.proc.` 这些域就必须声明对应能力，AP-011 会扫。
 
 | 能力位 | 管什么 |
@@ -247,14 +246,14 @@ SDK 的流式上传与分块下载在后端进程的 HTTPS 模块上照跑，渲
 ### 6.1 路径授权（`grants.ts`，GR 册）
 
 五条规则，会话内有效：应用数据目录内随便读写；数据目录外只读用户本次会话通过对话框显式选中的路径；
-`dialog` 选中的文件自动进入可读集合（`grantParentDir` 可连父目录一起授，给 vcp 那种"输出落在源文件同目录"用）；
+`dialog` 选中的文件自动进入可读集合（`grantParentDir` 可连父目录一起授，给 airship-ffmpeg 那种"输出落在源文件同目录"用）；
 共享命名空间要清单声明；越界直接拒。授权是会话级的，进程退出就没了。
 
 ### 6.2 共享命名空间
 
 `SHARED_NAMESPACES = ['library']`，这份名单**属于 runtime**：目录由 runtime 创建与托管，
-新增一个共享数据区是 runtime 的功能变更，不是应用变更。books 与 pdf 是两个独立应用入口，
-但书架、导入记录、封面、阅读进度是同一套数据——各自存一份就会"同一本书在两个入口里各有一本"。
+新增一个共享数据区是 runtime 的功能变更，不是应用变更。书库开成共享命名空间，是因为它曾由墨读与 PDF 两个入口共用
+（PDF 已于 2026-11-26 退场，机制留着）——各自存一份就会"同一本书在两个入口里各有一本"。
 应用只能在清单里声明自己要访问哪个，声明了不存在的直接拒。
 
 ### 6.3 工具发现（`tools.ts`，PT 册）
@@ -332,29 +331,29 @@ runtime 侧不再有扫包、拖装、启动器卸载的代码。
 
 | id | 名称 | capabilities | tools | 平台 | flush | 默认尺寸 |
 |---|---|---|---|---|---|---|
-| `books` | 墨读 | fs.read, fs.write, dialog, settings, shared, notify, clipboard, log | — | 全 | 是 | 600×800 |
-| `pdf` | PDF | fs.read, fs.write, dialog, settings, shared, notify, clipboard, log | — | 全 | 是 | 默认 |
-| `dagogo` | 打勾勾 | dialog, settings, tray, notify, log | — | 全 | 是 | 600×800 |
-| `life` | 生命游戏 | （空） | — | 全 | 是 | 1000×720 |
-| `vcp` | vcp | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | ffmpeg | 全 | 是 | 默认 |
-| `wsld` | wsld | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | wslc | windows | 是 | 默认 |
-| `albedo` | Albedo | settings, dialog, fs.read, fs.write, clipboard | — | 全 | 是 | 1440×900 |
-| `s3` | S3 | settings, dialog, clipboard | — | 全 | 是 | 1180×760 |
+| `airship-reader` | Reader | fs.read, fs.write, dialog, settings, shared, notify, clipboard, log | — | 全 | 是 | 600×800 |
+| `airship-dago` | Dago | dialog, settings, tray, notify, log | — | 全 | 是 | 600×800 |
+| `airship-life-game` | Life Game | （空） | — | 全 | 是 | 1000×720 |
+| `airship-ffmpeg` | FFmpeg | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | ffmpeg | 全 | 是 | 默认 |
+| `airship-wsld` | WSLD | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | wslc | windows | 是 | 默认 |
+| `airship-svg-editor` | SVG Editor | settings, dialog, fs.read, fs.write, clipboard | — | 全 | 是 | 1440×900 |
+| `airship-s3` | S3 | settings, dialog, clipboard | — | 全 | 是 | 1180×760 |
+| `airship-icon` | 图标工坊 | dialog, fs.read, fs.write | — | 全 | 否 | 720×780 |
 
-`dagogo` 与 `s3` 各自带一份 `backend.ts`，产包后进包根 `backend.js`：盘的活与网络活都在自带的后端进程里做，
+`airship-dago` 与 `airship-s3` 各自带一份 `backend.ts`，产包后进包根 `backend.js`：盘的活与网络活都在自带的后端进程里做，
 窗口的清单不再为它们要 fs 或外连的口子（§6 末尾与 `backend.md`）。
 
-books 与 pdf 都声明 `sharedNamespaces: ['library']`，共用同一份书库。
+从前 books 与 pdf 都声明 `sharedNamespaces: ['library']` 共用同一份书库；PDF 退场后只剩 airship-reader 这一个消费者。
 "默认"尺寸 = runtime 的 1100×740。`flush` 是 SDK 宿主给不留白（应用自己铺满整窗）。
 
 ## 8. 包协议与文档加载
 
 自定义方案 `airship://<id>/<entry>`：一个应用的文档面只读到它自己那一个包。
 方案属性在 `app ready` 之前注册，处理器在 `whenReady` 里挂（Electron 要求）。
-窗口加载 `airship://<id>/index.html`，PDF 的 worker 从包里取，EPUB 的章节样式表是 `blob:airship://books/…`。
+窗口加载 `airship://<id>/index.html`，EPUB 的章节样式表是 `blob:airship://airship-reader/…`。
 
 **CSP 的一个坑**：`airship://` 下 `blob:` 的 URL 不再被 `'self'` 覆盖——foliate 注入的章节样式表是
-`blob:airship://books/…`，`style-src` 不写 `blob:` 就被拦掉（2026-11-07 截图走查抓到过一次）。
+`blob:airship://airship-reader/…`，`style-src` 不写 `blob:` 就被拦掉（2026-11-07 截图走查抓到过一次）。
 CSP 由 SDK 产包时注入（产包一条、开发一条，不再按清单分档——`net` 退场的事，见 §6），应用的 `index.html` 里不写 CSP。
 
 归档读取用 fflate（`@airship/runtime` 的依赖）：`unzipSync(data, { filter })` 只解需要的那个条目，
@@ -369,7 +368,7 @@ userData/
   apps/<appId>/settings.json   应用私有设置（含它自己的主题档）
   apps/<appId>/data/           应用私有数据
   apps/<appId>/cache/          可随时整体删除重建
-  library/                     共享书库（books 与 pdf 同一份）
+  library/                     共享书库（Reader 的那一份）
 ```
 
 **没有 runtime 级的 settings.json 了**：从前壳级那份（全局主题、工具手动路径）随启动器退场——
@@ -431,8 +430,8 @@ runtime 自己没有界面。应用窗口的 DOM 只有 SDK 那一份宿主：�
 产物名 `airship-runtime-Setup-<版本>-x64.exe`，主 exe 叫 `airship.exe`（`productName: airship`，应用快捷方式的目标就是它）。
 runtime 自己没有界面：`createDesktopShortcut` / `createStartMenuShortcut` 都 false，只留控制面板卸载项（`airship runtime`）。
 **纯 runtime**：`files` 只有 `out/**`、`package.json`、`assets/icon.png`、`assets/tray.png`，不带任何 airship 包。
-根 package.json 已经没有 dependencies（foliate-js / pdfjs-dist 各自记在用它的应用名下，都是 devDependencies，
-构建期打进各家的包），所以不再需要"排除某个 node_modules 目录"那几条。
+根 package.json 已经没有 dependencies（foliate-js 记在 airship-reader 名下，是 devDependencies，
+构建期打进包；pdfjs-dist 随 PDF 应用于 2026-11-26 一并退场），所以不再需要"排除某个 node_modules 目录"那几条。
 
 **版本号规矩**（正式约定在 [version.md](version.md)）：根 `package.json` 与 `src/runtime/package.json` **保持一致**——它们是同一个发布物，
 就该念同一个数（现 0.4.4）。安装包文件名与 exe 文件版本取 `src/runtime/package.json` 的 version
@@ -473,7 +472,7 @@ Electron 与 electron-builder 的二进制走 npmmirror（`.npmrc` 与 `build-ru
 
 册子共 **24 本**：runtime 8 本（bridge / grants / logging / proc-tools / runtime / storage / theme / tray）
 + 应用区 2 本（app-model / package）+ 共享 2 本（library / textdecode）+ 应用 12 本
-（vcp / books / pdf / dagogo / life / albedo / s3 各一，wsld 五本）。索引见 [specs/index.md](specs/index.md)。
+（ffmpeg / reader / dago / life-game / svg-editor / s3 / icon 各一，wsld 五本）。索引见 [specs/index.md](specs/index.md)。
 
 **替身住 SDK**（`@airship/sdk/testing` 的 `FakeAirship` 与 `mountUi`），不住 runtime 的测试目录：
 应用不许引 runtime，用例也不能——否则"包自持"在测试里是假的，外部作者复制范本出去后拿不到同一个替身。
@@ -509,8 +508,8 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
 - TD-001 快捷方式（`.lnk`）上还没有 per-app 的 AUMID；窗口身份那一步已落（SH-010 / SH-034 / SH-035，见 §3）。
 - TD-003 没有代码签名证书；TD-004 没有自动更新链路；TD-005 想要 Inno Setup 那一档观感。
 - TD-006 多窗口的内存回收（现在没有触发这件事的症状）。
-- TD-008~010 wsld 原版有、这期先没有的三块（registry mirror / 拉取实时进度 / 自己的设置页）。
-  （TD-007 run 编排已于 2026-11-20 落成，册子 `wsld-run.md`，编号 RB-001~053 除显式删除的 026、053。）
+- TD-008~010 airship-wsld 原版有、这期先没有的三块（registry mirror / 拉取实时进度 / 自己的设置页）。
+  （TD-007 run 编排已于 2026-11-20 落成，册子 `airship-wsld-run.md`，编号 RB-001~053 除显式删除的 026、053。）
 - TD-012 EPUB 翻页延迟没单独采样。
 - TD-013 SDK 独立发布与版本协商；TD-014 装包的来源信任、更新与商店链路。
 

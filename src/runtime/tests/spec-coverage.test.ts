@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
  * 册子与用例都**跟着它们管的代码走**：
  *
  *   src/runtime/specs/runtime.md ↔  src/runtime/tests/*.test.ts
- *   src/apps/vcp/specs/vcp.md  ↔  src/apps/vcp/tests/*.test.ts
+ *   src/apps/airship-ffmpeg/specs/airship-ffmpeg.md  ↔  src/apps/airship-ffmpeg/tests/*.test.ts
  *   src/shared/library/specs/… ↔  src/shared/library/tests/*.test.ts
  *
  * 所以这里不写死任何一个区的路径，递归找 `specs/*.md` 与 `*.test.ts(x)`。

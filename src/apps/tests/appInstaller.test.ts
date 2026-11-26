@@ -8,14 +8,14 @@ import { REAL_APPS } from '../../runtime/tests/helpers/realApps'
 /**
  * PK-031 ~ PK-035：应用安装器生成出来的那份 NSIS 脚本里读得到的判据。
  *
- * 真装一遍、快捷方式真双击归真机走查（just app-installer life）；
+ * 真装一遍、快捷方式真双击归真机走查（just app-installer airship-life-game）；
  * 这里钉的是生成器的纯函数输出：找 runtime 的顺序、落点、快捷方式命令行、
  * 能力措辞（与契约层逐字一致）、卸载带走什么、两个安装器各要各的权限。
  */
 
 const REPO = join(__dirname, '..', '..', '..')
-const life = REAL_APPS.find((m) => m.id === 'life')!
-const vcp = REAL_APPS.find((m) => m.id === 'vcp')!
+const game = REAL_APPS.find((m) => m.id === 'airship-life-game')!
+const ffmpeg = REAL_APPS.find((m) => m.id === 'airship-ffmpeg')!
 
 function scriptOf(meta: (typeof REAL_APPS)[number]): string {
   return installerScript({ id: meta.id, name: meta.name, version: '0.0.0-test', capabilities: meta.capabilities })
@@ -23,7 +23,7 @@ function scriptOf(meta: (typeof REAL_APPS)[number]): string {
 
 describe('安装器找 runtime', () => {
   it('PK-031 找 runtime 按顺序，找不到念原话不装', () => {
-    const script = scriptOf(life)
+    const script = scriptOf(game)
     // AIRSHIP_PATH 在前，固定目录在后（与 tools.ts 同一套顺序）
     const envAt = script.indexOf('ReadEnvStr $0 "AIRSHIP_PATH"')
     const fixedAt = script.indexOf('$PROGRAMFILES64\\airship\\runtime')
@@ -40,24 +40,24 @@ describe('安装器找 runtime', () => {
 
 describe('装完留下什么', () => {
   it('PK-032 落点与快捷方式的命令行', () => {
-    const script = scriptOf(life)
-    expect(script).toContain('InstallDir "$LOCALAPPDATA\\airship\\apps\\life"')
+    const script = scriptOf(game)
+    expect(script).toContain('InstallDir "$LOCALAPPDATA\\airship\\apps\\airship-life-game"')
     expect(script).toContain('SetOutPath "$INSTDIR"')
-    expect(script).toContain('File "life.airship"')
+    expect(script).toContain('File "airship-life-game.airship"')
     // 目标与参数两段都带引号；图标是包内那张转的 .ico
     expect(script).toContain(
-      `CreateShortcut "$DESKTOP\\${life.name}.lnk" "$RuntimeDir\\airship.exe" '"$INSTDIR\\life.airship"' "$INSTDIR\\icon.ico"`
+      `CreateShortcut "$DESKTOP\\${game.name}.lnk" "$RuntimeDir\\airship.exe" '"$INSTDIR\\airship-life-game.airship"' "$INSTDIR\\icon.ico"`
     )
     expect(script).toContain('File "icon.ico"')
   })
 
   it('PK-033 装之前念能力清单（并进欢迎页，不再弹窗）', () => {
-    const script = scriptOf(vcp)
-    expect(script).toContain(nsisText(`它要的能力：${capabilitiesPhrase(vcp.capabilities)}`))
+    const script = scriptOf(ffmpeg)
+    expect(script).toContain(nsisText(`它要的能力：${capabilitiesPhrase(ffmpeg.capabilities)}`))
 
     // 空清单念的是「不碰你的文件」；每个应用的措辞都与契约层逐字一致（烘进，不另写）
-    const lifeScript = scriptOf(life)
-    expect(lifeScript).toContain(nsisText('它要的能力：不碰你的文件'))
+    const gameScript = scriptOf(game)
+    expect(gameScript).toContain(nsisText('它要的能力：不碰你的文件'))
     for (const meta of REAL_APPS) {
       expect(scriptOf(meta), `${meta.id} 的能力措辞与契约层分叉了`).toContain(
         nsisText(`它要的能力：${capabilitiesPhrase(meta.capabilities)}`)
@@ -73,9 +73,9 @@ describe('装完留下什么', () => {
 
 describe('卸载带走什么', () => {
   it('PK-034 卸载删归档留数据', () => {
-    const script = scriptOf(life)
+    const script = scriptOf(game)
     const uninstall = script.slice(script.indexOf('Section "Uninstall"'))
-    expect(uninstall).toContain(`Delete "$DESKTOP\\${life.name}.lnk"`)
+    expect(uninstall).toContain(`Delete "$DESKTOP\\${game.name}.lnk"`)
     expect(uninstall).toContain('DeleteRegKey HKCU')
     expect(uninstall).toContain('RMDir /r "$INSTDIR"')
     // 设置与数据在 %APPDATA%\airship\apps\<id>：整份脚本根本不出现那个目录
@@ -85,9 +85,9 @@ describe('卸载带走什么', () => {
 
 describe('两个安装器各要各的权限', () => {
   it('PK-035 应用每用户不提权，runtime 全机器钉死目录', () => {
-    const script = scriptOf(life)
+    const script = scriptOf(game)
     expect(script).toContain('RequestExecutionLevel user')
-    expect(script).toContain('InstallDir "$LOCALAPPDATA\\airship\\apps\\life"')
+    expect(script).toContain('InstallDir "$LOCALAPPDATA\\airship\\apps\\airship-life-game"')
     // 应用安装器只往 $INSTDIR（$LOCALAPPDATA 下）写，不往 Program Files 写
     expect(script).not.toMatch(/SetOutPath "\$PROGRAMFILES/)
 

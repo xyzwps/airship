@@ -9,7 +9,7 @@ import { SHARED_NAMESPACES, pathEscape, type AppId, type SharedNamespace } from 
  *   userData/
  *     logs/airship-YYYY-MM-DD.log
  *     icons/<id>.ico                 交给 Windows 外壳的任务栏图标（包内那份 icon.ico 的落盘）
- *     shared/library/              runtime 级共享区：books 与 pdf 共用的书库
+ *     shared/library/              runtime 级共享区：Reader 用的书库
  *     apps/<appId>/settings.json   应用私有设置（含它自己的主题档）
  *     apps/<appId>/data/           应用私有数据
  *     apps/<appId>/cache/          可随时整体删除重建

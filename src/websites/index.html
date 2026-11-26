@@ -43,7 +43,7 @@
             Airship 把这一层沉进一个装一次大家共用的 runtime——应用只剩清单、一个组件、一张图标，
             八个预置应用和外面写的应用跑的是同一份 runtime。
           </p>
-          <pre class="entry-code"><code><span class="c">// src/apps/life/main.tsx —— 一个应用入口脚本的全文</span>
+          <pre class="entry-code"><code><span class="c">// src/apps/airship-life-game/main.tsx —— 一个应用入口脚本的全文</span>
 import { createAirshipApp } from <span class="k">'@airship/sdk'</span>
 import { app } from <span class="k">'./app'</span>
 import LifeApp from <span class="k">'./LifeApp'</span>
@@ -63,7 +63,7 @@ createAirshipApp({ meta: app, component: LifeApp, icon: <span class="k">'./icon.
             <a class="card i2" href="./apps.html">
               <div class="tag">预置应用</div>
               <h3>八个跑在这上面的应用</h3>
-              <p>墨读 · PDF · 打勾勾 · 生命游戏 · vcp · wsld · Albedo · S3，附各自的窗口实拍与能力声明。</p>
+              <p>Reader · Dago · Life Game · FFmpeg · WSLD · SVG Editor · S3 · 图标工坊，附各自的窗口实拍与能力声明。</p>
               <span class="more">看应用 →</span>
             </a>
             <a class="card i3" href="./develop.html">

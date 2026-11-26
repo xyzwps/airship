@@ -59,7 +59,7 @@ build-apps: clean-apps build-libs
 clean-apps:
     rm -rf dist-apps
 
-# 开发模式：just dev life —— 直跑那一个应用。
+# 开发模式：just dev airship-life-game —— 直跑那一个应用。
 # 先产包（runtime 注册的是命令行指来的那份归档，清单与图标从包里读），
 # 再起 electron-vite dev：应用的文档走 dev server（改一行即热更）。
 # 所以改了 app.ts 要重跑一次 just build-apps。
@@ -78,7 +78,7 @@ compile: build-libs
     rm -rf src/runtime/out
     {{vite}} build src/runtime
 
-# 跑构建好的产物（不起 dev server）：just start life —— 应用文档从包里加载（airship://），
+# 跑构建好的产物（不起 dev server）：just start airship-life-game —— 应用文档从包里加载（airship://），
 # 这是与装好的 runtime 最接近的一条路，验"产物真能跑"用它
 start id: compile build-apps
     {{bin}}/electron src/runtime "{{justfile_directory()}}/dist-apps/{{id}}.airship"
@@ -166,4 +166,4 @@ e2e: build-libs
 
 # 真 wslc 只读命令那一路：要本机有 wslc
 wsld-real: build-libs
-    AIRSHIP_WSLD_INTEGRATION=1 {{vitest}} run src/apps/wsld/tests/real.test.ts
+    AIRSHIP_WSLD_INTEGRATION=1 {{vitest}} run src/apps/airship-wsld/tests/real.test.ts

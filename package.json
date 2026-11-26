@@ -2,7 +2,7 @@
   "name": "airship",
   "version": "0.4.6",
   "private": true,
-  "description": "飞船 —— airship runtime 与 vcp、墨读、打勾勾等自用应用",
+  "description": "飞船 —— airship runtime 与 Reader、FFmpeg、S3 等自用应用",
   "author": "xyzwps",
   "license": "MIT",
   "devDependencies": {

@@ -9,7 +9,7 @@
 封面图直接用仓库里真实的 src/runtime/assets/icon.png——不自己画图。
 
 用法：python code/make-jingang-epub.py
-产物：src/apps/books/tests/fixtures/金刚经.epub
+产物：src/apps/airship-reader/tests/fixtures/金刚经.epub
 """
 
 import io
@@ -17,7 +17,7 @@ import os
 import zipfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(REPO, 'src', 'apps', 'books', 'tests', 'fixtures', '金刚经.epub')
+OUT = os.path.join(REPO, 'src', 'apps', 'airship-reader', 'tests', 'fixtures', '金刚经.epub')
 COVER = os.path.join(REPO, 'src', 'runtime', 'assets', 'icon.png')
 
 BOOK_ID = 'urn:uuid:6b9d2f4a-1f0e-4c1a-9d3b-0d6e2f7a1b55'

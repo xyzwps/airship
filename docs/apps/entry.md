@@ -33,7 +33,7 @@ fs 除能力位外还要过一层路径表：自己数据目录内天然可读�
 
 ## 随包后台
 
-要连外部服务、流式读写大文件、跑长任务的应用自带一份 Node 进程（现成两份：S3 与 dagogo）。
+要连外部服务、流式读写大文件、跑长任务的应用自带一份 Node 进程（现成两份：S3 与 airship-dago）。
 
 - 有没有它看**包形状**：归档根有 `backend.js` 才有。源项目应用目录里的 `backend.ts` / `backend.js` 有且只有一处，产包时 bundle 成那一份。
 - 起进程前落到 `<userData>/apps/<id>/backend/backend.cjs`——`.cjs` 让扩展名自带 CommonJS 声明，不受外层 `"type": "module"` 影响。

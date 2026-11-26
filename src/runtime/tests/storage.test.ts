@@ -36,34 +36,34 @@ function fileOf(app: string): string {
 describe('每应用一份设置，runtime 自己不持有', () => {
   it('ST-001 应用之间看不到彼此的设置，磁盘上是两份文件', () => {
     // 这条要断言"pdf 那份文件不存在"，所以先把两边都清干净，别留上一轮的
-    resetDisk('vcp')
-    resetDisk('pdf')
-    settings.set('vcp', 'prefs', { crf: 20 })
-    expect(settings.get('pdf', 'prefs', null)).toBeNull()
-    expect(settings.get('vcp', 'prefs', null)).toEqual({ crf: 20 })
+    resetDisk('airship-ffmpeg')
+    resetDisk('airship-s3')
+    settings.set('airship-ffmpeg', 'prefs', { crf: 20 })
+    expect(settings.get('airship-s3', 'prefs', null)).toBeNull()
+    expect(settings.get('airship-ffmpeg', 'prefs', null)).toEqual({ crf: 20 })
 
-    expect(existsSync(fileOf('vcp'))).toBe(true)
-    expect(existsSync(fileOf('pdf'))).toBe(false)
-    expect(join(fileOf('vcp')).replace(/\\/g, '/')).toMatch(/apps\/vcp\/settings\.json$/)
+    expect(existsSync(fileOf('airship-ffmpeg'))).toBe(true)
+    expect(existsSync(fileOf('airship-s3'))).toBe(false)
+    expect(join(fileOf('airship-ffmpeg')).replace(/\\/g, '/')).toMatch(/apps\/airship-ffmpeg\/settings\.json$/)
     // runtime 自己没有设置文件：根上不许出现 settings.json
     expect(existsSync(join(ROOT, 'settings.json'))).toBe(false)
   })
 
   it('ST-002 写 undefined 等于删掉这个键', () => {
-    settings.set('vcp', 'temp', '留着')
-    settings.set('vcp', 'temp', undefined)
-    expect(settings.get('vcp', 'temp', '回落值')).toBe('回落值')
-    const stored = JSON.parse(readFileSync(fileOf('vcp'), 'utf8')) as Record<string, unknown>
+    settings.set('airship-ffmpeg', 'temp', '留着')
+    settings.set('airship-ffmpeg', 'temp', undefined)
+    expect(settings.get('airship-ffmpeg', 'temp', '回落值')).toBe('回落值')
+    const stored = JSON.parse(readFileSync(fileOf('airship-ffmpeg'), 'utf8')) as Record<string, unknown>
     expect('temp' in stored).toBe(false)
   })
 })
 
 describe('落盘是"临时文件 + 改名"', () => {
   it('ST-003 写完只剩正式文件，内容是完整 JSON', () => {
-    resetDisk('books')
-    settings.set('books', 'prefs', { fontScale: 1.2 })
-    expect(existsSync(`${fileOf('books')}.tmp`)).toBe(false)
-    const text = readFileSync(fileOf('books'), 'utf8')
+    resetDisk('airship-reader')
+    settings.set('airship-reader', 'prefs', { fontScale: 1.2 })
+    expect(existsSync(`${fileOf('airship-reader')}.tmp`)).toBe(false)
+    const text = readFileSync(fileOf('airship-reader'), 'utf8')
     expect(JSON.parse(text)).toEqual({ prefs: { fontScale: 1.2 } })
     expect(text).toContain('\n  "prefs"')
   })
@@ -71,13 +71,13 @@ describe('落盘是"临时文件 + 改名"', () => {
 
 describe('坏文件不致命', () => {
   it('ST-004 解析失败就改名留证、记日志、从空开始', () => {
-    resetDisk('dagogo')
-    mkdirSync(join(ROOT, 'apps', 'dagogo'), { recursive: true })
-    writeFileSync(fileOf('dagogo'), '{ 残缺', 'utf8')
+    resetDisk('airship-dago')
+    mkdirSync(join(ROOT, 'apps', 'airship-dago'), { recursive: true })
+    writeFileSync(fileOf('airship-dago'), '{ 残缺', 'utf8')
 
-    expect(settings.get('dagogo', 'anything', '回落')).toBe('回落')
-    expect(existsSync(fileOf('dagogo'))).toBe(false)
-    expect(existsSync(`${fileOf('dagogo')}.bad`)).toBe(true)
+    expect(settings.get('airship-dago', 'anything', '回落')).toBe('回落')
+    expect(existsSync(fileOf('airship-dago'))).toBe(false)
+    expect(existsSync(`${fileOf('airship-dago')}.bad`)).toBe(true)
 
     const day = new Date()
     const logFile = join(ROOT, 'logs', `airship-${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}.log`)
@@ -86,29 +86,29 @@ describe('坏文件不致命', () => {
   })
 
   it('ST-005 顶层是数组时同样从空开始', () => {
-    resetDisk('pdf')
-    mkdirSync(join(ROOT, 'apps', 'pdf'), { recursive: true })
-    writeFileSync(fileOf('pdf'), '[1,2,3]', 'utf8')
-    expect(settings.get('pdf', 'k', '回落')).toBe('回落')
-    expect(settings.dump('pdf')).toEqual({})
+    resetDisk('airship-s3')
+    mkdirSync(join(ROOT, 'apps', 'airship-s3'), { recursive: true })
+    writeFileSync(fileOf('airship-s3'), '[1,2,3]', 'utf8')
+    expect(settings.get('airship-s3', 'k', '回落')).toBe('回落')
+    expect(settings.dump('airship-s3')).toEqual({})
   })
 })
 
 describe('连续写与副本', () => {
   it('ST-006 连着写两笔，最后一份文件里两笔都在', () => {
-    resetDisk('vcp')
-    settings.set('vcp', 'a', 1)
-    settings.set('vcp', 'b', 2)
-    const stored = JSON.parse(readFileSync(fileOf('vcp'), 'utf8')) as Record<string, unknown>
+    resetDisk('airship-ffmpeg')
+    settings.set('airship-ffmpeg', 'a', 1)
+    settings.set('airship-ffmpeg', 'b', 2)
+    const stored = JSON.parse(readFileSync(fileOf('airship-ffmpeg'), 'utf8')) as Record<string, unknown>
     expect({ a: stored['a'], b: stored['b'] }).toEqual({ a: 1, b: 2 })
   })
 
   it('ST-007 一次拿全是副本，改它不影响主进程里那份', () => {
-    resetDisk('vcp')
-    settings.set('vcp', 'keep', '原值')
-    const dump = settings.dump('vcp')
+    resetDisk('airship-ffmpeg')
+    settings.set('airship-ffmpeg', 'keep', '原值')
+    const dump = settings.dump('airship-ffmpeg')
     dump['keep'] = '被外面改了'
-    expect(settings.get('vcp', 'keep', '?')).toBe('原值')
+    expect(settings.get('airship-ffmpeg', 'keep', '?')).toBe('原值')
   })
 
   /**

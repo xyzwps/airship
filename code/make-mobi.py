@@ -2,7 +2,7 @@
 """造一个真的 MOBI，用来补上 TD-011 那个"MOBI 没有样本可验"的缺口。
 
 正文是《老子》（道德经）匯校版全本八十一章，来自 zh.wikisource（2026-11-06 抓取，
-剥掉校勘模板只留主文），跟着夹具放在 `src/apps/books/tests/fixtures/道德经.txt`。
+剥掉校勘模板只留主文），跟着夹具放在 `src/apps/airship-reader/tests/fixtures/道德经.txt`。
 
 格式这一层不凭记忆写：每个字段都对着 `node_modules/foliate-js/mobi.js` 里
 `PDB_HEADER / PALMDOC_HEADER / MOBI_HEADER / EXTH_HEADER` 实际读的位置来的——
@@ -17,14 +17,14 @@
 - 文本按 4096 字节切记录（切在字符中间没关系：解析器先把所有文本记录拼回一整块再解码）。
 
 用法：python code/make-mobi.py
-产物：src/apps/books/tests/fixtures/道德经.mobi
+产物：src/apps/airship-reader/tests/fixtures/道德经.mobi
 """
 
 import os
 import struct
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FIXTURES = os.path.join(REPO, 'src', 'apps', 'books', 'tests', 'fixtures')
+FIXTURES = os.path.join(REPO, 'src', 'apps', 'airship-reader', 'tests', 'fixtures')
 TEXT = os.path.join(FIXTURES, '道德经.txt')
 OUT = os.path.join(FIXTURES, '道德经.mobi')
 

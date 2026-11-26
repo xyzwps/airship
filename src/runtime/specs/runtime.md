@@ -2,7 +2,7 @@
 
 ## Purpose
 窗口与直跑：runtime 自己没有界面，跑哪些包由命令行决定；一个应用一个窗口的规矩、窗口状态各记各的。
-每个应用在自己窗口里做什么不在这里（见 `src/apps/vcp/specs/vcp.md`、`src/apps/books/specs/books.md` 等），
+每个应用在自己窗口里做什么不在这里（见 `src/apps/airship-ffmpeg/specs/airship-ffmpeg.md`、`src/apps/airship-reader/specs/airship-reader.md` 等），
 标题栏与主题的呈现见 `theme.md`；跨进程调用的规矩见 `bridge.md`。
 
 > 只能在真机上观察的期望（单实例锁与第二实例转发的时序、一个应用崩了不带崩别人）记在
@@ -28,9 +28,9 @@ runtime 没有启动器、没有格子：`airship.exe <id>.airship` 注册一份
 - **AND** 判定与产包期是同一份，不存在"直跑判得松一点"
 
 #### Scenario: SH-033 同 id 同归档是聚焦，异归档拒
-- **WHEN** life 已在活动包表里，再交来同一份归档
-- **THEN** 返回的还是表里那一份，窗口动作是"聚焦已有窗口"，活着的 life 窗口始终只有一个
-- **AND** 同 id 交来另一份归档时拒，念「同一个 id 已经跑着另一份包：life 现在用的是 <旧路径>，这次交来的是 <新路径>。先关掉它的窗口再跑这一份。」
+- **WHEN** airship-life-game 已在活动包表里，再交来同一份归档
+- **THEN** 返回的还是表里那一份，窗口动作是"聚焦已有窗口"，活着的 airship-life-game 窗口始终只有一个
+- **AND** 同 id 交来另一份归档时拒，念「同一个 id 已经跑着另一份包：airship-life-game 现在用的是 <旧路径>，这次交来的是 <新路径>。先关掉它的窗口再跑这一份。」
 
 ### Requirement: 一个应用一个窗口，窗口之间各过各的
 窗口是隔离单位：同一个应用只开一个，关窗要把它名下的摊子收干净。

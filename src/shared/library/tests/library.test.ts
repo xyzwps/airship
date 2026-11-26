@@ -14,7 +14,7 @@ import {
 import { FakeAirship } from '@airship/sdk/testing'
 
 /**
- * LB 册子（docs/specs/library.md）。
+ * LB 册子（src/shared/library/specs/library.md）。
  *
  * 拿 FakeAirship 当 runtime：书库落在共享命名空间 `library` 里，
  * 所有断言读的都是那份内存卷与索引文件的原文，不看内部实现。
@@ -55,25 +55,18 @@ function grant(fake: FakeAirship, path: string): void {
 }
 
 /** 另一个应用读同一个目录：卷与授权各一份，数据是同一份 */
-function twin(from: FakeAirship, id: string): FakeAirship {
-  const other = shelf(id)
-  for (const [p, c] of from.vol) other.vol.set(p, c)
-  for (const d of from.dirSet) other.dirSet.add(d)
-  return other
-}
-
 function indexed(fake: FakeAirship): { version: number; books: BookRecord[] } {
   return JSON.parse(fake.text(INDEX)) as { version: number; books: BookRecord[] }
 }
 
 describe('索引文件自己带版本', () => {
   it('LB-001 书库还空着时读到的是空表', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     expect(await loadBooks(fake.api)).toEqual([])
   })
 
   it('LB-002 v2 的索引按原样读出，落盘也带 version: 2', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     const src = '/fake/media/起风了.epub'
     fake.seed(src, 'EPUB'.repeat(8))
     grant(fake, src)
@@ -94,7 +87,7 @@ describe('索引文件自己带版本', () => {
   })
 
   it('LB-003 版本对不上时报出该删哪个文件', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     fake.seed(INDEX, '{"version":1,"books":[]}')
     await expect(loadBooks(fake.api)).rejects.toThrow('书库索引是 v1，本包只认 v2。')
     const message = await loadBooks(fake.api).catch((e: unknown) => String(e))
@@ -102,13 +95,13 @@ describe('索引文件自己带版本', () => {
     expect(message).toContain('书本体和封面不用动')
 
     // 没写版本的同样被拒，念出来的是 v?
-    const blank = shelf('books')
+    const blank = shelf('airship-reader')
     blank.seed(INDEX, '{"books":[]}')
     await expect(loadBooks(blank.api)).rejects.toThrow('书库索引是 v?，本包只认 v2。')
   })
 
   it('LB-004 索引里 books 不是列表时单独报错', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     fake.seed(INDEX, '{"version":2,"books":{"a":1}}')
     await expect(loadBooks(fake.api)).rejects.toThrow('书库索引格式不正确')
   })
@@ -116,7 +109,7 @@ describe('索引文件自己带版本', () => {
 
 describe('判重在拷贝之前', () => {
   it('LB-005 大小与标题都对上就算同一本，不多拷一份', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     const first = '/fake/media/书名.epub'
     fake.seed(first, 'A'.repeat(64))
     grant(fake, first)
@@ -136,7 +129,7 @@ describe('判重在拷贝之前', () => {
   })
 
   it('LB-006 只有大小对上不是同一本', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     const a = '/fake/media/a.epub'
     const b = '/fake/media/b.epub'
     fake.seed(a, 'B'.repeat(50))
@@ -152,7 +145,7 @@ describe('判重在拷贝之前', () => {
   })
 
   it('LB-007 新书排在最前，本体落在 files/<书号>.<扩展名>', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     const src = '/fake/media/河上的船.MOBI'
     fake.seed(src, 'mobi-bytes')
     grant(fake, src)
@@ -173,7 +166,7 @@ describe('判重在拷贝之前', () => {
 
 describe('封面由导入方交进来', () => {
   it('LB-008 给了封面字节就存，没给也照样导入', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     const withCover = '/fake/media/有封面.epub'
     const noCover = '/fake/media/没封面.epub'
     fake.seed(withCover, 'x'.repeat(20))
@@ -198,7 +191,7 @@ describe('封面由导入方交进来', () => {
   })
 
   it('LB-009 封面地址交给图片就能真画出来，没封面的得到空值', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     const src = '/fake/media/c.epub'
     fake.seed(src, 'z'.repeat(9))
     grant(fake, src)
@@ -227,7 +220,7 @@ describe('封面由导入方交进来', () => {
 
 describe('删除连索引带文件一起清', () => {
   it('LB-010 删一本书把本体与封面一起删掉，别的书不动', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     const src = '/fake/media/del.epub'
     const keep = '/fake/media/keep.epub'
     fake.seed(src, 'd'.repeat(12))
@@ -253,7 +246,7 @@ describe('删除连索引带文件一起清', () => {
   })
 
   it('LB-011 删一个没登记过的书号什么都不动', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     const src = '/fake/media/e.epub'
     fake.seed(src, 'e'.repeat(7))
     grant(fake, src)
@@ -267,9 +260,9 @@ describe('删除连索引带文件一起清', () => {
   })
 })
 
-describe('进度与附加信息是两个应用共用的一份', () => {
+describe('进度与附加信息都存在记录上', () => {
   it('LB-012 进度四个字段存得下也读得出，也能抹掉', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     const src = '/fake/media/p.epub'
     fake.seed(src, 'p'.repeat(11))
     grant(fake, src)
@@ -294,35 +287,15 @@ describe('进度与附加信息是两个应用共用的一份', () => {
     expect(cleared!.progress).toBeNull()
   })
 
-  it('LB-013 墨读写的进度，PDF 从同一份索引读到', async () => {
-    const books = shelf('books')
-    const epub = '/fake/media/共读.epub'
-    const pdf = '/fake/media/规格书.pdf'
-    books.seed(epub, 'u'.repeat(15))
-    books.seed(pdf, 'd'.repeat(16))
-    grant(books, epub)
-    grant(books, pdf)
-    const mine = await addBook(books.api, { sourcePath: epub, format: 'epub', title: '共读', author: '' })
-    await addBook(books.api, { sourcePath: pdf, format: 'pdf', title: '规格书', author: '' })
-    await setProgress(books.api, mine.id, { section: 2, fraction: 0.5, cfi: 'x', updatedAt: '2026-11-04T00:00:00.000Z' })
-
-    const pdfApp = twin(books, 'pdf')
-    const all = await loadBooks(pdfApp.api)
-    expect(all.find((b) => b.id === mine.id)?.progress?.section).toBe(2)
-    // 两个应用按格式各筛各的，看到的仍是同一批记录
-    expect(all.filter((b) => b.format === 'pdf').map((b) => b.title)).toEqual(['规格书'])
-    expect(all.filter((b) => b.format !== 'pdf').map((b) => b.title)).toEqual(['共读'])
-  })
-
   it('LB-014 附加信息各存各的键，更新一本不动另一本', async () => {
-    const fake = shelf('pdf')
-    const doc = '/fake/media/带页数.pdf'
+    const fake = shelf('airship-reader')
+    const doc = '/fake/media/带页数.mobi'
     const other = '/fake/media/带章名.epub'
     fake.seed(doc, 'q'.repeat(18))
     fake.seed(other, 'r'.repeat(19))
     grant(fake, doc)
     grant(fake, other)
-    await addBook(fake.api, { sourcePath: doc, format: 'pdf', title: '带页数', author: '', meta: { pages: 7 } })
+    await addBook(fake.api, { sourcePath: doc, format: 'mobi', title: '带页数', author: '', meta: { pages: 7 } })
     const e = await addBook(fake.api, {
       sourcePath: other,
       format: 'epub',
@@ -332,7 +305,7 @@ describe('进度与附加信息是两个应用共用的一份', () => {
     })
 
     const before = await loadBooks(fake.api)
-    expect(before.find((b) => b.format === 'pdf')?.meta).toEqual({ pages: 7 })
+    expect(before.find((b) => b.format === 'mobi')?.meta).toEqual({ pages: 7 })
     expect(before.find((b) => b.format === 'epub')?.meta).toEqual({ lastChapter: '起风了' })
     // 索引里没有为某个格式专设的顶层字段
     expect(Object.keys(indexed(fake).books[0]!).sort()).toEqual(
@@ -341,11 +314,11 @@ describe('进度与附加信息是两个应用共用的一份', () => {
 
     await setProgress(fake.api, e.id, { section: 1, fraction: 0, cfi: null, updatedAt: '2026-11-05T00:00:00.000Z' })
     const after = await loadBooks(fake.api)
-    expect(after.find((b) => b.format === 'pdf')?.meta).toEqual({ pages: 7 })
+    expect(after.find((b) => b.format === 'mobi')?.meta).toEqual({ pages: 7 })
   })
 
   it('LB-015 连续导入两本，后一次不吞掉前一次', async () => {
-    const fake = shelf('books')
+    const fake = shelf('airship-reader')
     const a = '/fake/media/f1.epub'
     const b = '/fake/media/f2.epub'
     fake.seed(a, '1'.repeat(21))

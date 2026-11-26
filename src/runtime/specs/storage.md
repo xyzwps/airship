@@ -6,9 +6,9 @@
 
 ### Requirement: 每应用一份设置，runtime 自己不持有
 #### Scenario: ST-001 应用之间看不到彼此的设置
-- **WHEN** vcp 写一条自己的设置，PDF 读同一个键名
-- **THEN** PDF 读不到 vcp 那笔（它拿到自己的回落值）
-- **AND** 磁盘上是两份文件：`apps/vcp/settings.json` 与 `apps/pdf/settings.json`，根上没有 runtime 自己的设置文件
+- **WHEN** airship-ffmpeg 写一条自己的设置，airship-s3 读同一个键名
+- **THEN** airship-s3 读不到 airship-ffmpeg 那笔（它拿到自己的回落值）
+- **AND** 磁盘上是两份文件：`apps/airship-ffmpeg/settings.json` 与 `apps/airship-s3/settings.json`，根上没有 runtime 自己的设置文件
 
 #### Scenario: ST-002 写 undefined 等于把这个键删掉
 - **WHEN** 应用把某个键设成 `undefined`

@@ -139,7 +139,7 @@ describe('清单只写应用自己的事实', () => {
     expect(platformIssue(meta({ id: 'a', name: 'A' }), 'linux')).toBeNull()
     expect(platformIssue(meta({ id: 'a', name: 'A', platforms: [] }), 'macos')).toBeNull()
 
-    const only = meta({ id: 'wsld', name: 'wsld', platforms: ['windows'] })
+    const only = meta({ id: 'airship-wsld', name: 'WSLD', platforms: ['windows'] })
     expect(platformIssue(only, 'windows')).toBeNull()
     expect(platformIssue(only, 'macos')).toBe('它只在 windows 上可用，这台机器是 macos')
     expect(platformIssue(only, 'unknown')).toContain('这台机器是 unknown')

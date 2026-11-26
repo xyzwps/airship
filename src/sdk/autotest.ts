@@ -7,7 +7,7 @@ import { isShotMode } from './shot.ts'
  * 之前这套东西在每个应用里各抄了一遍（类型强转 + 注册时序 + 报就绪），
  * 四个应用 26 行重复代码。约定要求"应用只写业务"，所以把它收下来：
  *
- *   useAppAutotest('vcp', async (path) => { ...打开这个文件... })
+ *   useAppAutotest('airship-ffmpeg', async (path) => { ...打开这个文件... })
  *
  * 帮助函数负责三件事，顺序不能换：
  *   1. 把 path 授权给本应用读（截图模式下才有这条通道，正常启动时整个钩子不存在）

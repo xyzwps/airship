@@ -67,19 +67,19 @@ describe('proc 只跑白名单里的可执行文件', () => {
     const stranger = join(ROOT, 'notepad.exe')
     expect(isAllowedExecutable(stranger)).toBe(false)
 
-    await expect(proc.run('vcp', { exe: stranger, args: [] })).rejects.toThrowError(
+    await expect(proc.run('airship-ffmpeg', { exe: stranger, args: [] })).rejects.toThrowError(
       `不允许执行 ${stranger}：可执行文件必须先由 runtime 发现（见 tools.ts 的白名单规则）`
     )
-    expect(() => proc.start('vcp', { exe: stranger, args: [], jobId: 'j' })).toThrowError(/不允许执行/)
+    expect(() => proc.start('airship-ffmpeg', { exe: stranger, args: [], jobId: 'j' })).toThrowError(/不允许执行/)
     // 拒了就不该有进程被起，也不该有事件回流
-    expect(proc.list('vcp')).toEqual([])
+    expect(proc.list('airship-ffmpeg')).toEqual([])
     expect(events).toEqual([])
   })
 })
 
 describe('两种用法各自的结果', () => {
   it('PT-002 一次性调用把退出码、信号与两路输出完整交回，不推分块事件', async () => {
-    const res = await proc.run('vcp', {
+    const res = await proc.run('airship-ffmpeg', {
       exe: NODE,
       args: ['-e', "console.log('hi');console.error('boo');process.exit(3)"]
     })
@@ -92,7 +92,7 @@ describe('两种用法各自的结果', () => {
   })
 
   it('PT-003 后台任务的输出分块推回归属窗口，中文不被劈成半字', async () => {
-    proc.start('vcp', { exe: NODE, args: CHATTER, jobId: 'flow' })
+    proc.start('airship-ffmpeg', { exe: NODE, args: CHATTER, jobId: 'flow' })
     await waitUntil(() => exitsOf('flow').length === 1)
 
     const expectText = CJK.repeat(REPEATS)
@@ -103,39 +103,39 @@ describe('两种用法各自的结果', () => {
     // 分块确实是一点一点到的，不是一次性一整块
     const parts = events.filter((e) => e.event.kind === 'proc:chunk' && e.event.jobId === 'flow')
     expect(parts.length).toBeGreaterThan(1)
-    expect(parts.every((e) => e.app === 'vcp')).toBe(true)
+    expect(parts.every((e) => e.app === 'airship-ffmpeg')).toBe(true)
 
     const exit = exitsOf('flow')[0]!
     expect(exit.event.result).toMatchObject({ code: 0 })
-    expect(proc.list('vcp')).not.toContain('flow')
+    expect(proc.list('airship-ffmpeg')).not.toContain('flow')
     // 结束事件带回来的 stdout 与分块拼起来一致
     expect(exit.event.result?.stdout).toBe(expectText)
   })
 
   it('PT-004 同一应用内任务标识重复被拒，别的应用用同一个标识不受影响', () => {
-    proc.start('vcp', { exe: NODE, args: SLEEPER, jobId: 'same' })
-    expect(() => proc.start('vcp', { exe: NODE, args: SLEEPER, jobId: 'same' })).toThrowError(
+    proc.start('airship-ffmpeg', { exe: NODE, args: SLEEPER, jobId: 'same' })
+    expect(() => proc.start('airship-ffmpeg', { exe: NODE, args: SLEEPER, jobId: 'same' })).toThrowError(
       '任务标识重复：same（同一个应用内要唯一）'
     )
-    expect(() => proc.start('pdf', { exe: NODE, args: SLEEPER, jobId: 'same' })).not.toThrow()
-    expect(proc.list('vcp')).toEqual(['same'])
-    expect(proc.list('pdf')).toEqual(['same'])
+    expect(() => proc.start('airship-s3', { exe: NODE, args: SLEEPER, jobId: 'same' })).not.toThrow()
+    expect(proc.list('airship-ffmpeg')).toEqual(['same'])
+    expect(proc.list('airship-s3')).toEqual(['same'])
   })
 
   it('PT-005 停止任务：在跑的才停得掉，且只回来一条结束事件', async () => {
-    proc.start('vcp', { exe: NODE, args: SLEEPER, jobId: 'live' })
-    expect(proc.list('vcp')).toContain('live')
+    proc.start('airship-ffmpeg', { exe: NODE, args: SLEEPER, jobId: 'live' })
+    expect(proc.list('airship-ffmpeg')).toContain('live')
 
-    expect(proc.kill('nope', 'vcp')).toBe(false)
+    expect(proc.kill('nope', 'airship-ffmpeg')).toBe(false)
     expect(events.filter((e) => e.event.kind === 'proc:exit')).toEqual([])
 
-    expect(proc.kill('live', 'vcp')).toBe(true)
+    expect(proc.kill('live', 'airship-ffmpeg')).toBe(true)
     await waitUntil(() => exitsOf('live').length === 1)
     expect(exitsOf('live')[0]!.event.result).toMatchObject({ signal: 'SIGKILL' })
-    expect(proc.list('vcp')).toEqual([])
+    expect(proc.list('airship-ffmpeg')).toEqual([])
 
     // 已经结束的任务再停一次：没有这条任务了，返回 false，也不再产生事件
-    expect(proc.kill('live', 'vcp')).toBe(false)
+    expect(proc.kill('live', 'airship-ffmpeg')).toBe(false)
     expect(exitsOf('live').length).toBe(1)
   })
 })

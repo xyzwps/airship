@@ -1,7 +1,7 @@
 # airship · 给代理的说明
 
 飞船是一个 **airship runtime**（一个 Electron 运行时，像 JVM / .NET 那样装一次大家共用），
-外面挂着八个自用应用（墨读 · PDF · 打勾勾 · 生命游戏 · vcp · wsld · Albedo · S3）。
+外面挂着八个自用应用（airship-reader · airship-dago · airship-life-game · airship-ffmpeg · airship-wsld · airship-svg-editor · airship-s3 · airship-icon）。
 一个应用一个窗口一个渲染进程，**一个应用是一个 airship 包（zip 归档 `<id>.airship`），由命令行指给 runtime 注册**——
 runtime 的产物里没有应用代码，runtime 自己也没有界面。多个应用共用一个 runtime 进程，第二次启动转发包路径。
 这里只写"不照做就会做错"的事；架构理由见
@@ -53,7 +53,7 @@ src/cli                @airship/cli          作者命令行：产包流水、de
 src/scaffold           create-airship-app    npm 手脚架（npx create-airship-app）：minimal 与 todo 两套模板，
                                              模板里 `__APP_ID__` 与 `__APP_NAME__` 是渲染位；不参与 casecov
 src/shared/contract    @airship/contract     契约、清单类型、拒绝措辞、注册与包形状的规矩
-src/shared/library     @airship/library      共享书库（墨读与 PDF 同一份数据）
+src/shared/library     @airship/library      共享书库（Reader 管的那一份（PDF 应用已于 2026-11-26 退场））
 src/shared/textdecode  @airship/textdecode   中文解码
 ```
 
@@ -110,10 +110,10 @@ Node 脚本走软链读的就是那份 JS；这两区**源码里**的相对 impo
 - **界面观感（宽度、圆角、对齐、真排版好不好看）不进册子**，那是 `just shot` 截图走查的事，截图产物不入代码库。
 - 写不出可执行判据的期望别进册子，记到 architecture.md 对应小节。
 
-## 墨读支持的格式
+## Reader 支持的格式
 
 **只有 EPUB 与 MOBI。** 唯一真源是 `src/shared/library/index.ts` 的 `BookFormat`
-（`'epub' | 'mobi' | 'pdf'`，pdf 是 PDF 应用那侧的位）。TXT 与 azw3 都在 2026-11-06 被退回，
+（`'epub' | 'mobi'`；PDF 应用连同 `pdf` 格式位已于 2026-11-26 退场）。TXT 与 azw3 都在 2026-11-06 被退回，
 别把文件选择框里的扩展名别名当契约——要加格式是一次契约变更：改类型 + 开册子场景 + 造样本。
 
 ## 出包

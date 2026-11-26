@@ -3,7 +3,7 @@
  * 逐个应用构建并产成 airship 包，落进 `dist-apps/<id>.airship/`。
  *
  *   node code/build-apps.mjs              全部六个
- *   node code/build-apps.mjs life pdf     只产这几个
+ *   node code/build-apps.mjs airship-life-game airship-s3     只产这几个
  *   AIRSHIP_APPS_OUT=D:/pkgs node code/build-apps.mjs   换落点（用例与排查用）
  *
  * 为什么"每个应用各跑一次 vite build"：一次构建里放六份 html，Rollup 会把 React 抽成

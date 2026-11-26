@@ -28,7 +28,7 @@ export default defineConfig({
          *
          * `@aws-sdk/*` 不在这一列里，而且不该在：它被外部化之后挑的是 Node 那一档传输，
          * 换 `globalThis.fetch` 换不到它（请求会真发到机器上的端点去）。
-         * S3 那个应用的用例因此起一个真的内存 HTTP 服务当端点，见 `src/apps/s3/tests/helpers/fakeS3.ts`。
+         * S3 那个应用的用例因此起一个真的内存 HTTP 服务当端点，见 `src/apps/airship-s3/tests/helpers/fakeS3.ts`。
          */
         inline: [/^@airship\//]
       }

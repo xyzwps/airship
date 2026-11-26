@@ -93,9 +93,9 @@ const BOOKS = 103
 
 beforeEach(() => {
   shellState.owners.clear()
-  shellState.owners.set(VCP, 'vcp')
-  shellState.owners.set(DAGOGO, 'dagogo')
-  shellState.owners.set(BOOKS, 'books')
+  shellState.owners.set(VCP, 'airship-ffmpeg')
+  shellState.owners.set(DAGOGO, 'airship-dago')
+  shellState.owners.set(BOOKS, 'airship-reader')
 })
 
 /** 取错误原因：契约方法失败时应用 catch 到的就是这句 */
@@ -106,63 +106,63 @@ function reason<T>(res: Envelope<T>): string {
 
 describe('调用只返回信封，失败必须是中文句子', () => {
   it('BR-001 办成了只把值交给应用', async () => {
-    const res = await call<{ data: string }>('runtime:paths', VCP, 'vcp')
+    const res = await call<{ data: string }>('runtime:paths', VCP, 'airship-ffmpeg')
     expect(res.ok).toBe(true)
     const value = (res as { value: { data: string; cache: string; platform: string } }).value
-    expect(value.data.replace(/\\/g, '/')).toMatch(/apps\/vcp\/data$/)
-    expect(value.cache.replace(/\\/g, '/')).toMatch(/apps\/vcp\/cache$/)
+    expect(value.data.replace(/\\/g, '/')).toMatch(/apps\/airship-ffmpeg\/data$/)
+    expect(value.cache.replace(/\\/g, '/')).toMatch(/apps\/airship-ffmpeg\/cache$/)
   })
 
   it('BR-002 被拒时应用拿到的是中文原因，不是 Electron 的内部措辞', async () => {
-    const res = await call('settings:set', DAGOGO, 'dagogo', 'prefs', { a: 1 })
+    const res = await call('settings:set', DAGOGO, 'airship-dago', 'prefs', { a: 1 })
     expect(res.ok).toBe(true)
 
-    const bad = await call('settings:set', DAGOGO, 'dagogo', '', 1)
+    const bad = await call('settings:set', DAGOGO, 'airship-dago', '', 1)
     const why = reason(bad)
     expect(why).toContain('必须是非空字符串')
     expect(why).not.toContain('Error invoking remote method')
   })
 
   it('BR-008 参数不合法时把收到的值原样念出来', async () => {
-    const why = reason(await call('fs:read', VCP, 'vcp', 0))
+    const why = reason(await call('fs:read', VCP, 'airship-ffmpeg', 0))
     expect(why).toBe('path 必须是非空字符串，收到 0')
   })
 })
 
 describe('身份由 runtime 注入，冒充不了别人', () => {
   it('BR-003 以别的应用名义调用被拒，原因点出归属', async () => {
-    const why = reason(await call('fs:read', VCP, 'pdf', '/etc/passwd'))
-    expect(why).toBe('身份不匹配：这个窗口属于 vcp，不能以 pdf 的名义调用')
+    const why = reason(await call('fs:read', VCP, 'airship-s3', '/etc/passwd'))
+    expect(why).toBe('身份不匹配：这个窗口属于 airship-ffmpeg，不能以 airship-s3 的名义调用')
   })
 
   it('BR-004 没登记过的来源一律拒', async () => {
-    expect(reason(await call('fs:read', 4242, 'vcp', '/x'))).toBe('调用来源不是 runtime 注册的窗口，拒绝')
+    expect(reason(await call('fs:read', 4242, 'airship-ffmpeg', '/x'))).toBe('调用来源不是 runtime 注册的窗口，拒绝')
   })
 })
 
 describe('未声明的能力一律拒绝', () => {
   it('BR-006 没声明的能力，原因点出能力名与清单路径', async () => {
-    const why = reason(await call('clipboard:writeText', DAGOGO, 'dagogo', '你好'))
-    expect(why).toBe('dagogo 没有声明 clipboard 能力（要用它就在 apps/dagogo/app.ts 的 capabilities 里声明）')
+    const why = reason(await call('clipboard:writeText', DAGOGO, 'airship-dago', '你好'))
+    expect(why).toBe('airship-dago 没有声明 clipboard 能力（要用它就在 apps/airship-dago/app.ts 的 capabilities 里声明）')
 
     // 工具既要有 proc 能力，也要在清单里声明过：没 proc 的先被能力闸拦住
-    expect(reason(await call('tools:path', DAGOGO, 'dagogo', 'ffmpeg'))).toBe(
-      'dagogo 没有声明 proc 能力（要用它就在 apps/dagogo/app.ts 的 capabilities 里声明）'
+    expect(reason(await call('tools:path', DAGOGO, 'airship-dago', 'ffmpeg'))).toBe(
+      'airship-dago 没有声明 proc 能力（要用它就在 apps/airship-dago/app.ts 的 capabilities 里声明）'
     )
     // 有 proc 但清单里没声明这个工具
-    expect(reason(await call('tools:path', VCP, 'vcp', 'wslc'))).toBe(
-      'vcp 没有声明 wslc 工具（要用它就在 apps/vcp/app.ts 的 tools 里声明）'
+    expect(reason(await call('tools:path', VCP, 'airship-ffmpeg', 'wslc'))).toBe(
+      'airship-ffmpeg 没有声明 wslc 工具（要用它就在 apps/airship-ffmpeg/app.ts 的 tools 里声明）'
     )
     // runtime 的工具表里根本没有这个名字
-    expect(reason(await call('tools:path', VCP, 'vcp', 'nope'))).toContain('runtime 不认识的工具：nope')
+    expect(reason(await call('tools:path', VCP, 'airship-ffmpeg', 'nope'))).toContain('runtime 不认识的工具：nope')
   })
 
   it('BR-007 共享命名空间没声明就用不了', async () => {
-    const why = reason(await call('fs:resolveInShared', VCP, 'vcp', 'library', ['library.json']))
-    expect(why).toBe('vcp 没有声明共享命名空间 library（在 apps/vcp/app.ts 的 sharedNamespaces 里声明）')
+    const why = reason(await call('fs:resolveInShared', VCP, 'airship-ffmpeg', 'library', ['library.json']))
+    expect(why).toBe('airship-ffmpeg 没有声明共享命名空间 library（在 apps/airship-ffmpeg/app.ts 的 sharedNamespaces 里声明）')
 
     // 声明了的应用走同一条路就给的出路径
-    const ok = await call<string>('fs:resolveInShared', BOOKS, 'books', 'library', ['library.json'])
+    const ok = await call<string>('fs:resolveInShared', BOOKS, 'airship-reader', 'library', ['library.json'])
     expect(ok.ok ? ok.value.replace(/\\/g, '/') : ok).toMatch(/shared\/library\/library\.json$/)
   })
 })
@@ -174,28 +174,28 @@ describe('对话框给出去的许可', () => {
 
   it('GR-005 选中的文件才读得到，它所在目录仍然不给', async () => {
     io.pick = [one]
-    expect((await call('dialog:openFiles', VCP, 'vcp', {})).ok).toBe(true)
+    expect((await call('dialog:openFiles', VCP, 'airship-ffmpeg', {})).ok).toBe(true)
 
-    expect(await call('fs:stat', VCP, 'vcp', one)).toMatchObject({ ok: true })
-    expect(reason(await call('fs:stat', VCP, 'vcp', other))).toContain('没有读取权限')
-    expect(reason(await call('fs:list', VCP, 'vcp', dir))).toContain('没有读取权限')
+    expect(await call('fs:stat', VCP, 'airship-ffmpeg', one)).toMatchObject({ ok: true })
+    expect(reason(await call('fs:stat', VCP, 'airship-ffmpeg', other))).toContain('没有读取权限')
+    expect(reason(await call('fs:list', VCP, 'airship-ffmpeg', dir))).toContain('没有读取权限')
   })
 
   it('GR-007 要父目录授权的应用，得显式带 grantParentDir', async () => {
     mkdirSync(dir, { recursive: true })
     io.pick = [join(dir, 'c.mkv')]
-    await call('dialog:openFiles', VCP, 'vcp', { grantParentDir: true })
-    expect((await call('fs:list', VCP, 'vcp', dir)).ok).toBe(true)
+    await call('dialog:openFiles', VCP, 'airship-ffmpeg', { grantParentDir: true })
+    expect((await call('fs:list', VCP, 'airship-ffmpeg', dir)).ok).toBe(true)
   })
 
   it('GR-008 另存为只开放那一个写入目标，但同目录可读好回看产物', async () => {
     io.save = join(dir, 'out.mkv')
-    expect((await call('dialog:saveFile', VCP, 'vcp', {})).ok).toBe(true)
+    expect((await call('dialog:saveFile', VCP, 'airship-ffmpeg', {})).ok).toBe(true)
 
-    expect((await call('fs:ensureDir', VCP, 'vcp', join(dir, 'nope'))).ok).toBe(false)
-    expect((await call('fs:stat', VCP, 'vcp', join(dir, 'other.mkv'))).ok).toBe(true)
+    expect((await call('fs:ensureDir', VCP, 'airship-ffmpeg', join(dir, 'nope'))).ok).toBe(false)
+    expect((await call('fs:stat', VCP, 'airship-ffmpeg', join(dir, 'other.mkv'))).ok).toBe(true)
 
-    const write = await call('fs:write', VCP, 'vcp', join(dir, 'other.mkv'), 'x')
+    const write = await call('fs:write', VCP, 'airship-ffmpeg', join(dir, 'other.mkv'), 'x')
     expect(reason(write)).toContain('没有写入权限')
   })
 })

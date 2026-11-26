@@ -9,7 +9,7 @@
  * `ipc:` 留着是 preload 那侧通道的历史写法，跟 `blob:` 一起不影响 `'self'` 的边界。
  *
  * `style-src` 要 `blob:`：文档源从 `file://` 换成 `airship://<id>` 之后，
- * foliate-js 往章节 iframe 里注入的那份样式表变成了 `blob:airship://books/…`，
+ * foliate-js 往章节 iframe 里注入的那份样式表变成了 `blob:airship://airship-reader/…`，
  * 没有 `blob:` 就被拦掉——2026-11-07 截图走查真撞上过，书能画但章节自带排版丢了。
  * `blob:` 只放行同源创建的 blob，不是把口子开到外部。
  * `'unsafe-inline'` 同理保留：React 的 inline style 与主题变量要吃它，收紧它是一次独立的契约变更。

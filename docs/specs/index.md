@@ -15,7 +15,7 @@ src/sdk/tests/*.test.*        SDK 宿主的用例（SH-011 / SH-012 / SH-013 / S
                               实现住在 SDK，用例跟着实现走；编号不动）
 src/shared/<包>/specs/*.md    共享包一本；tests/ 放它的用例
 docs/specs/index.md           这本索引——唯一跨区的文件，与架构文档同级
-src/<区>/<名>/tests/fixtures/   真样本跟着用它的用例走（wslc 的真实输出在 src/apps/wsld/tests/fixtures/）
+src/<区>/<名>/tests/fixtures/   真样本跟着用它的用例走（wslc 的真实输出在 src/apps/airship-wsld/tests/fixtures/）
 ```
 
 `just casecov` 递归找所有 `specs/*.md` 与 `tests/**` 里的用例，新加区域不用改检查器。
@@ -34,8 +34,8 @@ src/<区>/<名>/tests/fixtures/   真样本跟着用它的用例走（wslc 的�
 依据：为什么这么定（一段，指向 architecture.md 的节）。
 
 #### Scenario: BR-001 未声明的能力，界面上读得到为什么被拒
-- **WHEN** vcp 未声明 settings，界面点"记住这套配置"
-- **THEN** 错误条原样读得到「vcp 没有声明 settings 能力（要用它就在 apps/vcp/app.ts 的 capabilities 里声明）」
+- **WHEN** airship-ffmpeg 未声明 settings，界面点"记住这套配置"
+- **THEN** 错误条原样读得到「airship-ffmpeg 没有声明 settings 能力（要用它就在 apps/airship-ffmpeg/app.ts 的 capabilities 里声明）」
 - **AND** 不出现 "Error invoking remote method" 这类 Electron 内部措辞
 ```
 
@@ -104,32 +104,33 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 
 | 前缀 | 能力 | 册子 | 谁该动它 | 验证档 |
 |---|---|---|---|---|
-| LB | 书库（索引版本、导入判重、封面、进度） | `library.md` | 碰 books/pdf 共用的那份数据的人 | 自动化 |
-| TD | 中文文本解码（BOM → UTF-8 严格 → GBK） | `textdecode.md` | 墨读正文与 vcp 字幕的解码 | 自动化 |
+| LB | 书库（索引版本、导入判重、封面、进度） | `library.md` | 碰 Reader 那份书库数据的人 | 自动化 |
+| TD | 中文文本解码（BOM → UTF-8 严格 → GBK） | `textdecode.md` | Reader 正文与 FFmpeg 字幕的解码 | 自动化 |
 
 ### 应用（`src/apps/<id>/`）
 
 | 前缀 | 能力 | 册子 | 验证档 |
 |---|---|---|---|
-| VC | vcp：选流、处理链、命令、队列 | `vcp.md` | 自动化 + 门控（`VCP_E2E=1` 真编码） |
-| BK | 墨读：书架与阅读器 | `books.md` | 自动化 + 门控（真书） |
-| PD | PDF：书架与阅读 | `pdf.md` | 自动化 |
-| DG | 打勾勾：每日清单与托盘徽标 | `dagogo.md` | 自动化 |
-| LF | 生命游戏：100 / 200 / 300 三档网格与缩放、世代推演、经典图形与自画 | `life.md` | 自动化 |
-| AL | Albedo：SVG 编辑工作台（形状与路径命令栈、布尔、对齐吸附、桌布、双语、导入导出） | `albedo.md` | 自动化 + 截图走查 |
-| OS | S3：好几个源与它们的记忆、桶与一层的对象与翻页（一段固定 500 把键，端点回多少行画多少行）、上传下载（含拖进来松手）、预览、删除、对象的重命名、建桶与临时链接 | `s3.md` | 自动化 + 截图走查（真端点） |
-| CL | wsld：容器列表与详情 | `wsld-containers.md` | 自动化（替身）+ 门控（`AIRSHIP_WSLD_INTEGRATION=1`） |
-| CA | wsld：容器生命周期操作 | `wsld-container-actions.md` | 同左 |
-| WL | wsld：容器日志（尾部行数、时间戳、实时） | `wsld-logs.md` | 同左 |
-| IM | wsld：镜像列表、拉取、删除与强制删除 | `wsld-images.md` | 同左 |
-| RB | wsld：run 命令编排（拼装、校验、读回、就地执行与历史） | `wsld-run.md` | 同左 |
+| VC | airship-ffmpeg（FFmpeg）：选流、处理链、命令、队列 | `airship-ffmpeg.md` | 自动化 + 门控（`VCP_E2E=1` 真编码） |
+| BK | airship-reader（Reader，即墨读）：书架与阅读器 | `airship-reader.md` | 自动化 + 门控（真书） |
+| DG | airship-dago（Dago，即打勾勾）：每日清单与托盘徽标 | `airship-dago.md` | 自动化 |
+| LF | airship-life-game（Life Game）：100 / 200 / 300 三档网格与缩放、世代推演、经典图形与自画 | `airship-life-game.md` | 自动化 |
+| AL | airship-svg-editor（SVG Editor，即 Albedo）：SVG 编辑工作台（形状与路径命令栈、布尔、对齐吸附、桌布、双语、导入导出） | `airship-svg-editor.md` | 自动化 + 截图走查 |
+| OS | airship-s3（S3）：好几个源与它们的记忆、桶与一层的对象与翻页（一段固定 500 把键，端点回多少行画多少行）、上传下载（含拖进来松手）、预览、删除、对象的重命名、建桶与临时链接 | `airship-s3.md` | 自动化 + 截图走查（真端点） |
+| CL | airship-wsld（WSLD）：容器列表与详情 | `airship-wsld-containers.md` | 自动化（替身）+ 门控（`AIRSHIP_WSLD_INTEGRATION=1`） |
+| CA | airship-wsld：容器生命周期操作 | `airship-wsld-container-actions.md` | 同左 |
+| WL | airship-wsld：容器日志（尾部行数、时间戳、实时） | `airship-wsld-logs.md` | 同左 |
+| IM | airship-wsld：镜像列表、拉取、删除与强制删除 | `airship-wsld-images.md` | 同左 |
+| RB | airship-wsld：run 命令编排（拼装、校验、读回、就地执行与历史） | `airship-wsld-run.md` | 同左 |
 | IC | 图标工坊：SVG 进、`icon.png` 与 7 帧 `icon.ico` 出（取景、目录字段、画不动的措辞） | `airship-icon.md` | 自动化 + 截图走查（真画出来的像素） |
 
 移植时**先不开**的册子（原版有、这期不做）：`registry-mirror`、`pull-progress`、
-`settings`（wsld 自己的设置页）。它们为什么还没开、各要动哪一层，统一记在
+`settings`（airship-wsld 自己的设置页）。它们为什么还没开、各要动哪一层，统一记在
 [../../todo.md](../todo.md) 的 TD-008 到 TD-010，这本索引不再抄理由。
 `run-builder` 已于 2026-11-20 开成上面那本 RB：编号沿用原版（RB-001~053），
 原版的 RB-026 与 RB-053 显式删除，理由写在册子末尾的注记里。
+PD 那本（PDF：书架与阅读）随 PDF 应用于 2026-11-26 整本退场，书库的 `pdf` 格式位一并删除
+（BK-003 与 LB-013 显式删除的理由写在那两本册子末尾的注记里）；前缀 PD 与编号都不复用。
 
 `runtime.md` 与 `theme.md` 也不搬：窗口、直跑与换皮都归 airship runtime 自己（本册表里的 SH / TH）；
 界面语言同理——本项目只做中文，见 todo.md 末尾"不做，只留理由"那一节。

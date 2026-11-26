@@ -34,30 +34,30 @@ const events: Array<{ app: string; event: unknown }> = []
 describe('窗口台账：一个应用只有一个窗口', () => {
   it('SH-033 同一个应用再指一次，判的是"聚焦已有"而不是"再开一个"', () => {
     const ledger = new WindowLedger()
-    expect(ledger.decision('vcp')).toBe('create')
+    expect(ledger.decision('airship-ffmpeg')).toBe('create')
 
-    ledger.open('vcp', 11)
-    ledger.open('pdf', 12)
-    expect(ledger.decision('vcp')).toBe('focus')
-    expect(ledger.openAppIds()).toEqual(['vcp', 'pdf'])
+    ledger.open('airship-ffmpeg', 11)
+    ledger.open('airship-s3', 12)
+    expect(ledger.decision('airship-ffmpeg')).toBe('focus')
+    expect(ledger.openAppIds()).toEqual(['airship-ffmpeg', 'airship-s3'])
 
     // 别的窗口关不关，不影响这个判定
     ledger.close(12)
-    expect(ledger.decision('vcp')).toBe('focus')
+    expect(ledger.decision('airship-ffmpeg')).toBe('focus')
 
     ledger.close(11)
-    expect(ledger.decision('vcp')).toBe('create')
+    expect(ledger.decision('airship-ffmpeg')).toBe('create')
     expect(ledger.openAppIds()).toEqual([])
   })
 
   it('SH-007 窗口关了归属就解除；应用没开过时判的是可以新开', () => {
     const ledger = new WindowLedger()
-    ledger.open('vcp', 21)
-    expect(ledger.ownerOf(21)).toBe('vcp')
-    expect(ledger.close(21)).toBe('vcp')
+    ledger.open('airship-ffmpeg', 21)
+    expect(ledger.ownerOf(21)).toBe('airship-ffmpeg')
+    expect(ledger.close(21)).toBe('airship-ffmpeg')
     expect(ledger.ownerOf(21)).toBeNull()
-    expect(ledger.live('vcp')).toBe(false)
-    expect(ledger.decision('vcp')).toBe('create')
+    expect(ledger.live('airship-ffmpeg')).toBe(false)
+    expect(ledger.decision('airship-ffmpeg')).toBe('create')
   })
 
   it('SH-007b 主进程查不到已销毁窗口的归属', () => {
@@ -66,9 +66,9 @@ describe('窗口台账：一个应用只有一个窗口', () => {
   })
 
   it('SH-010 任务栏身份一应用一个，每个都带应用 id 后缀', () => {
-    expect(appUserModelIdFor('vcp')).toBe('dev.xyzwp.airship.vcp')
-    expect(appUserModelIdFor('pdf')).toBe('dev.xyzwp.airship.pdf')
-    expect(appUserModelIdFor('vcp')).not.toBe(appUserModelIdFor('pdf'))
+    expect(appUserModelIdFor('airship-ffmpeg')).toBe('dev.xyzwp.airship.airship-ffmpeg')
+    expect(appUserModelIdFor('airship-s3')).toBe('dev.xyzwp.airship.airship-s3')
+    expect(appUserModelIdFor('airship-ffmpeg')).not.toBe(appUserModelIdFor('airship-s3'))
     // runtime 自己没有窗口：不存在不带后缀的特殊身份，任何归属都拼后缀
     expect(appUserModelIdFor('runtime')).toBe('dev.xyzwp.airship.runtime')
   })
@@ -87,28 +87,28 @@ describe('关掉应用窗口，它名下的子进程跟着收掉', () => {
     allowExecutable(process.execPath)
 
     const sleeper = ['-e', 'setInterval(() => {}, 5000)']
-    proc.start('vcp', { exe: process.execPath, args: sleeper, jobId: 'mine' })
-    proc.start('pdf', { exe: process.execPath, args: sleeper, jobId: 'theirs' })
+    proc.start('airship-ffmpeg', { exe: process.execPath, args: sleeper, jobId: 'mine' })
+    proc.start('airship-s3', { exe: process.execPath, args: sleeper, jobId: 'theirs' })
 
-    await waitFor(() => proc.list('vcp').length === 1 && proc.list('pdf').length === 1)
+    await waitFor(() => proc.list('airship-ffmpeg').length === 1 && proc.list('airship-s3').length === 1)
 
-    expect(proc.list('vcp')).toEqual(['mine'])
+    expect(proc.list('airship-ffmpeg')).toEqual(['mine'])
 
-    const killed = proc.killApp('vcp')
+    const killed = proc.killApp('airship-ffmpeg')
     expect(killed).toBe(1)
 
-    await waitFor(() => proc.list('vcp').length === 0)
-    expect(proc.list('vcp')).toEqual([])
+    await waitFor(() => proc.list('airship-ffmpeg').length === 0)
+    expect(proc.list('airship-ffmpeg')).toEqual([])
     // 别的应用名下的任务一条都不被碰
-    expect(proc.list('pdf')).toEqual(['theirs'])
+    expect(proc.list('airship-s3')).toEqual(['theirs'])
 
     const exits = events.filter((e) => (e.event as { kind?: string }).kind === 'proc:exit')
     expect(exits.length).toBe(1)
-    expect(exits[0]!.app).toBe('vcp')
+    expect(exits[0]!.app).toBe('airship-ffmpeg')
     expect((exits[0]!.event as { result: { signal: string | null } }).result.signal).toBe('SIGKILL')
 
-    proc.killApp('pdf')
-    await waitFor(() => proc.list('pdf').length === 0)
+    proc.killApp('airship-s3')
+    await waitFor(() => proc.list('airship-s3').length === 0)
     proc.killAll()
   })
 })

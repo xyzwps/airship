@@ -45,24 +45,24 @@ describe('一天一个文件，行形状固定', () => {
   })
 
   it('LG-002 一行是"时间 级别 [来源] 消息 详情"', () => {
-    log.info('vcp', '启动子进程', { jobId: 'j1', code: 0 })
+    log.info('airship-ffmpeg', '启动子进程', { jobId: 'j1', code: 0 })
     const line = lastLine()
-    expect(line).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z INFO\s+\[vcp\] 启动子进程 /)
+    expect(line).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+Z INFO\s+\[airship-ffmpeg\] 启动子进程 /)
     expect(line).toContain('"jobId":"j1"')
   })
 
   it('LG-003 详情里的换行折成 ⏎，超长截断，没法序列化也有交代', () => {
-    log.warn('books', '多行详情', '第一行\n第二行')
+    log.warn('airship-reader', '多行详情', '第一行\n第二行')
     const line = lastLine()
     expect(line).toContain('第一行 ⏎ 第二行')
     expect(line.split(/\r?\n/).length).toBe(1)
 
-    log.info('books', '超长详情', '字'.repeat(5000))
+    log.info('airship-reader', '超长详情', '字'.repeat(5000))
     expect(lastLine().length).toBeLessThan(5200)
 
     const cyclic: Record<string, unknown> = {}
     cyclic['self'] = cyclic
-    expect(() => log.info('books', '没法序列化', cyclic)).not.toThrow()
+    expect(() => log.info('airship-reader', '没法序列化', cyclic)).not.toThrow()
     expect(lastLine()).toContain('[unserializable detail]')
   })
 

@@ -12,7 +12,7 @@
 
 ```bash
 just build                # 一条命令三样都出：runtime 安装包 → 各应用的包 → 各应用的安装器
-just app-installer life   # 只重出那一个应用的安装器
+just app-installer airship-life-game   # 只重出那一个应用的安装器
 just installers           # 只重出全部应用的安装器（先产全部的包）
 ```
 
@@ -67,8 +67,8 @@ just installers           # 只重出全部应用的安装器（先产全部的�
 3. `electron-builder --win nsis`（配置在 `src/runtime/electron-builder.yml` + `build/installer.nsh`）：
    - `app.asar` ← `out/**`、`package.json`、`assets/icon.png`、`assets/tray.png`；
    - `resources/` 里只有 `app.asar` 与 NSIS 的 `elevate.exe`：**没有任何 airship 包**（纯 runtime）。
-     根 package.json 已经没有 dependencies（foliate-js / pdfjs-dist 各自记在用它的应用名下，都是
-     devDependencies，构建期打进各家的包），所以不再需要"排除某个 node_modules 目录"那几条。
+     根 package.json 已经没有 dependencies（foliate-js 记在 airship-reader 名下，是
+     devDependencies，构建期打进包；pdfjs-dist 随 PDF 应用于 2026-11-26 一并退场），所以不再需要"排除某个 node_modules 目录"那几条。
    - `perMachine: true`（要管理员），落点钉死 `C:\Program Files\airship\runtime`——目录的唯一真源在
      `installer.nsh` 的 `customInit`（`StrCpy $INSTDIR "$PROGRAMFILES64\airship\runtime"`），
      `allowToChangeInstallationDirectory: false` 去掉换目录页。升级时读到的旧 InstallLocation 同样被覆盖。
@@ -125,7 +125,7 @@ just installers           # 只重出全部应用的安装器（先产全部的�
   （授权只在安装期，PK-033）。验证到：`just check` 全绿（558 过 / 10 跳过，casecov 零差集）、runtime 安装包重出六检全绿、
   八个应用安装器带 MUI2 真编译产出。**真机安装走查**（欢迎页真念出路径、完成真不弹窗、双击应用真不再弹卡片）
   要装一遍才算数——把 runtime 装进 Program Files 是系统级动作，由使用者执行。
-- **应用安装器真装真卸过**（第三档样件，life）：双击快捷方式跑得起（日志 `[life] 应用窗口已打开`）；
+- **应用安装器真装真卸过**（第三档样件，airship-life-game）：双击快捷方式跑得起（日志 `[airship-life-game] 应用窗口已打开`）；
   卸载把安装目录、两处快捷方式、HKCU 注册表删净，`%APPDATA%` 里的数据 SHA256 前后相同。
 - 打包版与开发版共用 `%APPDATA%/airship`，装上去书架是同一份。这个目录名靠主进程开头一句
   `app.setName('airship')` 钉住——runtime 的包名是 `@airship/runtime`，不钉的话 Electron 会把数据写进
@@ -143,5 +143,5 @@ just installers           # 只重出全部应用的安装器（先产全部的�
 
 - Windows 10 起（Electron 45 的下限），实际建议 Windows 11；
 - 先装 runtime，再装应用（应用安装器找不到 runtime 会中止）；
-- 只有 wsld 还有额外要求：本机要有 `C:\Program Files\WSL\wslc.exe`（WSL 3 自带），
-  或用 `AIRSHIP_WSLC_PATH` 显式指一个。没有也能装能跑，wsld 会读得到"这台机器上没有 wslc"，其余应用不受影响。
+- 只有 airship-wsld 还有额外要求：本机要有 `C:\Program Files\WSL\wslc.exe`（WSL 3 自带），
+  或用 `AIRSHIP_WSLC_PATH` 显式指一个。没有也能装能跑，airship-wsld 会读得到"这台机器上没有 wslc"，其余应用不受影响。

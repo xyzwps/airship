@@ -16,28 +16,27 @@ import type { AppApi } from '@airship/contract'
  *   covers/<id>.<ext>   封面图
  *
  * 书库只负责"存"和"索引"。元数据和封面由导入方提供：
- * books 用 foliate-js 读 EPUB/MOBI 的 metadata 与封面，
- * pdf 用 pdfjs-dist 数页数、渲染第一页当封面。
- * 这样书库不绑任何渲染库，两个应用谁先导入都行。
+ * Reader 用 foliate-js 读 EPUB/MOBI 的 metadata 与封面。
+ * 这样书库不绑任何渲染库。
  */
 
 export const LIBRARY_API_VERSION = 1
 
 /** 格式是书库自己的领域概念（它就是个书库），不算消费者专有 */
-export type BookFormat = 'epub' | 'mobi' | 'pdf'
+export type BookFormat = 'epub' | 'mobi'
 
 /**
  * 每本书的附加信息。
  *
  * 刻意做成开放键值而不是给每个格式加一个专属字段：
- * pdf 有 pages、foliate 系有 sections，将来别的格式还有别的。
- * 一旦在 BookRecord 上写 `pages`，这个包就开始替 pdf 一个应用说话了。
+ * foliate 系有 sections，将来别的格式还有别的。
+ * 一旦在 BookRecord 上写某个格式专有的键，这个包就开始替一个应用说话了。
  * 键名由各应用自己维护，本包只保证存得下、读得出。
  */
 export type BookMeta = Record<string, number | string>
 
 export interface BookProgress {
-  /** 节序号（foliate 的 section index / pdf 的页号） */
+  /** 节序号（foliate 的 section index） */
   section: number
   /** 节内进度 0~1 */
   fraction: number

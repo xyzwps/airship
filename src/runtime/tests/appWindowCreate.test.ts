@@ -139,29 +139,29 @@ describe('窗口尺寸只认清单，位置与尺寸都不记', () => {
   it('SH-015 清单写了尺寸的应用，开出来就是那个尺寸', () => {
     resetWindows()
     // 打勾勾的清单写着 defaultWidth: 600 / defaultHeight: 800
-    openAppWindow('dagogo')
+    openAppWindow('airship-dago')
     expect(lastWindow().options).toMatchObject({ width: 600, height: 800 })
 
     // vcp 没写，两个维度都跟 runtime 的默认
-    openAppWindow('vcp')
+    openAppWindow('airship-ffmpeg')
     expect(lastWindow().options).toMatchObject({ width: 1100, height: 740 })
   })
 
   it('SH-016 手动拖大的尺寸不留到下次', () => {
     resetWindows()
-    openAppWindow('dagogo')
+    openAppWindow('airship-dago')
     const first = lastWindow()
     // 用户把它拉成 1125×743 再关掉
     first.bounds = { width: 1125, height: 743, x: 120, y: 90 }
     first.close()
 
-    openAppWindow('dagogo')
+    openAppWindow('airship-dago')
     expect(lastWindow().options).toMatchObject({ width: 600, height: 800 })
   })
 
   it('SH-018 关掉再重开，位置由系统重新摆；runtime 里不存在窗口记录', () => {
     resetWindows()
-    openAppWindow('dagogo')
+    openAppWindow('airship-dago')
     const win = lastWindow()
     // 创建时就没有坐标：位置交给系统
     expect(win.options.x).toBeUndefined()
@@ -171,11 +171,11 @@ describe('窗口尺寸只认清单，位置与尺寸都不记', () => {
     win.close()
 
     // 关掉之后：应用自己的设置里没有任何窗口状态的键，runtime 自己更没有设置文件
-    const keys = Object.keys(settings.dump('dagogo')).filter((k) => /Window|appWindow|launcherWindow/.test(k))
+    const keys = Object.keys(settings.dump('airship-dago')).filter((k) => /Window|appWindow|launcherWindow/.test(k))
     expect(keys, `设置里出现了窗口状态的键：${keys.join(', ')}`).toEqual([])
 
     // 重开还是不带坐标
-    openAppWindow('dagogo')
+    openAppWindow('airship-dago')
     expect(lastWindow().options.x).toBeUndefined()
     expect(lastWindow().options.y).toBeUndefined()
   })
@@ -190,8 +190,8 @@ describe('窗口尺寸只认清单，位置与尺寸都不记', () => {
 describe('所有窗口的同源策略一概不豁免', () => {
   it('建出来的每一扇应用窗口都带着默认收紧的 webSecurity', () => {
     resetWindows()
-    openAppWindow('s3')
-    openAppWindow('dagogo')
+    openAppWindow('airship-s3')
+    openAppWindow('airship-dago')
     for (const win of FakeBrowserWindow.created) {
       expect(win.options.webPreferences?.webSecurity, '没有窗口该关掉同源策略').not.toBe(false)
     }
@@ -239,24 +239,24 @@ describe('硬开一个没注册的应用', () => {
 describe('任务栏上每个应用是自己的那颗按钮', () => {
   it('SH-010 身份带应用 id 后缀，两个应用必然不同', () => {
     resetWindows()
-    openAppWindow('dagogo')
+    openAppWindow('airship-dago')
     const dagogo = lastWindow().appDetails
     expect(dagogo, '窗口一次都没把身份交给外壳（setAppDetails 没被调过）').not.toBeNull()
-    expect(dagogo!.appId).toBe('dev.xyzwp.airship.dagogo')
+    expect(dagogo!.appId).toBe('dev.xyzwp.airship.airship-dago')
 
-    openAppWindow('vcp')
+    openAppWindow('airship-ffmpeg')
     const vcp = lastWindow().appDetails!
-    expect(vcp.appId).toBe('dev.xyzwp.airship.vcp')
+    expect(vcp.appId).toBe('dev.xyzwp.airship.airship-ffmpeg')
     expect(vcp.appId).not.toBe(dagogo!.appId)
   })
 
   it('SH-034 交给外壳的图标是磁盘上那份，字节与包内那份相同；没有就喊出回落', () => {
     resetWindows()
-    openAppWindow('dagogo')
+    openAppWindow('airship-dago')
     const details = lastWindow().appDetails!
-    const inArchive = readArchiveEntry(join(packageFixtureRoot(), 'dagogo.airship'), WINDOWS_ICON_NAME)
+    const inArchive = readArchiveEntry(join(packageFixtureRoot(), 'airship-dago.airship'), WINDOWS_ICON_NAME)
     expect(inArchive, '工装包就该带 icon.ico，否则这条钉不到东西').not.toBeNull()
-    expect(details.appIconPath, '外壳只认磁盘路径').toBe(join(FAKE_USER_DATA, 'icons', 'dagogo.ico'))
+    expect(details.appIconPath, '外壳只认磁盘路径').toBe(join(FAKE_USER_DATA, 'icons', 'airship-dago.ico'))
     expect(existsSync(details.appIconPath!)).toBe(true)
     expect(Buffer.compare(readFileSync(details.appIconPath!), Buffer.from(inArchive!))).toBe(0)
 
@@ -288,33 +288,33 @@ describe('任务栏上每个应用是自己的那颗按钮', () => {
 
   it('SH-035 重启动作与快捷方式同形：每段带引号，显示名是清单里的应用名', () => {
     resetWindows()
-    openAppWindow('dagogo')
+    openAppWindow('airship-dago')
     const details = lastWindow().appDetails!
-    const archive = join(packageFixtureRoot(), 'dagogo.airship')
+    const archive = join(packageFixtureRoot(), 'airship-dago.airship')
     const command = details.relaunchCommand!
     expect(command.endsWith(`"${archive}"`), `命令行要以归档结尾并带引号：${command}`).toBe(true)
     expect(command, `每一段都得引号包住（路径里有空格也不散架）：${command}`).toMatch(/^(?:"[^"]*")(?: "[^"]*")+$/)
-    expect(details.relaunchDisplayName).toBe(metaOf('dagogo')!.name)
+    expect(details.relaunchDisplayName).toBe(metaOf('airship-dago')!.name)
 
     // 命令行本身的形状与这台机器的 argv 无关，纯函数两侧各钉一次
     expect(
       relaunchCommandFor({
         execPath: 'C:\\Program Files\\airship\\runtime\\airship.exe',
         runtimeDir: null,
-        archive: 'C:\\Users\\me\\AppData\\Local\\airship\\apps\\life\\life.airship'
+        archive: 'C:\\Users\\me\\AppData\\Local\\airship\\apps\\airship-life-game\\airship-life-game.airship'
       })
     ).toBe(
-      '"C:\\Program Files\\airship\\runtime\\airship.exe" "C:\\Users\\me\\AppData\\Local\\airship\\apps\\life\\life.airship"'
+      '"C:\\Program Files\\airship\\runtime\\airship.exe" "C:\\Users\\me\\AppData\\Local\\airship\\apps\\airship-life-game\\airship-life-game.airship"'
     )
     expect(
       relaunchCommandFor({
         execPath: 'D:\\tools\\electron.exe',
         runtimeDir: 'D:\\repo\\src\\runtime',
-        archive: 'D:\\repo\\dist-apps\\life.airship'
+        archive: 'D:\\repo\\dist-apps\\airship-life-game.airship'
       })
-    ).toBe('"D:\\tools\\electron.exe" "D:\\repo\\src\\runtime" "D:\\repo\\dist-apps\\life.airship"')
+    ).toBe('"D:\\tools\\electron.exe" "D:\\repo\\src\\runtime" "D:\\repo\\dist-apps\\airship-life-game.airship"')
 
-    expect(runtimeDirFromArgv(['electron.exe', 'src/runtime', 'D:\\pkgs\\life.airship'])).toBe(resolve('src/runtime'))
-    expect(runtimeDirFromArgv(['airship.exe', 'D:\\pkgs\\life.airship']), '打包后 argv[1] 就是归档，不多那一段').toBeNull()
+    expect(runtimeDirFromArgv(['electron.exe', 'src/runtime', 'D:\\pkgs\\airship-life-game.airship'])).toBe(resolve('src/runtime'))
+    expect(runtimeDirFromArgv(['airship.exe', 'D:\\pkgs\\airship-life-game.airship']), '打包后 argv[1] 就是归档，不多那一段').toBeNull()
   })
 })

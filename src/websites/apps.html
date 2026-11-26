@@ -39,7 +39,7 @@
           <span class="eyebrow">八个应用 · 一个应用一个包 · 一个窗口一个渲染进程</span>
           <h1>预置应用</h1>
           <p class="lede">
-            这八个是仓库里天天在用的工具，每一个都是一个独立的 <code>&lt;id&gt;.airship</code> 包，跟外部写的应用走同一条路：
+            这些是仓库里天天在用的工具（应用 id 统一带 <code>airship-</code> 前缀），每一个都是一个独立的 <code>&lt;id&gt;.airship</code> 包，跟外部写的应用走同一条路：
             <code>just app-installer &lt;id&gt;</code> 出它自己的安装器，装进每用户目录，桌面与开始菜单各留一枚快捷方式。
             下面每张卡是它自己窗口的实拍（<code>just shot</code> 抓的），能力位照 <code>src/apps/&lt;id&gt;/app.ts</code> 那份清单原样念——
             <strong>没声明的一律拒绝</strong>，所以卡上看不见的东西它也真做不到。
@@ -47,33 +47,21 @@
 
           <div class="cards app-cards">
             <article class="card app-card">
-              <a class="shot" href="./assets/screens/books.png"><img src="./assets/screens/books.png" alt="墨读的窗口实拍：三本书的封面格子" loading="lazy" /></a>
+              <a class="shot" href="./assets/screens/books.png"><img src="./assets/screens/books.png" alt="Reader 的窗口实拍：三本书的封面格子" loading="lazy" /></a>
               <div class="body">
-                <h3>墨读 <span class="id">books</span></h3>
+                <h3>Reader <span class="id">airship-reader</span></h3>
                 <p>EPUB / MOBI 电子书书架与阅读器。</p>
                 <div class="caps">
                   <span>fs.read</span><span>fs.write</span><span>dialog</span><span>settings</span><span>shared</span><span>notify</span><span>clipboard</span><span>log</span>
                 </div>
-                <p class="app-meta">窗口 600×800 · <code>sharedNamespaces: ['library']</code>（与 PDF 同一份书库） · 册子 BK + 共享书库 LB</p>
+                <p class="app-meta">窗口 600×800 · <code>sharedNamespaces: ['library']</code>（runtime 托管的共享书库） · 册子 BK + 共享书库 LB</p>
               </div>
             </article>
 
             <article class="card app-card">
-              <a class="shot" href="./assets/screens/pdf.png"><img src="./assets/screens/pdf.png" alt="PDF 的窗口实拍：渲染出来的一页与顶部翻页条" loading="lazy" /></a>
+              <a class="shot" href="./assets/screens/dagogo.png"><img src="./assets/screens/dagogo.png" alt="Dago 的窗口实拍：两条待办与一条今天已完成" loading="lazy" /></a>
               <div class="body">
-                <h3>PDF <span class="id">pdf</span></h3>
-                <p>PDF 阅读，与墨读共用同一个书架。</p>
-                <div class="caps">
-                  <span>fs.read</span><span>fs.write</span><span>dialog</span><span>settings</span><span>shared</span><span>notify</span><span>clipboard</span><span>log</span>
-                </div>
-                <p class="app-meta">尺寸跟 runtime 默认 · <code>sharedNamespaces: ['library']</code> · 册子 PD + 共享书库 LB</p>
-              </div>
-            </article>
-
-            <article class="card app-card">
-              <a class="shot" href="./assets/screens/dagogo.png"><img src="./assets/screens/dagogo.png" alt="打勾勾的窗口实拍：两条待办与一条今天已完成" loading="lazy" /></a>
-              <div class="body">
-                <h3>打勾勾 <span class="id">dagogo</span></h3>
+                <h3>Dago <span class="id">airship-dago</span></h3>
                 <p>每天要做的事，勾掉就行。</p>
                 <div class="caps">
                   <span>dialog</span><span>settings</span><span>tray</span><span>notify</span><span>log</span>
@@ -83,9 +71,9 @@
             </article>
 
             <article class="card app-card">
-              <a class="shot" href="./assets/screens/life.png"><img src="./assets/screens/life.png" alt="生命游戏的窗口实拍：网格上一枚滑翔机与右侧图形面板" loading="lazy" /></a>
+              <a class="shot" href="./assets/screens/life.png"><img src="./assets/screens/life.png" alt="Life Game 的窗口实拍：网格上一枚滑翔机与右侧图形面板" loading="lazy" /></a>
               <div class="body">
-                <h3>生命游戏 <span class="id">life</span></h3>
+                <h3>Life Game <span class="id">airship-life-game</span></h3>
                 <p>在 100 / 200 / 300 的网格上跑康威生命游戏，经典图形随手放，格子自己画。</p>
                 <div class="caps"><span class="none">capabilities: []　—— 一件都不声明</span></div>
                 <p class="app-meta">窗口 1000×720 · 不碰你的文件，也没有"记住上次那张图" · 册子 LF</p>
@@ -93,9 +81,9 @@
             </article>
 
             <article class="card app-card">
-              <a class="shot" href="./assets/screens/vcp.png"><img src="./assets/screens/vcp.png" alt="vcp 的窗口实拍：载入一段 4K 样片后的流选择与处理链卡片" loading="lazy" /></a>
+              <a class="shot" href="./assets/screens/vcp.png"><img src="./assets/screens/vcp.png" alt="FFmpeg 的窗口实拍：载入一段 4K 样片后的流选择与处理链卡片" loading="lazy" /></a>
               <div class="body">
-                <h3>vcp <span class="id">vcp</span></h3>
+                <h3>FFmpeg <span class="id">airship-ffmpeg</span></h3>
                 <p>FFmpeg 编排台：选流、加处理链、看命令、跑队列。</p>
                 <div class="caps">
                   <span>fs.read</span><span>fs.write</span><span>dialog</span><span>settings</span><span>proc</span><span>notify</span><span>clipboard</span><span>log</span>
@@ -105,9 +93,9 @@
             </article>
 
             <article class="card app-card">
-              <a class="shot" href="./assets/screens/wsld.png"><img src="./assets/screens/wsld.png" alt="wsld 的窗口实拍：六个 WSL 容器的列表与状态" loading="lazy" /></a>
+              <a class="shot" href="./assets/screens/wsld.png"><img src="./assets/screens/wsld.png" alt="WSLD 的窗口实拍：六个 WSL 容器的列表与状态" loading="lazy" /></a>
               <div class="body">
-                <h3>wsld</h3>
+                <h3>WSLD <span class="id">airship-wsld</span></h3>
                 <p>WSL 容器与镜像的图形外壳：看列表、起停删、读日志、编排 run 命令。</p>
                 <div class="caps">
                   <span>fs.read</span><span>fs.write</span><span>dialog</span><span>settings</span><span>proc</span><span>notify</span><span>clipboard</span><span>log</span>
@@ -117,9 +105,9 @@
             </article>
 
             <article class="card app-card">
-              <a class="shot" href="./assets/screens/albedo.png"><img src="./assets/screens/albedo.png" alt="Albedo 的窗口实拍：画布上的圆角矩形、圆与一条贝塞尔曲线" loading="lazy" /></a>
+              <a class="shot" href="./assets/screens/albedo.png"><img src="./assets/screens/albedo.png" alt="SVG Editor 的窗口实拍：画布上的圆角矩形、圆与一条贝塞尔曲线" loading="lazy" /></a>
               <div class="body">
-                <h3>Albedo <span class="id">albedo</span></h3>
+                <h3>SVG Editor <span class="id">airship-svg-editor</span></h3>
                 <p>SVG 编辑工作台：形状与路径命令栈、布尔运算、对齐吸附、桌布描图、导出 SVG/PNG。</p>
                 <div class="caps">
                   <span>settings</span><span>dialog</span><span>fs.read</span><span>fs.write</span><span>clipboard</span>
@@ -131,12 +119,23 @@
             <article class="card app-card">
               <a class="shot" href="./assets/screens/s3.png"><img src="./assets/screens/s3.png" alt="S3 的窗口实拍：三个桶、archive 的对象列表与右侧的图片预览" loading="lazy" /></a>
               <div class="body">
-                <h3>S3 <span class="id">s3</span></h3>
+                <h3>S3 <span class="id">airship-s3</span></h3>
                 <p>连着 S3 兼容的对象存储看桶与对象：浏览、上传、下载、预览、删除、复制临时链接。</p>
                 <div class="caps">
                   <span>settings</span><span>dialog</span><span>clipboard</span>
                 </div>
                 <p class="app-meta">自带后端程序连端点、搬字节 · 窗口 1180×760 · 册子 OS</p>
+              </div>
+            </article>
+
+            <article class="card app-card">
+              <div class="body">
+                <h3>图标工坊 <span class="id">airship-icon</span></h3>
+                <p>给一份 SVG，出符合 <code>docs/apps/icon.md</code> 的 <code>icon.png</code> 与 7 帧 <code>icon.ico</code>。</p>
+                <div class="caps">
+                  <span>dialog</span><span>fs.read</span><span>fs.write</span>
+                </div>
+                <p class="app-meta">窗口 720×780 · 册子 IC</p>
               </div>
             </article>
           </div>

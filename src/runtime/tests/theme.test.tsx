@@ -19,7 +19,7 @@ const ROOT = join(__dirname, '.tmp', 'theme-userData')
 
 const ipc = vi.hoisted(() => ({
   handlers: new Map<string, (event: unknown, ...args: unknown[]) => Promise<{ ok: boolean; value?: unknown; error?: string }>>(),
-  owners: { 101: 'vcp', 102: 'books', 103: 'life', 104: 'pdf' } as Record<number, string>
+  owners: { 101: 'airship-ffmpeg', 102: 'airship-reader', 103: 'airship-life-game', 104: 'airship-s3' } as Record<number, string>
 }))
 
 vi.mock('electron', async () => {
@@ -87,7 +87,7 @@ function spyTheme(fake: FakeAirship): Array<[string, string | undefined]> {
 const THEME_BTN = '.titlebar__controls button:first-child'
 
 async function mountTitlebar(theme: ThemeSnapshot): Promise<{ m: Awaited<ReturnType<typeof mountUi>>; fake: FakeAirship; calls: Array<[string, string | undefined]> }> {
-  const fake = new FakeAirship({ id: 'vcp', capabilities: [], theme })
+  const fake = new FakeAirship({ id: 'airship-ffmpeg', capabilities: [], theme })
   const calls = spyTheme(fake)
   const m = await mountUi(<Titlebar here="用例" />, { fake })
   return { m, fake, calls }
@@ -112,17 +112,17 @@ describe('每个应用改自己的主题档', () => {
     // 渲染侧：没声明任何能力的应用窗口也拿得到 setter，不存在"只读"的答复
     const seen: boolean[] = []
     const m = await mountUi(<Probe onResult={(c) => seen.push(c)} />, {
-      fake: new FakeAirship({ id: 'life', capabilities: [] })
+      fake: new FakeAirship({ id: 'airship-life-game', capabilities: [] })
     })
     expect(seen.at(-1)).toBe(true)
     m.unmount()
 
     // 主进程侧：生命游戏一个能力都没声明，theme:set 照样落进它自己那份设置文件
-    resetDisk('life')
+    resetDisk('airship-life-game')
     const res = await setTheme(103, 'dark')
     expect(res.ok, res.error).toBe(true)
     expect(res.value).toEqual({ mode: 'dark', resolved: 'dark' })
-    const stored = JSON.parse(readFileSync(fileOf('life'), 'utf8')) as Record<string, unknown>
+    const stored = JSON.parse(readFileSync(fileOf('airship-life-game'), 'utf8')) as Record<string, unknown>
     expect(stored['theme']).toEqual({ mode: 'dark' })
   })
 
@@ -164,17 +164,17 @@ describe('每个应用改自己的主题档', () => {
   })
 
   it('TH-014 改档只动这个应用，别的应用不跟着变', async () => {
-    resetDisk('vcp')
-    resetDisk('books')
+    resetDisk('airship-ffmpeg')
+    resetDisk('airship-reader')
     await setTheme(102, 'system', 'light') // books 先记好自己的档
-    const booksBefore = readThemeFor('books')
-    const booksBytes = readFileSync(fileOf('books'))
+    const booksBefore = readThemeFor('airship-reader')
+    const booksBytes = readFileSync(fileOf('airship-reader'))
 
     const res = await setTheme(101, 'light') // vcp 改成亮色
     expect(res.ok, res.error).toBe(true)
-    expect(readThemeFor('vcp')).toEqual({ mode: 'light', resolved: 'light' })
-    expect(readThemeFor('books')).toEqual(booksBefore)
-    expect(readFileSync(fileOf('books')).equals(booksBytes), 'books 那份设置文件一个字节没变').toBe(true)
+    expect(readThemeFor('airship-ffmpeg')).toEqual({ mode: 'light', resolved: 'light' })
+    expect(readThemeFor('airship-reader')).toEqual(booksBefore)
+    expect(readFileSync(fileOf('airship-reader')).equals(booksBytes), 'books 那份设置文件一个字节没变').toBe(true)
 
     // 不存在主题广播通道：改档的请求只写自己那份设置
     const source = readFileSync(join(__dirname, '..', 'main', 'ipc.ts'), 'utf8')
@@ -210,7 +210,7 @@ describe('每个窗口自己把主题落到文档上', () => {
 
   it('TH-006 桥还没回话时先按系统偏好画', async () => {
     prefs.__prefersDark = true
-    const fake = new FakeAirship({ id: 'vcp', capabilities: [] })
+    const fake = new FakeAirship({ id: 'airship-ffmpeg', capabilities: [] })
     fake.theme = () => new Promise<ThemeSnapshot>(() => undefined)
     const m = await mountUi(<Probe onResult={() => undefined} />, { fake })
     expect(document.documentElement.dataset.theme).toBe('dark')
@@ -220,21 +220,21 @@ describe('每个窗口自己把主题落到文档上', () => {
 
 describe('主进程读主题时不编造实际值', () => {
   it('TH-008 没记过主题时读出来是跟随系统', async () => {
-    resetDisk('dagogo')
-    expect(readThemeFor('dagogo')).toEqual({ mode: 'system', resolved: 'light' })
+    resetDisk('airship-dago')
+    expect(readThemeFor('airship-dago')).toEqual({ mode: 'system', resolved: 'light' })
   })
 
   it('TH-009 写过的档位原样读回', async () => {
-    resetDisk('pdf')
+    resetDisk('airship-s3')
     expect((await setTheme(104, 'dark')).value).toEqual({ mode: 'dark', resolved: 'dark' })
-    expect(readThemeFor('pdf')).toEqual({ mode: 'dark', resolved: 'dark' })
+    expect(readThemeFor('airship-s3')).toEqual({ mode: 'dark', resolved: 'dark' })
 
     // system 档回落到上次实际生效的那档
     expect((await setTheme(104, 'system', 'dark')).value).toEqual({ mode: 'system', resolved: 'dark' })
-    expect(readThemeFor('pdf')).toEqual({ mode: 'system', resolved: 'dark' })
+    expect(readThemeFor('airship-s3')).toEqual({ mode: 'system', resolved: 'dark' })
 
     // 落盘的就是那两个键，且在应用自己那份文件里
-    const stored = JSON.parse(readFileSync(fileOf('pdf'), 'utf8')) as Record<string, unknown>
+    const stored = JSON.parse(readFileSync(fileOf('airship-s3'), 'utf8')) as Record<string, unknown>
     expect(Object.keys(stored).sort()).toEqual(['lastResolved', 'theme'])
   })
 })

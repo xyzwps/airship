@@ -37,9 +37,9 @@ export type SettingsScope = AppId
  * 新增一个共享数据区是 runtime 的功能变更，不是应用变更。
  * 应用只能在清单里声明自己要访问哪个，声明了不存在的直接拒。
  *
- * 为什么需要它：books（EPUB/MOBI）和 pdf 是两个独立应用入口，
- * 但书架、导入记录、封面、阅读进度是同一套数据。
- * 各自存一份就会出现"同一本书在两个入口里各有一本"的重复。
+ * 为什么需要它：从前墨读与 PDF 是两个独立应用入口，
+ * 书架、导入记录、封面、阅读进度必须是同一套数据——各自存一份就会出现
+ * "同一本书在两个入口里各有一本"的重复（PDF 已于 2026-11-26 退场，机制留着）。
  */
 export const SHARED_NAMESPACES = ['library'] as const
 export type SharedNamespace = (typeof SHARED_NAMESPACES)[number]

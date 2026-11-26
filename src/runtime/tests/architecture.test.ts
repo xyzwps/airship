@@ -347,7 +347,7 @@ describe('runtime 侧零应用字面量（I-5 的直接证明）', () => {
   const appIds = discoveredAppIds()
 
   // 只扫 src/runtime：runtime 不该知道任何具体应用。
-  // 不扫 src/shared——那里出现的 'pdf' 是书的格式名，不是应用名，扫它会误报。
+  // 不扫 src/shared——那里出现的 'airship-s3' 是书的格式名，不是应用名，扫它会误报。
   it('AP-010 加一个应用不改动 runtime 的任何文件：runtime 侧不出现任何具体应用 id', () => {
     const violations: string[] = []
     const scanned = [

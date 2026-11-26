@@ -89,8 +89,8 @@
   └─ 没有自己的界面：不画启动器，不扫磁盘找应用
 
 应用（八个，src/apps/&lt;id&gt;/，各自一个 airship 包）
-  books 墨读 · pdf PDF · dagogo 打勾勾 · life 生命游戏
-  vcp · wsld · albedo Albedo · s3 S3
+  airship-reader Reader · airship-dago Dago · airship-life-game Life Game
+  airship-ffmpeg FFmpeg · airship-wsld WSLD · airship-svg-editor SVG Editor · airship-s3 S3 · airship-icon 图标工坊
   每个应用 = &lt;id&gt;.airship 归档 + 它自己的每用户安装器 + 一枚快捷方式</code></pre>
           </figure>
           <p>
@@ -111,7 +111,7 @@
               <tr><td><code>src/sdk</code></td><td><code>@airship/sdk</code></td><td>宿主（标题栏 / 主题落地 / 留白 / 占位）、图标键、CSP、工装钩子；将来独立发布的那一份</td></tr>
               <tr><td><code>src/apps/&lt;id&gt;</code></td><td><code>@airship/&lt;id&gt;</code></td><td>八个应用，各自自持 <code>index.html</code> + <code>main.tsx</code></td></tr>
               <tr><td><code>src/shared/contract</code></td><td><code>@airship/contract</code></td><td>契约、清单类型、拒绝措辞、注册与包形状的规矩</td></tr>
-              <tr><td><code>src/shared/library</code></td><td><code>@airship/library</code></td><td>共享书库（墨读与 PDF 同一份数据）</td></tr>
+              <tr><td><code>src/shared/library</code></td><td><code>@airship/library</code></td><td>共享书库（Reader 管的那一份）</td></tr>
               <tr><td><code>src/shared/textdecode</code></td><td><code>@airship/textdecode</code></td><td>中文解码</td></tr>
             </tbody>
           </table>
@@ -173,10 +173,10 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
               <p class="dg-title"><span class="no">I-1</span>应用区 · 一个应用一个窗口一个渲染进程</p>
               <p class="dg-sub">各自一个 <code>@airship/&lt;id&gt;</code> 包、各自一本册子；改一个不用管其余七个，一个崩了不带崩别人。</p>
               <div class="dg-row win">
-                <div class="dg-cell app"><b>墨读 books</b>600×800 · 与 PDF 共用同一份书库</div>
-                <div class="dg-cell app"><b>vcp</b>要外部工具 <code>ffmpeg</code></div>
-                <div class="dg-cell app"><b>wsld</b><code>platforms: ['windows']</code> · 要 <code>wslc</code></div>
-                <div class="dg-cell app"><b>生命游戏 life</b><code>capabilities: []</code>——不碰你的文件</div>
+                <div class="dg-cell app"><b>Reader airship-reader</b>600×800 · 用 runtime 托管的共享书库</div>
+                <div class="dg-cell app"><b>FFmpeg airship-ffmpeg</b>要外部工具 <code>ffmpeg</code></div>
+                <div class="dg-cell app"><b>WSLD airship-wsld</b><code>platforms: ['windows']</code> · 要 <code>wslc</code></div>
+                <div class="dg-cell app"><b>Life Game airship-life-game</b><code>capabilities: []</code>——不碰你的文件</div>
                 <div class="dg-cell app"><b>你的应用 hello</b><code>just new-app</code> 从范本造</div>
               </div>
               <div class="dg-row" style="margin-top: 10px">
@@ -310,7 +310,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
           <h3>启动流程</h3>
           <ol class="steps">
             <li><h4>钉死数据目录名</h4><p><code>app.setName('airship')</code>：Electron 的 userData 默认取 package.json 的 name，而那个 name 是 <code>@airship/runtime</code>——不钉住的话书架与设置会在某次升级后"凭空消失"，其实是换了目录。</p></li>
-            <li><h4>抢单实例锁，在 <code>whenReady</code> 之前</h4><p>抢不到不是错误——argv 会由 Electron 自动交给第一实例的 <code>second-instance</code>，这次直接 <code>app.quit()</code>。<code>whenReady</code> 首行 <code>if (!GOT_LOCK) return</code>：不然第二实例也会把启动跑完、开出一扇重复的窗再退出（真机抓到过：两扇 dagogo 各开一次）。</p></li>
+            <li><h4>抢单实例锁，在 <code>whenReady</code> 之前</h4><p>抢不到不是错误——argv 会由 Electron 自动交给第一实例的 <code>second-instance</code>，这次直接 <code>app.quit()</code>。<code>whenReady</code> 首行 <code>if (!GOT_LOCK) return</code>：不然第二实例也会把启动跑完、开出一扇重复的窗再退出（真机抓到过：两扇 airship-dago 各开一次）。</p></li>
             <li><h4>挂协议、注册 IPC、接事件路由</h4><p>包协议处理器、IPC 方法、把子进程事件接到"只投归属窗口"的路由上。</p></li>
             <li><h4>从 argv 挑包路径</h4><p>挑出以 <code>.airship</code> 结尾的路径（相对路径按 cwd 解）。一份都没有 → 念用法 + <code>app.exit(1)</code>，不开任何界面。</p></li>
             <li><h4>逐份注册</h4><p>读归档里的清单、校验形状与引用边界、装进<strong>活动包表</strong>。不合格响亮退出（弹错误框 + exit 1），不静默少一个窗口。</p></li>
@@ -353,7 +353,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 
           <h2 class="sub" id="capabilities">能力与授权</h2>
           <p>
-            <code>capabilities</code> 是唯一授权面，没声明的一律拒绝；用不到就写 <code>[]</code>（生命游戏就是这么起的）。用了 <code>api.settings.</code> /
+            <code>capabilities</code> 是唯一授权面，没声明的一律拒绝；用不到就写 <code>[]</code>（airship-life-game 就是这么起的）。用了 <code>api.settings.</code> /
             <code>api.proc.</code> 这些域就必须声明对应能力，AP-011 会扫源码核对。
           </p>
           <table>
@@ -384,8 +384,8 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
           </p>
           <h3>共享命名空间与工具发现</h3>
           <p>
-            <code>SHARED_NAMESPACES = ['library']</code>，这份名单<strong>属于 runtime</strong>：目录由 runtime 创建与托管，新增一个共享数据区是 runtime 的功能变更，不是应用变更。墨读与
-            PDF 是两个独立应用入口，但书架、导入记录、封面、阅读进度是同一套数据——各自存一份就会"同一本书在两个入口里各有一本"。
+            <code>SHARED_NAMESPACES = ['library']</code>，这份名单<strong>属于 runtime</strong>：目录由 runtime 创建与托管，新增一个共享数据区是 runtime 的功能变更，不是应用变更。书库开成共享命名空间，是因为它曾由墨读与
+            PDF 两个入口共用（PDF 已于 2026-11-26 退场）——各自存一份就会"同一本书在两个入口里各有一本"。
           </p>
           <p>
             <code>TOOL_NAMES = ['ffmpeg', 'wslc']</code>，同样<strong>属于 runtime</strong>。发现顺序三档：<strong>环境变量 <code>AIRSHIP_&lt;NAME&gt;_PATH</code>（如
@@ -414,7 +414,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
           </p>
           <p>
             文档面走自定义方案 <code>airship://&lt;id&gt;/&lt;entry&gt;</code>：一个应用只读到它自己那一个包。方案属性在 <code>app ready</code>
-            之前注册，处理器在 <code>whenReady</code> 里挂。PDF 的 worker 从包里取，EPUB 的章节样式表是 <code>blob:airship://books/…</code>。
+            之前注册，处理器在 <code>whenReady</code> 里挂。EPUB 的章节样式表是 <code>blob:airship://airship-reader/…</code>。
           </p>
           <div class="note">
             <b>CSP 的一个坑</b>：<code>airship://</code> 下 <code>blob:</code> 的 URL 不再被 <code>'self'</code> 覆盖——<code>style-src</code> 不写
@@ -430,7 +430,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
   apps/&lt;appId&gt;/settings.json   应用私有设置（含它自己的主题档）
   apps/&lt;appId&gt;/data/           应用私有数据
   apps/&lt;appId&gt;/cache/          可随时整体删除重建
-  library/                     共享书库（墨读与 PDF 同一份）</code></pre>
+  library/                     共享书库（Reader 的那一份）</code></pre>
           <p>
             <strong>没有 runtime 级的 settings.json</strong>：从前那份全局设置（全局主题、工具手动路径）随启动器退场——主题按应用各记各的，工具"用户指定"那一档整档删了。目录布局只依赖 userData
             根与 id，<strong>不需要知道"现在有哪些应用"</strong>（这条是踩过来的：<code>build()</code> 曾遍历当时的注册表建一张表并缓存，一开机就读失败）。
@@ -482,14 +482,13 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
           <table>
             <thead><tr><th>窗口</th><th>工作集</th><th>首屏挂载</th></tr></thead>
             <tbody>
-              <tr><td>打勾勾</td><td>88 MB</td><td>140 ms</td></tr>
-              <tr><td>墨读</td><td>100 MB</td><td>132 ms</td></tr>
-              <tr><td>wsld</td><td>99 MB</td><td>—（wslc 定位 136 ms）</td></tr>
-              <tr><td>生命游戏</td><td>101 MB</td><td>—</td></tr>
-              <tr><td>Albedo</td><td>113 MB</td><td>—</td></tr>
-              <tr><td>PDF</td><td>100 MB</td><td>141 ms</td></tr>
+              <tr><td>Dago</td><td>88 MB</td><td>140 ms</td></tr>
+              <tr><td>Reader</td><td>100 MB</td><td>132 ms</td></tr>
+              <tr><td>WSLD</td><td>99 MB</td><td>—（wslc 定位 136 ms）</td></tr>
+              <tr><td>Life Game</td><td>101 MB</td><td>—</td></tr>
+              <tr><td>SVG Editor</td><td>113 MB</td><td>—</td></tr>
               <tr><td>S3</td><td>105 MB</td><td>157 ms</td></tr>
-              <tr><td>vcp</td><td>104 MB</td><td>170 ms</td></tr>
+              <tr><td>FFmpeg</td><td>104 MB</td><td>170 ms</td></tr>
             </tbody>
           </table>
           <p>
@@ -510,7 +509,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
           <p>要 Windows、Node.js <code>^20.19.0 || &gt;=22.12.0</code>、<a href="https://github.com/casey/just">just</a> 和 Git Bash。</p>
           <pre><code>npm install            <span class="c"># 各区是 npm workspaces，装完自动软链</span>
 just                   <span class="c"># 不带参数列出全部配方</span>
-just dev life          <span class="c"># 直跑那一个应用：文档热更，清单与图标走包</span>
+just dev airship-life-game          <span class="c"># 直跑那一个应用：文档热更，清单与图标走包</span>
 just check             <span class="c"># 类型 + 单测 + 册子差集</span></code></pre>
           <p>
             <code>just dev</code> 与截图配方都吃 <code>dist-apps/</code>：改了 <code>app.ts</code>（清单）要重跑一次 <code>just build-apps</code> 才生效，只改组件源码不用——应用的<strong>文档</strong>在
@@ -646,7 +645,7 @@ just app-installer hello   <span class="c"># 产 release/apps/hello-Setup-&lt;�
           </ul>
           <p>
             现有 24 本：runtime 8 本（bridge / grants / logging / proc-tools / runtime / storage / theme / tray）+ 应用区 2 本（app-model / package）+ 共享 2 本（library /
-            textdecode）+ 应用 12 本（墨读、PDF、打勾勾、生命游戏、vcp、Albedo、S3 各一本，wsld 五本）。索引与前缀表见 <code>docs/specs/index.md</code>——新能力的两字母前缀要取没被占用的，索引表里查。
+            textdecode）+ 应用 12 本（Reader、Dago、Life Game、FFmpeg、SVG Editor、S3、图标工坊各一本，airship-wsld 五本）。索引与前缀表见 <code>docs/specs/index.md</code>——新能力的两字母前缀要取没被占用的，索引表里查。
           </p>
 
           <h2 class="sub" id="tests">用例与替身</h2>
@@ -696,7 +695,7 @@ it('SH-006 只杀这个应用的任务，别人的任务一条都不碰', async 
 
           <h2 class="sub" id="release">出包与分发</h2>
           <pre><code>just build-apps            <span class="c"># 八个包 → dist-apps/&lt;id&gt;.airship</span>
-just app-installer books   <span class="c"># 先产 books 那份包，再裹成每用户安装器</span>
+just app-installer airship-reader   <span class="c"># 先产 airship-reader 那份包，再裹成每用户安装器</span>
 just build-runtime         <span class="c"># 清场 → 编译 → NSIS → 自检 + .sha256（纯 runtime）</span>
 just build                 <span class="c"># 两条一起跑</span></code></pre>
           <ul>

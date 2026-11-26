@@ -11,23 +11,23 @@ import { targetsFor, type WindowRef } from '../main/services/routing'
  */
 
 const WINDOWS: WindowRef[] = [
-  { contentsId: 1, owner: 'dagogo' },
-  { contentsId: 2, owner: 'vcp' },
-  { contentsId: 3, owner: 'books' },
-  { contentsId: 4, owner: 'vcp' } // 同一应用重开（理论上不该有两个，路由规则仍要正确）
+  { contentsId: 1, owner: 'airship-dago' },
+  { contentsId: 2, owner: 'airship-ffmpeg' },
+  { contentsId: 3, owner: 'airship-reader' },
+  { contentsId: 4, owner: 'airship-ffmpeg' } // 同一应用重开（理论上不该有两个，路由规则仍要正确）
 ]
 
 describe('事件路由', () => {
   it('BR-010 A 应用的事件不会投给 B 应用的窗口', () => {
-    expect(targetsFor('vcp', WINDOWS)).toEqual([2, 4])
-    expect(targetsFor('vcp', WINDOWS)).not.toContain(3)
-    expect(targetsFor('books', WINDOWS)).toEqual([3])
-    expect(targetsFor('dagogo', WINDOWS)).toEqual([1])
+    expect(targetsFor('airship-ffmpeg', WINDOWS)).toEqual([2, 4])
+    expect(targetsFor('airship-ffmpeg', WINDOWS)).not.toContain(3)
+    expect(targetsFor('airship-reader', WINDOWS)).toEqual([3])
+    expect(targetsFor('airship-dago', WINDOWS)).toEqual([1])
   })
 
   it('BR-010b 归属不存在时返回空：事件被丢弃，绝不广播兜底', () => {
     // 应用窗口已关，此时广播等于把它的转码进度发给别人——不能这么干
-    expect(targetsFor('pdf', WINDOWS)).toEqual([])
+    expect(targetsFor('airship-s3', WINDOWS)).toEqual([])
   })
 })
 

@@ -14,7 +14,7 @@ import type { AppApi, AppMeta } from '@airship/contract'
  * 标题栏只念应用名、留白按清单给、界面在路上时有占位。
  *
  * 挂的是**真宿主 + 假应用**：真去挂某个应用就把那本应用册子的东西全拖进来了
- * （vcp 会把 ffmpeg 探测那一整套拉进来），那属于 `vcp.md` 的用例。
+ * （vcp 会把 ffmpeg 探测那一整套拉进来），那属于 `airship-ffmpeg.md` 的用例。
  */
 
 const ICON = 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='
@@ -31,9 +31,9 @@ function mountSdkHost(manifest: AppMeta, component: ComponentType<{ api: AppApi 
 
 describe('应用窗口里宿主只添三样东西', () => {
   it('SH-011 应用窗口的标题栏只念应用名，三颗键各有可读名称', async () => {
-    const m = await mountSdkHost(meta({ id: 'vcp', name: 'vcp' }), () => <div className="app-body">编排台正文</div>)
+    const m = await mountSdkHost(meta({ id: 'airship-ffmpeg', name: 'airship-ffmpeg' }), () => <div className="app-body">编排台正文</div>)
     const visible = m.text()
-    expect(visible).toContain('vcp')
+    expect(visible).toContain('airship-ffmpeg')
     // 这扇窗就是那个应用，不需要再自报家门一次
     expect(visible, '应用窗口的标题栏不该带「飞船」前缀').not.toContain('飞船')
     expect(visible).not.toContain('/')

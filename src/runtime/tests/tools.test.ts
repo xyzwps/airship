@@ -109,10 +109,10 @@ describe('发现按固定顺序试', () => {
 describe('应用只能问自己声明过的工具', () => {
   it('PT-010 应用只能问自己声明过的工具', () => {
     // vcp 声明了 ffmpeg、没声明 wslc；dagogo 两个都没声明
-    expect(canUseTool('vcp', 'ffmpeg')).toBe(true)
-    expect(canUseTool('vcp', 'wslc')).toBe(false)
-    expect(canUseTool('dagogo', 'ffmpeg')).toBe(false)
+    expect(canUseTool('airship-ffmpeg', 'ffmpeg')).toBe(true)
+    expect(canUseTool('airship-ffmpeg', 'wslc')).toBe(false)
+    expect(canUseTool('airship-dago', 'ffmpeg')).toBe(false)
     // 有 proc 能力是前提（appRegistry 里那条与 ipc 的闸一致）
-    expect(canUseTool('books', 'ffmpeg')).toBe(false)
+    expect(canUseTool('airship-reader', 'ffmpeg')).toBe(false)
   })
 })

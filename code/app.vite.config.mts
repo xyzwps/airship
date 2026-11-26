@@ -9,7 +9,7 @@ import { airshipCspPlugin } from '@airship/sdk/vite'
  * 三条不显眼的规矩，都是"错了就装不起来"的那种：
  *
  *   1. `root` 就是那个应用目录。Vite 会把输入 html 相对 root 的路径**原样搬进产物**：
- *      root 设成 `src` 就会产出 `<out>/apps/life/index.html`，包根就不是一层 `index.html` 了。
+ *      root 设成 `src` 就会产出 `<out>/apps/airship-life-game/index.html`，包根就不是一层 `index.html` 了。
  *      包根必须是入口本身，`airship://<id>/index.html` 才指得到它。
  *   2. `base: './'`。默认的 `/` 会在 html 里写出 `/assets/…`，那是相对盘符的地址；
  *      在 `airship://<id>` 这个 origin 下它指到协议根，而协议根只认包内路径——一加载就 404。
