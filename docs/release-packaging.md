@@ -70,8 +70,24 @@ just installers           # 只重出全部应用的安装器（先产全部的�
      根 package.json 已经没有 dependencies（foliate-js 记在 airship-reader 名下，是
      devDependencies，构建期打进包；pdfjs-dist 随 PDF 应用于 2026-11-26 一并退场），所以不再需要"排除某个 node_modules 目录"那几条。
    - `perMachine: false`（每用户，不要管理员），落点钉死 `~\.airship\runtime`——目录的唯一真源在
-     `installer.nsh` 的 `customInit`（`StrCpy $INSTDIR "$PROFILE\.airship\runtime"`），
-     `allowToChangeInstallationDirectory: false` 去掉换目录页。升级时读到的旧 InstallLocation 同样被覆盖。
+     `installer.nsh` 的 `customInit`（`StrCpy $INSTDIR "$PROFILE\.airship\runtime"` **加上**把同一个路径写进
+     `${INSTALL_REGISTRY_KEY}`（= `HKCU\Software\<由 appId 派生的 guid>`）的 `InstallLocation`），
+     `allowToChangeInstallationDirectory: false` 去掉换目录页。
+     为什么两句都要：辅助向导的安装模式页在前置函数里跑 `setInstallModePerUser`（`multiUser.nsh`），它会
+     **重新赋值 `$INSTDIR`**——先读那条注册表值，读不到就用默认位置 `$LOCALAPPDATA\Programs\airship`。
+     只写 `StrCpy` 的话，欢迎页念的是 `~\.airship\runtime`、文件整份落进 `AppData\Local\Programs\airship`
+     （2026-11-26 真机装过一次，注册表卸载项把落点念了出来才发现；PK-035 钉这两句必须同时在场）。
+     那条键本来就是模板记安装路径用的（`include/installer.nsh` 装完写 `InstallLocation $INSTDIR`），
+     这里只是提前写成固定值，升级与历史都不作数。
+   - **向导里没有"为所有用户安装"那一档**：辅助向导在 `perMachine: false` 下恒定插一页
+     "为所有用户 / 仅为当前用户"（`assistedInstaller.nsh` 的 `PAGE_INSTALL_MODE`），而
+     `allowElevation: false` 只是在非管理员时把那颗键禁用并补一句英文 "must run as admin"，页面照旧。
+     真闸是 `installer.nsh` 里的 `customInstallMode` 把 `$isForceCurrentInstall` 拍成 1
+     （页面前置函数直接 `setInstallModePerUser` + `Abort`）。留着不拍就会出现
+     "文件落 `$PROFILE`、卸载项写 HKLM"的分裂，而且它会先卸掉 HKCU 那份（`installSection.nsh`）。
+     模板里那个钩子写了两样拼写（闸门 `!ifmacrodef customInstallmode`、插入 `!insertmacro customInstallMode`），
+     但 **NSIS 的宏名不区分大小写**，它们是同一个宏——各定义一份 makensis 直接报
+     `macro named "customInstallMode" already exists`，只许定义一次（实测，PK-035 钉这一点）。
    - 主 exe 叫 `airship.exe`（`productName: airship`），应用快捷方式的目标就是它。
    - runtime 自己没有界面：不留桌面/开始菜单快捷方式，只留控制面板卸载项（`airship runtime`）。
      卸载**不动**用户数据（`deleteAppDataOnUninstall: false`，`~\.airship` 下的 data 与 shared 里是书架与设置）。

@@ -125,6 +125,8 @@ runtime 见到那个条目才起进程（通道侧契约见 `src/runtime/specs/b
 #### Scenario: PK-035 两个安装器都装进 ~/.airship，都不要管理员
 - **WHEN** 看生成出来的应用安装脚本与 runtime 的安装配置
 - **THEN** 应用那份 `RequestExecutionLevel user`、落点 `$PROFILE\.airship\apps\<id>`；runtime 那份 perMachine 为假、落点钉死 `$PROFILE\.airship\runtime`，且不给换目录
+- **AND** runtime 那份把安装模式拍成"当前用户"——不出现"为所有用户安装"那一档，也就不会出现文件落 `$PROFILE` 而卸载项写 HKLM 的分裂
+- **AND** runtime 那份在安装模式那一步之前，把模板要读的那条安装路径也写成同一个固定目录——向导念的目录与文件真正落下的目录是同一个
 - **AND** 两个安装器都不往 `Program Files` 写任何东西，runtime 安装包不带任何应用归档
 
 <!--

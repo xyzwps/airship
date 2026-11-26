@@ -91,9 +91,18 @@ describe('两个安装器都装进 ~/.airship，都不要管理员', () => {
     // 应用安装器只往 $INSTDIR（$PROFILE\.airship\apps 下）写，不往 Program Files 写
     expect(script).not.toMatch(/SetOutPath "\$PROGRAMFILES/)
 
-    // runtime 那份：每用户 + 固定目录的唯一真源在 installer.nsh
+    // runtime 那份：每用户 + 固定目录的唯一真源在 installer.nsh 的 customInit
     const nsh = readFileSync(join(REPO, 'src', 'runtime', 'build', 'installer.nsh'), 'utf8')
-    expect(nsh).toContain('StrCpy $INSTDIR "$PROFILE\\.airship\\runtime"')
+    // 安装模式页的前置函数会重新赋值 $INSTDIR（先读这条注册表值，读不到就用默认位置），
+    // 所以同一个固定路径要一起写进模板要读的那条键——否则向导念一个目录、文件落另一个目录
+    const initMacro = nsh.match(/!macro customInit\r?\n([\s\S]*?)!macroend/i)
+    expect(initMacro, 'installer.nsh 里没有 customInit 宏').not.toBeNull()
+    expect(initMacro![1]).toContain('StrCpy $INSTDIR "$PROFILE\\.airship\\runtime"')
+    expect(initMacro![1]).toContain('WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" "InstallLocation" "$PROFILE\\.airship\\runtime"')
+    // 安装模式拍成当前用户。NSIS 宏名不区分大小写：模板里 customInstallmode / customInstallMode
+    // 两样拼写是同一个宏，各定义一份会让 makensis 报 "macro already exists"，所以只许出现一次
+    expect(nsh).toContain('StrCpy $isForceCurrentInstall "1"')
+    expect(nsh.match(/!macro\s+custominstallmode\s*$/gim)).toHaveLength(1)
     const yml = readFileSync(join(REPO, 'src', 'runtime', 'electron-builder.yml'), 'utf8')
     expect(yml).toMatch(/perMachine: false/)
     expect(yml).toMatch(/allowToChangeInstallationDirectory: false/)

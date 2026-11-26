@@ -122,7 +122,11 @@ Node 脚本走软链读的就是那份 JS；这两区**源码里**的相对 impo
 
 - `just build-runtime` = 清场 → 编译 runtime → NSIS → 自检 + 写 `.sha256`。安装包是**纯 runtime**，
   `perMachine: false`（不要管理员，2026-11-26 从 Program Files 挪来），落点钉死 `~\.airship\runtime`（目录唯一真源在
-  `src/runtime/build/installer.nsh` 的 `customInit`）。项目根是 `src/runtime`（`--projectDir`），
+  `src/runtime/build/installer.nsh` 的 `customInit`——**两句一起才算钉住**：`StrCpy $INSTDIR` 之外还要把同一路径写进
+  `HKCU\Software\<由 appId 派生的 guid>\InstallLocation`（模板里的 `${INSTALL_REGISTRY_KEY}`），因为安装模式页会跑 `setInstallModePerUser` 重新赋值 `$INSTDIR`，读不到那条键
+  就用 `$LOCALAPPDATA\Programs` 兜底，结果是欢迎页念一个目录、文件落另一个目录）。辅助向导**不出现"为所有用户安装"那一档**——真闸是
+  `installer.nsh` 的 `customInstallMode` 拍 `$isForceCurrentInstall`（`allowElevation: false` 只禁用那颗键、页面照旧）；
+  模板里 `customInstallmode` 与 `customInstallMode` 两样拼写是**同一个宏**（NSIS 宏名不区分大小写），定义两遍 makensis 报 already exists。项目根是 `src/runtime`（`--projectDir`），
   所以**安装包文件名只由 `src/runtime/package.json` 的 `version` 决定**（`airship-runtime-Setup-<版本>-x64.exe`，
   主 exe 叫 `airship.exe`）。runtime 自己没有界面，不留快捷方式，只留控制面板卸载项。
 - `just app-installer id` = 先产它那份包，再裹成**每用户**安装器（`RequestExecutionLevel user`，不要管理员），
