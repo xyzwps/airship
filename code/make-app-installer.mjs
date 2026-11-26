@@ -9,7 +9,8 @@
  *   - 落点：release/apps/ 与产物同名 .sha256。
  *
  * 契约在 src/apps/specs/package.md（PK-031 ~ PK-035）。措辞全部从 @airship/contract 烘进脚本，
- * 图标取包根那份 icon.ico（PK-036），安装器不再自己转——转图标只发生在 code/pack-app.mjs。
+ * 图标取包根那份 icon.ico（PK-036，产包时随应用目录那张源图一起备好的），安装器只取不转——
+ * 全仓已没有任何转图标的脚本。
  *
  * 用法：node code/make-app-installer.mjs <id>    只出那一个（`just app-installer <id>` 会先产它的包再调它）
  *       node code/make-app-installer.mjs         不给 id 就出全部，名单与产包同源（code/app-dirs.mjs）

@@ -110,7 +110,7 @@ runtime 装一次，钉死在 `C:\Program Files\airship\runtime`（perMachine，
 relaunchDisplayName })`（win32 专有；后两条必须成对，否则外壳两条一起忽略）。从前那句
 `window.setAppUserModelId?.(...)` 是假绿——方法只挂在 `app`（进程级）上，BrowserWindow 没有，可选链把失败
 吞成空操作，八个应用仍共用 `dev.xyzwp.airship` 一个身份。现在 `appId` 是 `dev.xyzwp.airship.<id>`，
-图标取包根那份产包期派生的 `icon.ico`（PK-036）落到 `%APPDATA%\airship\icons\<id>.ico` 交给外壳——
+图标取包根那份随包备好的 `icon.ico`（PK-036）落到 `%APPDATA%\airship\icons\<id>.ico` 交给外壳——
 外壳只认磁盘上的 `.ico`，asar 与 `airship://` 它不认；包里缺那一份时身份照样分开、只回落 runtime 的图标并在日志念一句。
 判据在 `runtime.md` 的 SH-010 / SH-034 / SH-035。**还没做的那半件**：`.lnk` 上没有 per-app 的 AUMID
 （NSIS 裸 `CreateShortCut` 写不了 `System.AppUserModel.ID`，那要 ShellLink 插件），记在 todo.md TD-001。

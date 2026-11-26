@@ -38,7 +38,6 @@ just installers           # 只重出全部应用的安装器（先产全部的�
 | `just installers` | 产全部应用的安装器：先 `build-apps`，再对名单里每个应用各裹一枚（名单与产包同源 `code/app-dirs.mjs`） |
 | `just compile` | 只编译 runtime 的两个目标 → `src/runtime/out/{main,preload}`（没有 renderer） |
 | `just verify-installer` | 出包后自检（六件事，见下） |
-| `just icon` | 由母版 `assets/icon-master.png` 重出 `assets/icon.ico` |
 | `just shot` | 逐窗口截图，验证"真的跑起来了"（安装包出之前至少跑一遍） |
 
 > **顺序**：应用安装器用的 `makensis` 是 electron-builder 缓存里那份（不引新依赖），

@@ -6,9 +6,9 @@
  * 从前"Node 解不开本仓 TS 所以两侧各写一遍、用例钉相等"的局面随 contract 的 dist 一起退场了。
  * 这里只剩盘上动作与 PK-007 那条纪律（暂存后改名，失败一个字节都不留）。
  *
- * `icon.ico` 的两条路：
- *   - 仓库内：`code/pack-app.mjs` 传 `makeWindowsIcon`，由包根那张源图派生（resvg + Pillow，PK-036）；
- *   - 仓库外：产物目录里**自备** `icon.ico`，缺了响亮失败（PK-039）——不静默降级成"任务栏穿 runtime 的图标"。
+ * `icon.ico` 只有一条路（PK-036 / PK-039）：产物目录里**自备**那张多尺寸 ico，产包期只搬不转，
+ * 缺了响亮失败——不静默降级成"任务栏穿 runtime 的图标"。仓库内那八个应用同样自备
+ * （存在 `src/apps/<id>/icon.ico`，由 `code/build-apps.mjs` 与源图一起搬进产物目录）。
  */
 
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -74,7 +74,7 @@ export function collectEntries(dir, prefix = '') {
  * 中途任何一步失败，旧包原样还在，包根里不留半成品——
  * 半成的归档被扫到只会得到"读不出来"，比没有更糟。
  */
-export function packPackage({ srcDir, outRoot, manifestText, manifest: manifestIn, makeWindowsIcon }) {
+export function packPackage({ srcDir, outRoot, manifestText, manifest: manifestIn }) {
   const source = resolve(srcDir)
   const root = resolve(outRoot)
   if (!existsSync(source)) throw new Error(`产物目录不存在：${source}`)
@@ -103,12 +103,9 @@ export function packPackage({ srcDir, outRoot, manifestText, manifest: manifestI
   const layout = packageLayoutProblems(manifest, Object.keys(entries))
   if (layout.length > 0) throw new Error(`包不合格：\n${layout.join('\n')}`)
 
-  // PK-036 / PK-039：包根那份外壳图标。在写盘之前备好——
+  // PK-036 / PK-039：包根那份外壳图标由应用作者备好，产包期只搬不转。判在写盘之前——
   // 拿不到图标时旧包一个字节都没动，包根里也不留半成品（与 PK-007 同一条纪律）。
-  if (typeof makeWindowsIcon === 'function') {
-    const sourceIcon = Object.keys(entries).find((n) => !n.includes('/') && /^icon\.(svg|png|jpe?g|webp)$/.test(n))
-    entries[WINDOWS_ICON_NAME] = makeWindowsIcon(sourceIcon, entries[sourceIcon])
-  } else if (!(WINDOWS_ICON_NAME in entries)) {
+  if (!(WINDOWS_ICON_NAME in entries)) {
     throw new Error(
       `包根没有 ${WINDOWS_ICON_NAME}：任务栏与快捷方式那颗外壳图标只认磁盘上的 .ico。` +
         `请把一张多尺寸（16~256）的 icon.ico 放进产物目录再产包——` +

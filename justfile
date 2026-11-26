@@ -123,10 +123,6 @@ new-app id *name: build-libs
     npm install
     node code/build-apps.mjs {{id}}
 
-# 由母版重出 runtime 的 icon.ico
-icon:
-    python code/make-ico.py
-
 # 清掉 release/ 里上一次留下的安装包（宁可没有，不可有旧的）
 clean-release:
     rm  -rf release

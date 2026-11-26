@@ -255,7 +255,7 @@ describe('任务栏上每个应用是自己的那颗按钮', () => {
     openAppWindow('dagogo')
     const details = lastWindow().appDetails!
     const inArchive = readArchiveEntry(join(packageFixtureRoot(), 'dagogo.airship'), WINDOWS_ICON_NAME)
-    expect(inArchive, '工装包就该带派生 ico，否则这条钉不到东西').not.toBeNull()
+    expect(inArchive, '工装包就该带 icon.ico，否则这条钉不到东西').not.toBeNull()
     expect(details.appIconPath, '外壳只认磁盘路径').toBe(join(FAKE_USER_DATA, 'icons', 'dagogo.ico'))
     expect(existsSync(details.appIconPath!)).toBe(true)
     expect(Buffer.compare(readFileSync(details.appIconPath!), Buffer.from(inArchive!))).toBe(0)
@@ -273,7 +273,7 @@ describe('任务栏上每个应用是自己的那颗按钮', () => {
     expect(problems, problems.join('\n')).toEqual([])
     openAppWindow('noico')
     const fallback = lastWindow()
-    expect(fallback.appDetails!.appIconPath, '没有派生 ico 就不该交图标键').toBeUndefined()
+    expect(fallback.appDetails!.appIconPath, '包里没有 icon.ico 就不该交图标键').toBeUndefined()
     expect(fallback.appDetails!.appId).toBe('dev.xyzwp.airship.noico')
     expect(fallback.options.icon, '窗口自己的图标回落 runtime 那张母版').toContain(join('assets', 'icon.png'))
 

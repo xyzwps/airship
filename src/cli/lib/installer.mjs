@@ -2,7 +2,8 @@
  * 每用户应用安装器的生成器（契约见 src/apps/specs/package.md PK-031 ~ PK-035）。
  *
  * 从产物视角看它只做四件事：读包里的清单、抽包根那份 icon.ico（取，不转——
- * 图标只有一处生成，就是产包那一步，PK-036/PK-039）、生成 NSIS 脚本、跑 makensis。
+ * 全仓没有任何地方转图标，那张 ico 与应用目录里的源图一起随包走，PK-036/PK-039）、
+ * 生成 NSIS 脚本、跑 makensis。
  * 措辞（能力清单、找不到 runtime 那句）全部从 @airship/contract 烘进脚本。
  *
  * makensis 的来源是**注入的**：这台机器上 `just installers` 用 electron-builder 缓存里那份
@@ -133,13 +134,13 @@ export function archiveHasBackend(archivePath) {
   return Object.keys(unzipSync(bytes, { filter: (f) => f.name === PACKAGE_BACKEND_ENTRY })).length > 0
 }
 
-/** 取包根那份 icon.ico（PK-036/PK-039）：快捷方式与安装目录用的就是它，安装器不自己转第二遍 */
+/** 取包根那份 icon.ico（PK-036/PK-039）：快捷方式与安装目录用的就是它，全仓没有第二处转图标 */
 export function extractWindowsIcon(archivePath, work) {
   const bytes = new Uint8Array(readFileSync(archivePath))
   const ico = unzipSync(bytes, { filter: (f) => f.name === WINDOWS_ICON_NAME })[WINDOWS_ICON_NAME]
   if (!ico) {
     throw new Error(
-      `包里缺 ${WINDOWS_ICON_NAME}：它由产包那一步备好（仓库内产包器从源图派生；外部项目在产物目录里自备一张）`
+      `包里缺 ${WINDOWS_ICON_NAME}：它是应用目录里自备的那张多尺寸 ico，随源图一起进包（产包期缺了就会拦下）`
     )
   }
   const target = join(work, WINDOWS_ICON_NAME)

@@ -32,7 +32,7 @@ const ENTRY_HTML = [
 const ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>\n'
 
 /**
- * 包根那份派生的 Windows 外壳图标（PK-036）在用例里的样子。
+ * 包根那份 Windows 外壳图标（PK-036）在用例里的样子。
  *
  * 外壳不参与用例，所以这里放的是一段够短的假字节：
  * 用例钉的是"落盘那份与包内那份逐字节相同"（SH-034），与图标画的是什么无关。

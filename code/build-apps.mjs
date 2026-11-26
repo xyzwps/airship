@@ -76,10 +76,14 @@ async function buildOne(dirId, work) {
     build: { outDir: built, emptyOutDir: true }
   })
 
-  // 图标是文件约定，不是 html 里的引用，vite 不会替我们搬——自己放进包根
-  // （包根那份 Windows 外壳用的 icon.ico 由产包器从这张源图派生，见 PK-036）
-  const icon = readdirSync(join(SRC_APPS, dirId)).find((n) => /^icon\.(svg|png|jpe?g|webp)$/.test(n))
-  cpSync(join(SRC_APPS, dirId, icon), join(built, icon))
+  // 图标是文件约定，不是 html 里的引用，vite 不会替我们搬——包根那张源图与应用目录里
+  // 存好的那份外壳图标 icon.ico 一起拷进产物目录（与外部作者那条路同源，见 @airship/cli 的 copyIcons）。
+  // 缺 icon.ico 由产包流水响亮失败，不放行"任务栏只能穿 runtime 图标"的包
+  for (const name of readdirSync(join(SRC_APPS, dirId))) {
+    if (/^icon\.(svg|png|jpe?g|webp)$/.test(name) || name === 'icon.ico') {
+      cpSync(join(SRC_APPS, dirId, name), join(built, name))
+    }
+  }
 
   // 后端按约定走：应用目录里有 backend.ts 就由流水（@airship/cli 那份，外部作者同路）
   // 编成包根那份 backend.js；没有就什么都不做。改这个文件要重跑 just build-apps 才进包

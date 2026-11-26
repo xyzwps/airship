@@ -18,8 +18,8 @@
 
 ### TD-001 快捷方式（`.lnk`）上还没有 per-app 的身份
 
-窗口的任务栏身份已经按应用分开了：`setAppDetails` 逐窗口给 `dev.xyzwp.airship.<id>`、图标取包内那份产包期
-派生的 `icon.ico`、重启动作与快捷方式同形（判据 SH-010 / SH-034 / SH-035，派生那一份见 PK-036）。
+窗口的任务栏身份已经按应用分开了：`setAppDetails` 逐窗口给 `dev.xyzwp.airship.<id>`、图标取包内那份
+随包备好的 `icon.ico`、重启动作与快捷方式同形（判据 SH-010 / SH-034 / SH-035，备好的那一份见 PK-036）。
 原先列的四处里前三处 2026-11-19 落了，**只剩第四处**：应用安装器落的 `.lnk` 上没有 `System.AppUserModel.ID`。
 
 为什么挂着：`code/make-app-installer.mjs` 用的是 NSIS 裸 `CreateShortcut`，它写不了 `.lnk` 的属性——

@@ -30,8 +30,9 @@ export const ICON_PATTERN = /^icon\.(svg|png|jpe?g|webp)$/
  * 包根那份 Windows 外壳图标（PK-036）。
  *
  * 它不是第二张图标：外壳（任务栏按钮、固定到任务栏那颗）只读磁盘上的 `.ico`，
- * 不认归档里的路径，也不认包内那张源图的格式。仓库内产包时由包根那张源图派生
- * （resvg + Pillow，见 `code/pack-app.mjs`）；仓库外由作者自备（PK-039），两处都只有产包器写它。
+ * 不认归档里的路径，也不认包内那张源图的格式。这张多尺寸（16~256）的 ico 由应用作者
+ * 备在应用目录里，与源图一起被搬进产物目录、打进包根；产包期只搬不转（PK-039 缺了响亮失败），
+ * 装包侧只取不转。
  */
 export const WINDOWS_ICON_NAME = 'icon.ico'
 

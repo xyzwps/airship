@@ -17,7 +17,7 @@ import type { InstalledPackage } from './packageRegistry'
  *   1. **身份是逐窗口给的**——`win.setAppDetails()` 内部是 `ITaskbarList3::SetAppUserModelID`。
  *      `app.setAppUserModelId()` 是进程级的，八个应用共用一个 runtime 进程，那一句只能给出一个身份。
  *   2. **图标走磁盘**——外壳读 `appIconPath` 时只认文件系统路径，既不认 asar 也不认 `airship://`。
- *      所以包根那份派生的 `icon.ico`（PK-036）先由 runtime 摊平落到 `<userData>/icons/`，
+ *      所以包根那份 `icon.ico`（PK-036，随源图一起备好的那一份）先由 runtime 摊平落到 `<userData>/icons/`，
  *      落盘按字节比对：包换了才重写，没换就不动磁盘。
  *   3. **命令行要同形**——固定到任务栏那颗按钮点下去跑的是 `relaunchCommand`，
  *      它与快捷方式一样是 `airship.exe "<归档绝对路径>"`。第二实例会把包路径转给活着的进程，
@@ -27,7 +27,7 @@ import type { InstalledPackage } from './packageRegistry'
 export interface TaskbarIdentity {
   /** `dev.xyzwp.airship.<id>`：每应用一个，才能单独固定与预览 */
   appId: string
-  /** 磁盘上那份 ico；包里没有派生 ico 时是 null——身份照样分开，图标回落 runtime 的 */
+  /** 磁盘上那份 ico；包里没有 `icon.ico` 时是 null——身份照样分开，图标回落 runtime 的 */
   appIconPath: string | null
   relaunchCommand: string
   relaunchDisplayName: string
@@ -37,7 +37,7 @@ export interface TaskbarIdentity {
 export function taskbarIconFor(pkg: InstalledPackage): string | null {
   const raw = readArchiveEntry(pkg.archive, WINDOWS_ICON_NAME)
   if (!raw) {
-    log.warn(pkg.meta.id, `包里缺 ${WINDOWS_ICON_NAME}，任务栏图标回落 runtime 的（产包期会派生这一份，见 PK-036）`)
+    log.warn(pkg.meta.id, `包里缺 ${WINDOWS_ICON_NAME}，任务栏图标回落 runtime 的（那一份由应用目录备好随包走，见 PK-036）`)
     return null
   }
   const file = taskbarIconFile(pkg.meta.id)

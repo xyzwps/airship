@@ -29,7 +29,6 @@ just app-installer id  产那一个应用的每用户安装器（release/apps/<i
 just installers        产全部应用的安装器（先 build-apps；名单与产包同源 code/app-dirs.mjs）
 just test              单测            just casecov        册子编号与用例编号的双向差集
 just typecheck         两个 tsconfig   just check          提交前一轮（类型 + 单测 + 差集）
-just icon              由母版重出 runtime 的 icon.ico
 just build-runtime     打 runtime 安装包（清场 → 编译 → NSIS → 自检）
 just build             三样一起跑（runtime 安装包 → 各应用的包 → 各应用的安装器）   just verify-installer  出包自检
 just e2e / just wsld-real           要真环境的那两档（ffmpeg / wslc）
@@ -50,7 +49,7 @@ src/cli                @airship/cli          作者命令行：产包流水、de
                                              四个动词都不接 id——id 的真源是项目根 package.json 的 name；
                                              外部项目是常规 src/ 形状（mono repo 只属于本仓），dev 的文档地址整份由它经 AIRSHIP_DEV_URL 递给 runtime
                                              仓库内 code/pack-app.mjs 与 code/make-app-installer.mjs 是它的薄适配——
-                                             resvg/Pillow 派生图标与 electron-builder 缓存那份 makensis 留在仓库侧
+                                             electron-builder 缓存那份 makensis 留在仓库侧
 src/scaffold           create-airship-app    npm 手脚架（npx create-airship-app）：minimal 与 todo 两套模板，
                                              模板里 `__APP_ID__` 与 `__APP_NAME__` 是渲染位；不参与 casecov
 src/shared/contract    @airship/contract     契约、清单类型、拒绝措辞、注册与包形状的规矩
@@ -81,7 +80,9 @@ runtime 给应用窗口的 DOM 只有 SDK 那一份——`src/runtime` 里没有
 
 一个应用该有的文件：`package.json`、`app.ts`（纯数据清单）、`index.html`（入口文档，
 引 `./main.tsx`，**里面不写 CSP**）、`main.tsx`（一行 `createAirshipApp({ meta, component, icon })`）、
-`icon.svg|png|jpg|jpeg|webp`（**有且只有一张**，不套底板，颜色烘进图里）；缺哪件产包期炸哪件。
+`icon.svg|png|jpg|jpeg|webp`（**有且只有一张**，不套底板，颜色烘进图里）、
+`icon.ico`（任务栏那颗外壳图标，多尺寸 16~256，**存成文件**）；缺哪件产包期炸哪件。
+**产包与安装期都不转图标格式**——`.ico` 就是应用目录里存的那份，改了源图要自己重出，产包只把它随源图搬进包根。
 **runtime 侧任何文件都不用改**——runtime 运行期注册命令行指来的包（`airship.exe <id>.airship`），
 不扫磁盘、没有"包根"那回事。这条有用例守着（AP-010：runtime 产品代码里不许出现具体应用 id 的字面量）。
 
@@ -179,10 +180,14 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
 - Electron 与 electron-builder 的二进制走 npmmirror：机器本地的 `.npmrc`（个人配置，**已不入库**）里配了
   `electron_mirror` 与 `electron_builder_binaries_mirror`，`just build-runtime` 里也显式带上同名环境变量。
   registry 一律不在仓库里写死：npm 系命令按 `.npmrc` > 全局默认解析。
-- Pillow 不认 SVG，无头 Chrome 截内联 SVG 会出空白；要 SVG→位图用 `@resvg/resvg-js`（根 devDep）。
-  应用安装器把包内 SVG 图标经 resvg 出 256 PNG，再交 `code/app-ico.py`（Pillow）转多尺寸 `.ico`。
+- **仓里没有任何转图标的脚本**：`code/app-ico.py`、`code/make-ico.py`、`code/make-icons.py` 与 `just icon` 配方
+  已在 2026-11-26 一起退场，`@resvg/resvg-js` 也卸了（当初只为 SVG→PNG 这一步装的）。
+  所有图标都是**存进仓库的文件**：八张应用 `.ico` + 源图、`templates/app` 那张、两个模板各自那张、
+  runtime 的 `icon.ico` / `icon.png` / `tray.png`（`icon-master.png` 是母版，只当素材留着）。
+  改了源图要自己在外部工具里重出对应的那张 `.ico`（多尺寸 16~256），否则包里与源图会各说各话——
+  这条是这轮决定接受的风险，**别再往产包或安装流水里加转换步骤**。
 - 系统级动作（重启 explorer、清图标缓存、覆盖安装、**把 runtime 装进 Program Files**）**只给命令，由使用者执行**，别自己跑。
-- 工具脚本一律放 `code/`（现成有 `make-ico.py`、`make-icons.py`、`app-ico.py`、`make-jingang-epub.py`、`make-mobi.py`、
+- 工具脚本一律放 `code/`（现成有 `make-jingang-epub.py`、`make-mobi.py`、
   `make-rustfs-demo.mjs`、`clean-installer.mjs`、`verify-installer.mjs`、`pack-app.mjs`、`build-apps.mjs`、
   `make-app-installer.mjs`、`app-dirs.mjs`（应用名单的唯一判据，产包与产安装器共用）、`new-app.mjs`、`app.vite.config.mts`）；中间产物写到系统临时目录，别落在仓库里。
   `src/runtime/out/`、`dist-apps/`、`release/`、`shots/` 都不入库，根目录保持干净。

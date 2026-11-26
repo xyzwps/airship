@@ -2,10 +2,8 @@
 /**
  * airship 产包器（仓库内适配层）—— 把一个已构建好的产物目录装成 `<id>.airship`。
  *
- * 流水本身住在 @airship/cli（src/cli/lib/pack.mjs），外部作者与这里跑的是同一份判据；
- * 这个文件只做仓库特有的那一件事：包根那张源图派生出 `icon.ico`（PK-036，
- * resvg 渲 PNG + code/app-ico.py 出多尺寸 ico）。仓库外是作者自备（PK-039），
- * 两条路都是 packPackage 的 `makeWindowsIcon` 钩子的不同取值。
+ * 流水本身住在 @airship/cli（src/cli/lib/pack.mjs），外部作者与这里跑的是同一份判据，
+ * 也包括同一份 `icon.ico`：它存在应用目录里、由构建搬进产物目录，产包期不转格式。
  *
  * 判据只有 @airship/contract 那一份：从前"Node 解不开本仓 TS 所以两侧各写一遍、用例钉相等"
  * 的局面随 contract 的 dist 一起退场了。下面的旧名导出只是给用例与 build-apps.mjs 留接口。
@@ -14,13 +12,9 @@
  *   node code/pack-app.mjs --src <产物目录> --manifest <manifest.json> --out <包根目录>
  */
 
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { spawnSync } from 'node:child_process'
+import { readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { join, resolve } from 'node:path'
-import { strFromU8 } from 'fflate'
-import { Resvg } from '@resvg/resvg-js'
+import { resolve } from 'node:path'
 import { packPackage } from '@airship/cli/pack'
 import {
   APP_ID_PATTERN,
@@ -49,45 +43,9 @@ export {
 export const manifestProblems = (manifest) => packageManifestProblems(manifest)
 export const layoutProblems = ({ fileNames, manifest }) => packageLayoutProblems(manifest, fileNames)
 
-/** 仓库根：code/ 的上一层。用文件路径算，不认 cwd */
-const REPO = resolve(fileURLToPath(import.meta.url), '..', '..')
-
-/**
- * 包根那张源图 → 多尺寸 `.ico` 的字节（PK-036）。
- *
- * SVG 先经 @resvg/resvg-js 渲染成 256 宽 PNG（Pillow 不认 SVG 是本机事实），
- * 再交 code/app-ico.py（Pillow）出 16~256 各档。中间文件落在系统临时目录的一个新目录里，用完就删。
- * 转不出来就抛：任务栏那颗按钮的图标要靠它，产包不静默降级成"外壳用 runtime 的图标"。
- * `@resvg/resvg-js` 是静态 import——产包全程同步（PK-007 那条"暂存后改名"不容异步插队）。
- */
-export function windowsIconBytes(iconName, raw) {
-  const work = mkdtempSync(join(tmpdir(), 'airship-ico-'))
-  try {
-    let raster
-    if (iconName.endsWith('.svg')) {
-      raster = join(work, 'icon.png')
-      writeFileSync(raster, new Resvg(strFromU8(raw), { fitTo: { mode: 'width', value: 256 } }).render().asPng())
-    } else {
-      raster = join(work, iconName)
-      writeFileSync(raster, raw)
-    }
-    const ico = join(work, WINDOWS_ICON_NAME)
-    // 成功时不刷屏（Pillow 那句"已生成…"在 GBK 控制台下是乱码），失败时把它的报错原样交出来
-    const py = spawnSync('python', [join(REPO, 'code', 'app-ico.py'), raster, ico], {
-      stdio: ['ignore', 'ignore', 'inherit']
-    })
-    if (py.status !== 0) {
-      throw new Error(`图标转 .ico 失败（python code/app-ico.py，退出码 ${py.status}）：任务栏图标靠这一份，产包不降级`)
-    }
-    return readFileSync(ico)
-  } finally {
-    rmSync(work, { recursive: true, force: true })
-  }
-}
-
-/** 产一个包：流水在 @airship/cli，这里只把仓库那份图标派生法接进去 */
+/** 产一个包：流水在 @airship/cli，仓库这一层只是它的入口——图标随应用目录备好了进来 */
 export function pack(options) {
-  return packPackage({ ...options, makeWindowsIcon: windowsIconBytes })
+  return packPackage(options)
 }
 
 function parseArgs(argv) {

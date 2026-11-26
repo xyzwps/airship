@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -20,7 +20,7 @@ import { badAppId } from '@airship/contract'
 import { APP_ID_PATTERN as CONTRACT_APP_ID_PATTERN } from '@airship/contract'
 import { manifestProblems as registryManifestProblems } from '@airship/contract'
 import { packageManifestProblems } from '@airship/contract'
-import { REAL_APPS } from '../../runtime/tests/helpers/realApps'
+import { REAL_APP_IDS, REAL_APPS, appSourceDir } from '../../runtime/tests/helpers/realApps'
 import { DEFAULT_ENTRY } from '@airship/contract'
 import { archiveEntryNames, readArchiveEntry, readArchiveText } from '../../runtime/main/services/packageArchive'
 import { registerPackageAt } from '../../runtime/main/services/packageRegistry'
@@ -39,11 +39,15 @@ import { writeArchive } from '../../runtime/tests/helpers/packages'
 
 let work = ''
 
-/** 包根那张源图在用例里的样子：产包期要把它转成外壳认的 icon.ico，所以得是能渲染的 SVG */
+/** 包根那张源图在用例里的样子（产包期不转格式，它只是随包带着的一张图） */
 const ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>'
+/** 应用作者自备的那份外壳图标：ICO 头是保留字节 0、类型 1（单图图标），用例只需要形状合格 */
+const WINDOWS_ICON = Buffer.from([0, 0, 1, 0, 1, 0, 0, 0])
 
-/** 一个够格的产物目录：入口 + 图标 + 一份相对引用的资产 */
-function fixture(options?: { html?: string; icons?: string[]; extraFiles?: Record<string, string> }): string {
+/** 一个够格的产物目录：入口 + 图标 + 外壳图标 + 一份相对引用的资产 */
+function fixture(
+  options?: { html?: string; icons?: string[]; extraFiles?: Record<string, string>; windowsIcon?: boolean }
+): string {
   const dir = mkdtempSync(join(work, 'src-'))
   const html =
     options?.html ??
@@ -56,6 +60,7 @@ function fixture(options?: { html?: string; icons?: string[]; extraFiles?: Recor
     ].join('\n')
   writeFileSync(join(dir, 'index.html'), html, 'utf8')
   for (const icon of options?.icons ?? ['icon.svg']) writeFileSync(join(dir, icon), ICON_SVG, 'utf8')
+  if (options?.windowsIcon !== false) writeFileSync(join(dir, WINDOWS_ICON_NAME), WINDOWS_ICON)
   mkdirSync(join(dir, 'assets'))
   writeFileSync(join(dir, 'assets', 'main.js'), 'console.log(1)', 'utf8')
   writeFileSync(join(dir, 'assets', 'styles.css'), 'body{margin:0}', 'utf8')
@@ -158,7 +163,7 @@ describe('包清单只写应用自己的事实', () => {
     const two = layoutProblems({ fileNames: ['index.html', 'icon.svg', 'icon.png'], manifest: goodManifest })
     expect(two[0]).toBe('包里的图标有多张，只留一张：icon.svg, icon.png')
 
-    // 派生那份 icon.ico（PK-036）不算第二张图标：它是产物，外壳只认磁盘上的 .ico
+    // 随包备好的 icon.ico（PK-036）不算第二张图标：外壳只认磁盘上的 .ico
     expect(layoutProblems({ fileNames: ['index.html', 'icon.svg', 'icon.ico'], manifest: goodManifest })).toEqual([])
   })
 
@@ -276,44 +281,55 @@ describe('包里的东西只能在包内互相引用', () => {
   })
 })
 
-describe('包根那份派生的 Windows 外壳图标', () => {
-  it('PK-036 产包时把源图转成 icon.ico 放进包根；转不出来不放行包；安装器只取不转', () => {
-    // 两处常量必须是同一个名字：产包器写它、runtime 与安装器读它
+describe('包根那份随包备好的 Windows 外壳图标', () => {
+  it('PK-036 应用目录里的 icon.ico 原样进包根；产包不转格式，安装器只取不转', () => {
+    // 两处常量必须是同一个名字：产包侧搬它、runtime 与安装器读它
     expect(WINDOWS_ICON_NAME).toBe(CONTRACT_WINDOWS_ICON_NAME)
 
-    const out = outRoot()
-    const { file } = pack({ srcDir: fixture(), outRoot: out, manifestText: json() })
-    expect(archiveEntryNames(file), '包根要有派生的那份 ico').toContain(WINDOWS_ICON_NAME)
-    const ico = readArchiveEntry(file, WINDOWS_ICON_NAME)
-    expect(ico).not.toBeNull()
-    // ICO 头部前两档是保留字节 0、类型 1（单图图标）；Pillow 出的是 16~256 七档
-    expect([...ico!.subarray(0, 4)]).toEqual([0, 0, 1, 0])
-    expect(ico!.length, '多尺寸 ico 不该是个空壳').toBeGreaterThan(1000)
-
-    // 源图渲染不出来 → 产包失败，包根里不留一个"任务栏只能穿 runtime 图标"的包
-    const unrenderable = fixture()
-    writeFileSync(join(unrenderable, 'icon.svg'), '这不是 svg', 'utf8')
-    const out2 = outRoot()
-    expect(() => pack({ srcDir: unrenderable, outRoot: out2, manifestText: json() })).toThrow()
-    expect(readdirSync(out2), '转不出图标就一个包都不许留下').toEqual([])
-
-    // 图标只在一处生成：安装器（@airship/cli 的 lib/installer.mjs）取包内那一份，不再自己转第二遍
-    const installer = readFileSync(join(__dirname, '..', '..', '..', 'src', 'cli', 'lib', 'installer.mjs'), 'utf8')
-    expect(installer, '安装器要取包内那份 icon.ico').toContain(WINDOWS_ICON_NAME)
-    expect(installer, '转 ico 只许住在产包器一处').not.toContain('app-ico.py')
-    expect(readFileSync(join(__dirname, '..', '..', '..', 'code', 'make-app-installer.mjs'), 'utf8'), '仓库驱动也只是取').not.toContain('app-ico.py')
-  })
-
-  it('PK-039 仓库外产包：缺 icon.ico 响亮失败，自备了就进包根且不算第二张图标', () => {
     const src = fixture()
     const out = outRoot()
-    // 不传 makeWindowsIcon 就是外部作者那条路（@airship/cli 的默认）
+    const { file } = pack({ srcDir: src, outRoot: out, manifestText: json() })
+    expect(archiveEntryNames(file), '包根要有那份外壳图标').toContain(WINDOWS_ICON_NAME)
+    // 原样搬：包里的字节与应用目录里那份一字不差——产包期不存在任何转换
+    expect([...readArchiveEntry(file, WINDOWS_ICON_NAME)!]).toEqual([...readFileSync(join(src, WINDOWS_ICON_NAME))])
+
+    // 八个应用目录都备着这张多尺寸 ico：缺一份产包期就报错，用例先在这里把它喊出来
+    for (const id of REAL_APP_IDS) {
+      const p = join(appSourceDir(id), WINDOWS_ICON_NAME)
+      expect(existsSync(p), `src/apps/${id} 缺 ${WINDOWS_ICON_NAME}`).toBe(true)
+      const bytes = readFileSync(p)
+      // ICO 头部前两档是保留字节 0、类型 1（单图图标）
+      expect([...bytes.subarray(0, 4)], `${id} 的 icon.ico 头部该是单图图标`).toEqual([0, 0, 1, 0])
+      expect(bytes.length, `${id} 的多尺寸 ico 不该是个空壳`).toBeGreaterThan(1000)
+    }
+
+    // 全仓没有转图标这一步了：脚本、配方与依赖三样都随这条契约退场，安装器与仓库驱动只是取包内那一份
+    const REPO = join(__dirname, '..', '..', '..')
+    for (const gone of ['code/app-ico.py', 'code/make-ico.py', 'code/make-icons.py']) {
+      expect(existsSync(join(REPO, gone)), `${gone} 该随这条契约一起退场`).toBe(false)
+    }
+    expect(readFileSync(join(REPO, 'justfile'), 'utf8'), 'just 里不再有重出图标的配方').not.toMatch(/^icon:$/m)
+    expect(
+      JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8')).devDependencies,
+      '转 SVG 的那份依赖也不再要了'
+    ).not.toHaveProperty('@resvg/resvg-js')
+    const installer = readFileSync(join(REPO, 'src', 'cli', 'lib', 'installer.mjs'), 'utf8')
+    expect(installer, '安装器要取包内那份 icon.ico').toContain(WINDOWS_ICON_NAME)
+    expect(installer, '安装器不转图标').not.toContain('Resvg')
+    expect(readFileSync(join(REPO, 'code', 'make-app-installer.mjs'), 'utf8'), '仓库驱动也只是取').not.toContain(
+      'Resvg'
+    )
+  })
+
+  it('PK-039 自备的 icon.ico 缺了响亮失败，补上就进包根且不算第二张图标', () => {
+    const src = fixture({ windowsIcon: false })
+    const out = outRoot()
     expect(() => packPackage({ srcDir: src, outRoot: out, manifestText: json() })).toThrow(
       '包根没有 icon.ico：任务栏与快捷方式那颗外壳图标只认磁盘上的 .ico'
     )
     expect(readdirSync(out), '缺图标产包不留任何归档').toEqual([])
 
-    writeFileSync(join(src, WINDOWS_ICON_NAME), Buffer.from([0, 0, 1, 0]))
+    writeFileSync(join(src, WINDOWS_ICON_NAME), WINDOWS_ICON)
     const { file } = packPackage({ srcDir: src, outRoot: out, manifestText: json() })
     expect(archiveEntryNames(file)).toContain(WINDOWS_ICON_NAME)
     expect([...readArchiveEntry(file, WINDOWS_ICON_NAME)!.subarray(0, 4)]).toEqual([0, 0, 1, 0])

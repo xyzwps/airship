@@ -8,7 +8,7 @@ import { SHARED_NAMESPACES, pathEscape, type AppId, type SharedNamespace } from 
  *
  *   userData/
  *     logs/airship-YYYY-MM-DD.log
- *     icons/<id>.ico                 交给 Windows 外壳的任务栏图标（包内派生那份的落盘）
+ *     icons/<id>.ico                 交给 Windows 外壳的任务栏图标（包内那份 icon.ico 的落盘）
  *     shared/library/              runtime 级共享区：books 与 pdf 共用的书库
  *     apps/<appId>/settings.json   应用私有设置（含它自己的主题档）
  *     apps/<appId>/data/           应用私有数据
@@ -102,8 +102,8 @@ export function logDir(): string {
  * 外壳（任务栏按钮）用的那张图落在哪里：`<userData>/icons/<id>.ico`。
  *
  * 为什么要在磁盘上另放一份：Windows 外壳读图标只认文件系统路径，既不认 asar，
- * 也不认 `airship://`——包内那张派生的 `icon.ico`（PK-036）必须由 runtime 摊平了交出去。
- * 这份是**可再生的派生物**，不是应用数据：重装或重产包后按包内字节覆盖，删了也只是回落成 runtime 的样子。
+ * 也不认 `airship://`——包根那份 `icon.ico`（PK-036，随源图一起备好的那一份）必须由 runtime 摊平了交出去。
+ * 这份是**包内那份的落盘副本**，不是应用数据：重装或重产包后按包内字节覆盖，删了也只是回落成 runtime 的样子。
  */
 export function taskbarIconFile(id: AppId): string {
   const dir = join(paths().root, 'icons')

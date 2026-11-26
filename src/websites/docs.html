@@ -546,7 +546,6 @@ just check             <span class="c"># 类型 + 单测 + 册子差集</span></
               <tr><td><code>just build-runtime</code> / <code>just build</code></td><td>打 runtime 安装包 / 两条一起跑（产物互不包含）</td></tr>
               <tr><td><code>just verify-installer</code></td><td>已存在安装包时单独跑一次出包自检</td></tr>
               <tr><td><code>just e2e</code> / <code>just wsld-real</code></td><td>要真环境的那两档（本机 ffmpeg / 本机 wslc）</td></tr>
-              <tr><td><code>just icon</code></td><td>由母版重出 runtime 的 <code>icon.ico</code></td></tr>
             </tbody>
           </table>
           <p>
@@ -570,6 +569,7 @@ just app-installer hello   <span class="c"># 产 release/apps/hello-Setup-&lt;�
               <tr><td><code>index.html</code></td><td>入口文档，引 <code>./main.tsx</code>（相对路径）；<strong>里面不写 CSP</strong></td></tr>
               <tr><td><code>main.tsx</code></td><td>一行 <code>createAirshipApp({ meta, component, icon })</code></td></tr>
               <tr><td><code>icon.svg|png|jpg|jpeg|webp</code></td><td><strong>有且只有一张</strong>，不套底板，颜色烘进图里；缺或多在产包期炸</td></tr>
+              <tr><td><code>icon.ico</code></td><td>任务栏那颗外壳图标：一张<strong>多尺寸（16~256）</strong>的 ico，<strong>存成文件放在这里</strong>——产包只把它随源图搬进包根，全仓不转格式；缺了产包期响亮失败</td></tr>
               <tr><td><code>specs/&lt;名&gt;.md</code> + <code>tests/*.test.tsx</code></td><td>册子与用例跟着它们管的代码放在这个区里</td></tr>
             </tbody>
           </table>
@@ -730,7 +730,7 @@ just build                 <span class="c"># 两条一起跑</span></code></pre>
               <tr><td>暗色模式下书叶还是白底</td><td>EPUB 自带 CSS 会盖过渲染器那层，只能往每节文档注入带 <code>!important</code> 的纸面样式，换主题时对已渲染页重打、新页在 <code>load</code> 里补。</td></tr>
               <tr><td>封面画成破图</td><td>靠 <code>file:///</code> 拼地址会被应用窗口 CSP 拦掉；改成 <code>api.fs.read</code> 拿字节 → <code>blob:</code> URL。<code>airship://</code> 下 <code>blob:</code> 不被 <code>'self'</code> 覆盖，<code>style-src</code> 要写 <code>blob:</code>。</td></tr>
               <tr><td>Python 脚本打印 <code>✓</code> 或韩文报 <code>UnicodeEncodeError</code></td><td>控制台默认 GBK：脚本里用 ASCII 或中文（GBK 能编码）；乱码输出不代表文件坏了。PowerShell 5.1 读无 BOM 的 UTF-8 <code>.ps1</code> 按 GBK 解，所以 <code>.ps1</code> 要纯 ASCII。Git Bash 的 MSYS 路径转换会破坏 NSIS 的 <code>/S</code>，静默安装走 <code>cmd //c "set VAR=...&amp;&amp; prog.exe /S"</code>。</td></tr>
-              <tr><td>Pillow 不认 SVG，无头 Chrome 截内联 SVG 出空白</td><td>要 SVG→位图用 <code>@resvg/resvg-js</code>；应用安装器把包内 SVG 经 resvg 出 256 PNG，再转多尺寸 <code>.ico</code>。</td></tr>
+              <tr><td>图标格式转换</td><td><strong>仓里没有任何转图标的脚本</strong>（resvg、Pillow 那条路 2026-11-26 一起退场）。任务栏那颗 <code>.ico</code> 是存进仓库的文件：应用目录里一张多尺寸（16~256）的 <code>icon.ico</code>，产包只随源图搬进包根；改了源图要在外部工具里自己重出那张。</td></tr>
               <tr><td><code>just dev</code> 里看到 <code>undefinedp</code> 这类怪值</td><td>先怀疑热更新：React Fast Refresh 会保住已挂载组件的 <code>useRef</code>，改了 state 形状后旧进程里还是老形状。截图模式每次是新进程，所以只有直跑那边会看到——重启一次，别写防御性代码。</td></tr>
               <tr><td>界面上"设置像没存过"但画得好好的</td><td>截图模式用的是 <code>%APPDATA%/airship-shot-profile</code>，要喂真数据得灌进那份档案。</td></tr>
               <tr><td>托盘徽标只更新了提示文字</td><td>Windows 托盘图标是位图，主进程没有画字的能力；要画出带数字的图标，应用侧用 <code>renderTrayIcon()</code> 生成 <code>iconDataUrl</code> 一起传。</td></tr>

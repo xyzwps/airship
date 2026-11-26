@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, rmSync, existsSync } from 'node:fs'
+import { cpSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 /**
@@ -13,6 +13,8 @@ import { join, resolve } from 'node:path'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const TEMPLATE = join(ROOT, 'templates', 'app')
+/** 换占位只给文本文件做：icon.ico 那种二进制按 utf8 读再写会坏掉（与 create-airship-app 同一条判据） */
+const TEXT_FILE = /\.(json|md|ts|tsx|js|mjs|css|html|txt)$/
 
 const [id, displayName] = process.argv.slice(2)
 if (!id) {
@@ -48,6 +50,11 @@ function copyTree(from, to) {
     const dst = join(to, dstName)
     if (statSync(src).isDirectory()) {
       copyTree(src, dst)
+      continue
+    }
+    // icon.ico 那种二进制按 utf8 读再写会坏掉：占位替换只做文本，其余原样拷字节
+    if (!TEXT_FILE.test(entry)) {
+      cpSync(src, dst)
       continue
     }
     const text = readFileSync(src, 'utf8').replace(/CHANGE_ME/g, entry.endsWith('.md') ? id : id).replace(/显示名/g, name)
