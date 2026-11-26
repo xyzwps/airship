@@ -1,0 +1,150 @@
+/* 图标工坊的版心。配色一律用宿主给的变量（--fg / --bg-elev / --border / --danger …），这里不写死颜色。 */
+
+.airship-icon {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 700px;
+  overflow: auto;
+  padding: 4px 2px 20px;
+}
+
+.airship-icon h2 {
+  margin: 0;
+  font-size: 20px;
+  color: var(--fg);
+}
+
+.airship-icon .hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fg-dim);
+}
+
+.airship-icon .row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.airship-icon .src {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--fg-faint);
+  overflow-wrap: anywhere;
+}
+
+.airship-icon button {
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.airship-icon button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.airship-icon button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.airship-icon .svg-src {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--fg);
+  resize: vertical;
+}
+
+.airship-icon .note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-dim);
+  overflow-wrap: anywhere;
+}
+
+.airship-icon .error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+
+.airship-icon .error:empty {
+  display: none;
+}
+
+/* 预览那一排：图按真实像素摆，格子底色用边框托住透明 PNG 的边缘 */
+.airship-icon .preview {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-sidebar);
+}
+
+.airship-icon .preview-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.airship-icon .preview-cell img {
+  display: block;
+  image-rendering: pixelated;
+  border: 1px solid var(--border);
+}
+
+.airship-icon .preview-cell em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--fg-faint);
+}
+
+.airship-icon .preview-empty {
+  font-size: 12px;
+  color: var(--fg-faint);
+}
+
+.airship-icon .out {
+  margin-top: 4px;
+}
+
+.airship-icon .edge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+
+.airship-icon .edge input {
+  width: 78px;
+  font: inherit;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--fg);
+}
+
+.airship-icon .edge em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--fg-faint);
+}

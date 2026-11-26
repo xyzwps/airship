@@ -123,6 +123,7 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 | WL | wsld：容器日志（尾部行数、时间戳、实时） | `wsld-logs.md` | 同左 |
 | IM | wsld：镜像列表、拉取、删除与强制删除 | `wsld-images.md` | 同左 |
 | RB | wsld：run 命令编排（拼装、校验、读回、就地执行与历史） | `wsld-run.md` | 同左 |
+| IC | 图标工坊：SVG 进、`icon.png` 与 7 帧 `icon.ico` 出（取景、目录字段、画不动的措辞） | `airship-icon.md` | 自动化 + 截图走查（真画出来的像素） |
 
 移植时**先不开**的册子（原版有、这期不做）：`registry-mirror`、`pull-progress`、
 `settings`（wsld 自己的设置页）。它们为什么还没开、各要动哪一层，统一记在

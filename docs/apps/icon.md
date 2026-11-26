@@ -40,8 +40,9 @@ src/apps/<id>/main.tsx     createAirshipApp({ …, icon: './icon.png' })
 
 ## 仓内现状（2026-11-26）
 
-- 已合格：albedo、books、dagogo、life、s3、wsld。
-- 待补源图（还留着 svg）：pdf、vcp、`templates/app`、minimal 与 todo 模板（后两张在 `src/` 下）。这五处补图之前产不出包。
+- 已合格：九个应用（albedo、books、dagogo、life、pdf、s3、vcp、wsld 与新建的 airship-icon）都有 `icon.png` 与 `icon.ico`，`just pack` 九份包全出得来。
+- 待补源图：`templates/app`（还留着 svg）、minimal 与 todo 模板的 `src/`。这三处补图之前 scaffold 的两条用例红。
+- 新建的 airship-icon 那张 `icon.png` 是它自己 `icon.ico` 里 256 那一帧的原字节（帧内本来就是 PNG，只做了条目寻址与切片，没有转格式）。
 
 ## 更新日志
 
