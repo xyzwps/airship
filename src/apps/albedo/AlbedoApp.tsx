@@ -225,12 +225,12 @@ export default function AlbedoApp({ api }: { api: AppApi }): JSX.Element {
           <div className="size-row">
             <label className="size-field">
               <span data-i18n="modal.width">宽度</span>
-              <span className="size-input"><input id="canvasWidthInput" type="number" min="64" max="10000" step="1" inputMode="numeric" data-i18n-aria="modal.widthAria" aria-label="画布宽度" /><em>px</em></span>
+              <span className="size-input"><input id="canvasWidthInput" type="number" min="8" max="10000" step="1" inputMode="numeric" data-i18n-aria="modal.widthAria" aria-label="画布宽度" /><em>px</em></span>
             </label>
             <span className="size-times">×</span>
             <label className="size-field">
               <span data-i18n="modal.height">高度</span>
-              <span className="size-input"><input id="canvasHeightInput" type="number" min="64" max="10000" step="1" inputMode="numeric" data-i18n-aria="modal.heightAria" aria-label="画布高度" /><em>px</em></span>
+              <span className="size-input"><input id="canvasHeightInput" type="number" min="8" max="10000" step="1" inputMode="numeric" data-i18n-aria="modal.heightAria" aria-label="画布高度" /><em>px</em></span>
             </label>
             <span id="canvasRatioChip" className="ratio-chip">3 : 2</span>
           </div>

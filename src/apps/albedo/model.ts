@@ -164,7 +164,7 @@ export type Shape =
 export interface Doc {
   /** "none" 或 6 位 hex：画布视图背景，不进导出 */
   background: string
-  /** [64,10000]，整数 */
+  /** [8,10000]，整数 */
   width: number
   height: number
   shapes: Shape[]
@@ -361,8 +361,8 @@ export function normalizeDoc(raw: unknown, lang: Lang): Doc {
   const input = (raw ?? {}) as Record<string, unknown>
   const doc: Doc = {
     background: input.background === 'none' || isHexColor(input.background) ? input.background : '#fffdf8',
-    width: clamp(Math.round(num(input.width, 960)), 64, 10000),
-    height: clamp(Math.round(num(input.height, 640)), 64, 10000),
+    width: clamp(Math.round(num(input.width, 960)), 8, 10000),
+    height: clamp(Math.round(num(input.height, 640)), 8, 10000),
     shapes: []
   }
   const shapes = Array.isArray(input.shapes) ? input.shapes : []

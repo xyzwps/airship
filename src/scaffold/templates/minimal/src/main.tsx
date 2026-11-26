@@ -8,4 +8,4 @@ import App from './App.tsx'
  * `icon` 是包根那张源图的相对路径。应用侧除了这一行不需要知道 runtime 的存在——
  * 这就是"包自持"的意思。
  */
-createAirshipApp({ meta: app, component: App, icon: './icon.svg' })
+createAirshipApp({ meta: app, component: App, icon: './icon.png' })

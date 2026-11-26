@@ -15,5 +15,5 @@ npm run installer  # 产每用户安装器（要先有 NSIS：winget install nsi
 
 - 应用 id 就是这份 `package.json` 的 `name`——命令行不传 id，四个动词都认它。
 - `src/app.ts` 是清单——应用对外形状的全部；`capabilities` 是唯一授权面，用到哪个域就声明哪个。
-- `src/icon.svg` 是包根那张源图；`src/icon.ico` 是任务栏与快捷方式那颗外壳图标，**自备的**（缺了产包会响亮失败）。
+- `src/icon.png` 是包根那张源图（**只认 png**，svg / jpg / webp 那批 2026-11-26 起退场）；`src/icon.ico` 是任务栏与快捷方式那颗外壳图标，**自备的**（缺了产包会响亮失败）。
 - 窗口加载的文档、CSP 与标题栏都由 `@airship/sdk` 的宿主给，应用侧只有 `main.tsx` 那一行 `createAirshipApp`。

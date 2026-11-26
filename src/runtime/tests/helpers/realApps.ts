@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { manifestProblems } from '@airship/contract'
-import { ICON_PATTERN, entryOf, packageManifestProblems, DEFAULT_ENTRY } from '@airship/contract'
+import { ICON_PATTERN, RETIRED_ICON_PATTERN, entryOf, packageManifestProblems, DEFAULT_ENTRY } from '@airship/contract'
 import type { AppMeta } from '@airship/contract'
 
 /**
@@ -63,7 +63,13 @@ export function appSourceProblems(id: string): string[] {
     if (!names.includes(need)) out.push(`src/apps/${id} 缺 ${need}`)
   }
   const icons = names.filter((n) => ICON_PATTERN.test(n))
-  if (icons.length !== 1) out.push(`src/apps/${id} 的图标该有且只有一张，实际 ${icons.length} 张：${icons.join(', ')}`)
+  const stale = names.filter((n) => RETIRED_ICON_PATTERN.test(n))
+  if (icons.length !== 1) {
+    out.push(`src/apps/${id} 的源图该是 icon.png 那一张，实际 ${icons.length} 张：${icons.join(', ')}`)
+  }
+  if (stale.length > 0) {
+    out.push(`src/apps/${id} 根上留着已退场的源图格式：${stale.join(', ')}（源图只认 icon.png）`)
+  }
   return out
 }
 

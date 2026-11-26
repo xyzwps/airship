@@ -282,7 +282,8 @@ SDK 的流式上传与分块下载在后端进程的 HTTPS 模块上照跑，渲
 
 一个应用该有的文件：`package.json`、`app.ts`（纯数据清单）、`index.html`（入口文档，引 `./main.tsx`，
 **里面不写 CSP**）、`main.tsx`（一行 `createAirshipApp({ meta, component, icon })`）、
-`icon.svg|png|jpg|jpeg|webp`（**有且只有一张**，不套底板，颜色烘进图里）。缺哪件产包期炸哪件。
+`icon.png`（**只认这一张源图**，不套底板，颜色烘进图里；svg / jpg / jpeg / webp 于 2026-11-26 退场）。
+外加 `icon.ico`（任务栏那颗外壳图标，作者自备的多尺寸 16~256，产包只搬不转）。缺哪件产包期炸哪件，标准见 [docs/apps/icon.md](apps/icon.md)。
 
 清单只写"这个应用自己的事实"：`id / name / description / capabilities / platforms / tools /
 sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `iconPath`、`order` 这类表现或关系字段

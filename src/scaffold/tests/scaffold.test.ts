@@ -42,6 +42,8 @@ describe('create-airship-app', () => {
     expect(existsSync(join(srcDir, 'backend.ts')), '后端入口按约定平铺在 src/backend.ts').toBe(true)
     expect(existsSync(join(srcDir, 'backend')), '后端不再是目录').toBe(false)
     expect(statSync(join(srcDir, 'icon.ico')).size, '自备的外壳图标随模板在（PK-039）').toBeGreaterThan(1000)
+    expect(existsSync(join(srcDir, 'icon.png')), '源图随模板在（PK-004 只认 icon.png）').toBe(true)
+    expect(existsSync(join(srcDir, 'icon.svg')), '模板不留已退场的 svg 源图').toBe(false)
 
     // id 的真源：根 package.json 的 name 就是 id，版本也只有这一份
     const pkg = JSON.parse(readFileSync(join(work, 'my-todo', 'package.json'), 'utf8'))
@@ -66,6 +68,7 @@ describe('create-airship-app', () => {
     expect(appTs).toContain('capabilities: []')
     expect(existsSync(join(work, 'ping', 'src', 'backend.ts')), 'minimal 也带后端——计数就在它内存里').toBe(true)
     expect(existsSync(join(work, 'ping', 'src', 'backend.js')), '后端入口只有一份 ts 源').toBe(false)
+    expect(existsSync(join(work, 'ping', 'src', 'icon.png')), 'minimal 也带那张源图 icon.png').toBe(true)
     // 模板里那份叫 gitignore（npm pack 不收 .gitignore），落项目时必须改名就位
     const ignore = readFileSync(join(work, 'ping', '.gitignore'), 'utf8')
     const lines = new Set(ignore.split('\n').map((s) => s.trim().replace(/\/$/, '')))

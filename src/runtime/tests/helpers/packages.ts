@@ -29,7 +29,8 @@ const ENTRY_HTML = [
   ''
 ].join('\n')
 
-const ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>\n'
+/** 包根那张源图（PK-004 只认 icon.png）：注册判据不看字节，PNG 签名这段就够 */
+const ICON_PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 /**
  * 包根那份 Windows 外壳图标（PK-036）在用例里的样子。
@@ -71,7 +72,7 @@ export function installPackageAt(root: string, meta: AppMeta, opts?: { backend?:
   const entries: Record<string, string | Uint8Array> = {
     [MANIFEST_NAME]: `${JSON.stringify(manifestOf(meta), null, 2)}\n`,
     [DEFAULT_ENTRY]: ENTRY_HTML,
-    'icon.svg': ICON_SVG,
+    'icon.png': ICON_PNG,
     [WINDOWS_ICON_NAME]: WINDOWS_ICON_BYTES,
     'assets/index.js': 'export default 1\n'
   }
@@ -100,7 +101,7 @@ export function installRawPackage(root: string, fileName: string, manifestText: 
   return writeArchive(join(root, fileName), {
     [MANIFEST_NAME]: manifestText,
     [DEFAULT_ENTRY]: ENTRY_HTML,
-    'icon.svg': ICON_SVG
+    'icon.png': ICON_PNG
   })
 }
 

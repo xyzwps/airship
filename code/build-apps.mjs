@@ -17,14 +17,14 @@
  * 中间产物（构建输出与抹掉类型的清单）都写在系统临时目录，只有包本身进 dist-apps/。
  */
 
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { build, transformWithOxc } from 'vite'
-import { compileBackend } from '@airship/cli'
+import { compileBackend, copyIcons } from '@airship/cli'
 import { pack, SCHEMA_VERSION } from './pack-app.mjs'
-import { appIds, SRC_APPS } from './app-dirs.mjs'
+import { appIds, incompleteApps, incompleteAppsMessage, SRC_APPS } from './app-dirs.mjs'
 
 process.env.VITE_CONFIG_NATIVE_IGNORE_WARNING = 'true'
 
@@ -77,13 +77,9 @@ async function buildOne(dirId, work) {
   })
 
   // 图标是文件约定，不是 html 里的引用，vite 不会替我们搬——包根那张源图与应用目录里
-  // 存好的那份外壳图标 icon.ico 一起拷进产物目录（与外部作者那条路同源，见 @airship/cli 的 copyIcons）。
-  // 缺 icon.ico 由产包流水响亮失败，不放行"任务栏只能穿 runtime 图标"的包
-  for (const name of readdirSync(join(SRC_APPS, dirId))) {
-    if (/^icon\.(svg|png|jpe?g|webp)$/.test(name) || name === 'icon.ico') {
-      cpSync(join(SRC_APPS, dirId, name), join(built, name))
-    }
-  }
+  // 存好的那份外壳图标 icon.ico 一起拷进产物目录。与外部作者那条路同源（就是 @airship/cli 那一份），
+  // 缺 icon.ico 或还留着已退场的源图格式，都由它响亮失败
+  copyIcons(join(SRC_APPS, dirId), built)
 
   // 后端按约定走：应用目录里有 backend.ts 就由流水（@airship/cli 那份，外部作者同路）
   // 编成包根那份 backend.js；没有就什么都不做。改这个文件要重跑 just build-apps 才进包
@@ -103,7 +99,12 @@ async function buildOne(dirId, work) {
 async function main() {
   const wanted = process.argv.slice(2).filter((a) => !a.startsWith('-'))
   const dirs = appIds()
-  if (dirs.length === 0) throw new Error(`src/apps 下一个完整的应用都没有（要 app.ts + index.html + main.tsx + 一张 icon.*）`)
+  if (dirs.length === 0) throw new Error('src/apps 下一个完整的应用都没有（要 app.ts + index.html + main.tsx + 那张 icon.png）')
+  // 出全量名单时先问"有没有目录只差那张源图"：它们不在 dirs 里，不喊一声就是"八个应用变成六个"没人察觉
+  if (wanted.length === 0) {
+    const stalled = incompleteApps()
+    if (stalled.length > 0) throw new Error(incompleteAppsMessage(stalled))
+  }
   const picked = wanted.length > 0 ? dirs.filter((d) => wanted.includes(d)) : dirs
   const missing = wanted.filter((w) => !dirs.includes(w))
   if (missing.length > 0) throw new Error(`这些应用不存在或不完整：${missing.join(', ')}（在 src/apps 里有的：${dirs.join(', ')}）`)

@@ -23,8 +23,17 @@ export const SCHEMA_VERSION = 1
 /** 入口文档的默认名字（清单不写 entry 就是它） */
 export const DEFAULT_ENTRY = 'index.html'
 
-/** 图标仍是文件约定，不进清单 */
-export const ICON_PATTERN = /^icon\.(svg|png|jpe?g|webp)$/
+/** 图标仍是文件约定，不进清单；源图只认 png 一张 */
+export const ICON_NAME = 'icon.png'
+export const ICON_PATTERN = /^icon\.png$/
+
+/**
+ * 已退场的源图格式（2026-11-26 起不再支持）。
+ *
+ * 包根或应用目录根出现它们要喊出来，不许静默当没看见——否则"只支持 png"这件事
+ * 只在缺图时念一句，作者看着自己那张 svg 在包里躺着，以为还能用。
+ */
+export const RETIRED_ICON_PATTERN = /^icon\.(?:svg|jpe?g|jpeg|webp|gif|bmp)$/
 
 /**
  * 包根那份 Windows 外壳图标（PK-036）。
@@ -161,7 +170,7 @@ export function packageManifestProblems(manifest: unknown, at = ''): string[] {
   for (const key of REJECTED_KEYS) {
     if (key in m) {
       out.push(
-        `${p}包清单里不写 ${key}：图标是包根那一张文件（icon.svg / png / jpg / jpeg / webp），` +
+        `${p}包清单里不写 ${key}：图标是包根那一张文件（源图 ${ICON_NAME}，外壳图标 icon.ico），` +
           `显示顺序由 runtime 按名字典序定，两者都不是应用自己能决定的`
       )
     }
@@ -175,14 +184,26 @@ export function packageManifestProblems(manifest: unknown, at = ''): string[] {
 }
 
 /**
- * 包根那层唯一的图标（PK-004）。只看根：条目名里没有斜杠的才算
- * （assets/icon.svg 那种是应用自己的素材）。缺与多都返回那句人读的原因。
+ * 包根那层唯一的源图（PK-004）。只看根：条目名里没有斜杠的才算
+ * （assets/icon.png 那种是应用自己的素材）。缺与格式不对各念一句人读的原因。
+ *
+ * "有多张"那条判据随格式收窄一起退场：源图的名字钉死成 `icon.png`，
+ * 同一个目录里不可能出现第二份同名文件，从前那种 svg 与 png 并排的局面已经不存在。
  */
 export function rootIconName(entryNames: readonly string[]): { name?: string; error?: string } {
-  const icons = entryNames.filter((n) => !n.includes('/') && ICON_PATTERN.test(n))
-  if (icons.length === 0) return { error: '包里缺图标 icon.svg（也接受 png / jpg / jpeg / webp），一张都要有' }
-  if (icons.length > 1) return { error: `包里的图标有多张，只留一张：${icons.join(', ')}` }
-  return { name: icons[0]! }
+  const root = entryNames.filter((n) => !n.includes('/'))
+  const stale = root.filter((n) => RETIRED_ICON_PATTERN.test(n))
+  if (stale.length > 0) {
+    return {
+      error:
+        `包里的源图格式 runtime 不认：${stale.join(', ')}——源图只认 ${ICON_NAME}` +
+        `（${WINDOWS_ICON_NAME} 是外壳图标，不算源图）`
+    }
+  }
+  if (!root.some((n) => ICON_PATTERN.test(n))) {
+    return { error: `包里缺图标 ${ICON_NAME}：包根的源图只认那一张 png` }
+  }
+  return { name: ICON_NAME }
 }
 
 /**

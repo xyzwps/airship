@@ -568,7 +568,7 @@ just app-installer hello   <span class="c"># 产 release/apps/hello-Setup-&lt;�
               <tr><td><code>app.ts</code></td><td>纯数据清单，导出 <code>app: AppMeta</code>；主进程也要读它，所以不带任何组件引用</td></tr>
               <tr><td><code>index.html</code></td><td>入口文档，引 <code>./main.tsx</code>（相对路径）；<strong>里面不写 CSP</strong></td></tr>
               <tr><td><code>main.tsx</code></td><td>一行 <code>createAirshipApp({ meta, component, icon })</code></td></tr>
-              <tr><td><code>icon.svg|png|jpg|jpeg|webp</code></td><td><strong>有且只有一张</strong>，不套底板，颜色烘进图里；缺或多在产包期炸</td></tr>
+              <tr><td><code>icon.png</code></td><td><strong>只认这一张源图</strong>，不套底板，颜色烘进图里；缺了产包期炸。svg / jpg / jpeg / webp 那批格式 2026-11-26 起退场——不是忽略，是点名拒绝（PK-004 / AP-002）</td></tr>
               <tr><td><code>icon.ico</code></td><td>任务栏那颗外壳图标：一张<strong>多尺寸（16~256）</strong>的 ico，<strong>存成文件放在这里</strong>——产包只把它随源图搬进包根，全仓不转格式；缺了产包期响亮失败</td></tr>
               <tr><td><code>specs/&lt;名&gt;.md</code> + <code>tests/*.test.tsx</code></td><td>册子与用例跟着它们管的代码放在这个区里</td></tr>
             </tbody>

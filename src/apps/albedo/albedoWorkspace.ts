@@ -1989,8 +1989,8 @@ export class AlbedoWorkspace {
     }
     const w = Math.round(wNum)
     const h = Math.round(hNum)
-    if (w < 64 || w > 10000 || h < 64 || h > 10000) {
-      this.el('canvasSizeError').textContent = this.t('modal.range', { min: 64, max: 10000 })
+    if (w < 8 || w > 10000 || h < 8 || h > 10000) {
+      this.el('canvasSizeError').textContent = this.t('modal.range', { min: 8, max: 10000 })
       return
     }
     if (w === st.doc.width && h === st.doc.height) {
@@ -3655,11 +3655,11 @@ export class AlbedoWorkspace {
     const h = source.height
     if (!Number.isFinite(w as number) || !Number.isFinite(h as number) || (w as number) <= 0 || (h as number) <= 0) return
     if (replacesAll) {
-      st.doc.width = clamp(Math.round(w as number), 64, 10000)
-      st.doc.height = clamp(Math.round(h as number), 64, 10000)
+      st.doc.width = clamp(Math.round(w as number), 8, 10000)
+      st.doc.height = clamp(Math.round(h as number), 8, 10000)
     } else {
-      st.doc.width = clamp(Math.max(st.doc.width, Math.round(w as number)), 64, 10000)
-      st.doc.height = clamp(Math.max(st.doc.height, Math.round(h as number)), 64, 10000)
+      st.doc.width = clamp(Math.max(st.doc.width, Math.round(w as number)), 8, 10000)
+      st.doc.height = clamp(Math.max(st.doc.height, Math.round(h as number)), 8, 10000)
     }
   }
 

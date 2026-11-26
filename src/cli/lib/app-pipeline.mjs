@@ -15,11 +15,9 @@ import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, relative, resolve, sep } from 'node:path'
 import { build, createServer } from 'vite'
-import { PACKAGE_BACKEND_ENTRY, WINDOWS_ICON_NAME } from '@airship/contract'
+import { ICON_NAME, ICON_PATTERN, PACKAGE_BACKEND_ENTRY, RETIRED_ICON_PATTERN, WINDOWS_ICON_NAME } from '@airship/contract'
 import { packPackage } from './pack.mjs'
 import { findAppManifestFile, readAppManifest } from './manifest.mjs'
-
-const ICON_SOURCE_PATTERN = /^icon\.(svg|png|jpe?g|webp)$/
 
 /**
  * 找应用目录：单应用项目的两种摆法——`<项目>/src`（手脚架默认）与项目根直接放应用文件。
@@ -60,10 +58,24 @@ async function buildApp(appDir, outDir) {
   })
 }
 
-/** 图标是文件约定，vite 不搬：源图与自备的 icon.ico 都拷进产物目录 */
-function copyIcons(appDir, outDir) {
-  for (const name of readdirSync(appDir)) {
-    if (ICON_SOURCE_PATTERN.test(name) || name === WINDOWS_ICON_NAME) {
+/**
+ * 图标是文件约定，vite 不搬：包根那张源图与自备的 icon.ico 都拷进产物目录。
+ *
+ * 源图只认 `icon.png`（2026-11-26 起 svg / jpg / jpeg / webp 退场）。应用目录根还躺着
+ * 那些格式的，这里就响亮失败——全仓不转图标格式，重出 png 是作者那一步，
+ * 不放行"产物里没有源图、要到产包最后一步才知道"的局面。
+ */
+export function copyIcons(appDir, outDir) {
+  const names = readdirSync(appDir)
+  const stale = names.filter((n) => RETIRED_ICON_PATTERN.test(n))
+  if (stale.length > 0) {
+    throw new Error(
+      `源图只认 ${ICON_NAME}：${appDir} 根上那张 ${stale.join('、')} 是已退场的格式——` +
+        `在外部工具里重出一份 ${ICON_NAME}（产包与安装期都不转格式），并把旧的那张从目录根删掉`
+    )
+  }
+  for (const name of names) {
+    if (ICON_PATTERN.test(name) || name === WINDOWS_ICON_NAME) {
       cpSync(join(appDir, name), join(outDir, name))
     }
   }

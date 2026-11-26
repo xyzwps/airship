@@ -1173,11 +1173,11 @@ describe('双语与画布尺寸', () => {
       el(m, 'canvasApplyBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
     expect(el(m, 'canvasSizeError').textContent).toBe('请输入画布的宽度和高度。')
-    await m.type('画布宽度', '32')
+    await m.type('画布宽度', '4')
     await act(async () => {
       el(m, 'canvasApplyBtn').dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    expect(el(m, 'canvasSizeError').textContent).toBe('尺寸需在 64 – 10000 px 之间。')
+    expect(el(m, 'canvasSizeError').textContent).toBe('尺寸需在 8 – 10000 px 之间。')
     m.unmount()
   })
 

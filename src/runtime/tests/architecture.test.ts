@@ -149,9 +149,11 @@ describe('应用注册', () => {
       expect(html, `${dir}/index.html 的入口脚本必须是相对路径（dev 与包里指的不是同一层）`).toContain(
         'src="./main.tsx"'
       )
-      // 图标是文件约定：apps/<id>/icon.svg|png|jpg|jpeg|webp，而且只能有一张
-      const icons = readdirSync(join(APPS_DIR, dir)).filter((n) => /^icon\.(svg|png|jpe?g|webp)$/.test(n))
-      expect(icons.length, `${dir}/ 必须有且只有一张 icon.* 文件`).toBe(1)
+      // 图标是文件约定：源图就是 apps/<id>/icon.png 那一张（svg / jpg / webp 已于 2026-11-26 退场）
+      // 外加作者自备的那张外壳图标 icon.ico（PK-036），它不算源图
+      expect(existsSync(join(APPS_DIR, dir, 'icon.png')), `${dir}/icon.png 必须是那张源图`).toBe(true)
+      const stale = readdirSync(join(APPS_DIR, dir)).filter((n) => /^icon\.(svg|jpe?g|jpeg|webp|gif|bmp)$/.test(n))
+      expect(stale, `${dir}/ 根上不许留已退场的源图格式：${stale.join(', ')}`).toEqual([])
       const meta = readFileSync(join(APPS_DIR, dir, 'app.ts'), 'utf8')
       expect(meta, `${dir}/app.ts 的 id 必须等于目录名`).toContain(`id: '${dir}'`)
     }

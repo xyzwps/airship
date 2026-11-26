@@ -12,7 +12,7 @@ import { createAirshipApp } from '@airship/sdk'
 import { app } from './app.ts'
 import App from './App.tsx'
 
-createAirshipApp({ meta: app, component: App, icon: './icon.svg' })
+createAirshipApp({ meta: app, component: App, icon: './icon.png' })
 ```
 
 组件里拿到的 `api` 就是 runtime 的全部通道：用了 `api.settings.` / `api.proc.` 这类域，就回清单把对应能力声明上——没声明的一律拒绝，且拒绝时收到的是句人话。

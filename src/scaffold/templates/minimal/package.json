@@ -11,9 +11,9 @@
     "installer": "airship installer"
   },
   "dependencies": {
-    "@airship/cli": "^0.4.5",
-    "@airship/contract": "^0.4.5",
-    "@airship/sdk": "^0.4.5",
+    "@airship/cli": "^0.4.6",
+    "@airship/contract": "^0.4.6",
+    "@airship/sdk": "^0.4.6",
     "@vitejs/plugin-react": "^6.2.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

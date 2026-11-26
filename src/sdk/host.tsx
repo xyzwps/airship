@@ -27,14 +27,14 @@ export interface AirshipAppOptions {
   meta: AppMeta
   /** 应用组件：`({ api }) => …` */
   component: ComponentType<{ api: AppApi }>
-  /** 包根那张图标的相对路径，例如 `'./icon.svg'`；标题栏用它画那枚 15px 记号 */
+  /** 包根那张源图的相对路径，只认 `'./icon.png'`；标题栏用它画那枚 15px 记号 */
   icon?: string
 }
 
 /**
  * 把一个应用装进它自己的文档。应用侧的 `main.tsx` 只写这一行：
  *
- *   createAirshipApp({ meta: app, component: LifeApp, icon: './icon.svg' })
+ *   createAirshipApp({ meta: app, component: LifeApp, icon: './icon.png' })
  */
 export function createAirshipApp(options: AirshipAppOptions): void {
   const container = document.getElementById('root')

@@ -20,7 +20,7 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { appIds, SRC_APPS } from './app-dirs.mjs'
+import { appIds, incompleteApps, incompleteAppsMessage, SRC_APPS } from './app-dirs.mjs'
 import { APP_ID_PATTERN, PACKAGE_SUFFIX } from '@airship/contract'
 import { buildInstaller, installerScript, nsisText } from '@airship/cli/installer'
 
@@ -78,6 +78,11 @@ async function cli() {
   }
   const ids = wanted.length === 1 ? wanted : appIds()
   if (ids.length === 0) throw new Error('src/apps 下一个完整的应用都没有（名单判据见 code/app-dirs.mjs）')
+  // 全量名单时先问"有没有目录只差那张源图"：不在名单里就是这枚安装器凭空少一个应用
+  if (wanted.length === 0) {
+    const stalled = incompleteApps()
+    if (stalled.length > 0) throw new Error(incompleteAppsMessage(stalled))
+  }
   if (ids.length > 1) console.log(`产 ${ids.length} 枚应用安装器 → release/apps`)
   for (const id of ids) installerFor(id)
 }

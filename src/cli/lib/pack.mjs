@@ -16,6 +16,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { strToU8, zipSync } from 'fflate'
 import {
+  ICON_NAME,
   MANIFEST_NAME,
   PACKAGE_SUFFIX,
   WINDOWS_ICON_NAME,
@@ -109,7 +110,7 @@ export function packPackage({ srcDir, outRoot, manifestText, manifest: manifestI
     throw new Error(
       `包根没有 ${WINDOWS_ICON_NAME}：任务栏与快捷方式那颗外壳图标只认磁盘上的 .ico。` +
         `请把一张多尺寸（16~256）的 icon.ico 放进产物目录再产包——` +
-        `它不算第二张图标，包根那张源图（icon.svg / png / jpg / jpeg / webp）仍要在`
+        `它不算第二张图标，包根那张源图（${ICON_NAME}）仍要在`
     )
   }
 

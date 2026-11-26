@@ -1,6 +1,7 @@
 import type { AppMeta } from './app.ts'
 import { APP_ID_PATTERN } from './app.ts'
 import { badAppId, unknownTool } from './errors.ts'
+import { ICON_NAME, RETIRED_ICON_PATTERN } from './packageRules.ts'
 import { PLATFORM_IDS, TOOL_NAMES } from './protocol.ts'
 
 /**
@@ -42,18 +43,20 @@ export function manifestProblems(
 }
 
 /**
- * 图标是文件约定：一张，也不能没有。
+ * 图标是文件约定：源图就那一张 `icon.png`，也不能没有。
  *
  * 组件入口那一条判据原来也在这里（"缺 index.tsx"），随着构建期 glob 一起退场了：
  * 现在入口文档是包的一部分，缺不缺由产包器与运行期注册各自喊一次
  * （`code/pack-app.mjs` 的 `layoutProblems`、`services/packageRegistry.ts`）。
+ * "有多张"那一条随格式收窄（2026-11-26 起只认 png）一起退场：名字钉死就不存在第二张。
  */
 export function iconProblems(id: string, iconKeys: readonly string[]): string[] {
   if (iconKeys.length === 0) {
-    return [`${id}: 缺图标 apps/${id}/icon.svg（也接受 png / jpg / jpeg / webp）`]
+    return [`${id}: 缺图标 apps/${id}/${ICON_NAME}（源图只认 png，svg / jpg / jpeg / webp 已退场）`]
   }
-  if (iconKeys.length > 1) {
-    return [`${id}: 图标有多张，只留一张：${iconKeys.join(', ')}`]
+  const stale = iconKeys.filter((k) => RETIRED_ICON_PATTERN.test(k.split('/').pop()!))
+  if (stale.length > 0) {
+    return [`${id}: 源图格式 runtime 不认：${stale.join(', ')}——只留一张 apps/${id}/${ICON_NAME}`]
   }
   return []
 }

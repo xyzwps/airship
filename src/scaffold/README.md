@@ -20,7 +20,7 @@ my-todo/
     app.css     版心：配色只用宿主给的 CSS 变量
     index.html  入口文档
     main.tsx    一行 createAirshipApp({ meta, component, icon })
-    icon.svg    包根源图
+    icon.png    包根那张源图（只认 png）
     icon.ico    外壳图标（发版前换成你自己的多尺寸 .ico）
     backend.ts  仅 todo 模板：随包自带的后端程序（约定：有这文件就有后台，产包编成包根 backend.js）
 ```

@@ -78,11 +78,11 @@ describe('注册失败的包逐条拒', () => {
     const dir = mkdtempSync(join(tmpdir(), 'airship-badpkg-'))
     const broken = writeArchive(join(dir, `broken${PACKAGE_SUFFIX}`), {
       [MANIFEST_NAME]: '{ 残缺',
-      'icon.svg': '<svg/>'
+      'icon.png': '\u0089PNG\r\n\u001a\n'
     })
     const noentry = writeArchive(join(dir, `noentry${PACKAGE_SUFFIX}`), {
       [MANIFEST_NAME]: JSON.stringify({ ...manifestOf(minimalMeta('noentry')), entry: 'page.html' }),
-      'icon.svg': '<svg/>'
+      'icon.png': '\u0089PNG\r\n\u001a\n'
     })
 
     for (const archive of [broken, noentry]) {

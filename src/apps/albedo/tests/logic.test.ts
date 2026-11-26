@@ -33,12 +33,12 @@ describe('模型净化', () => {
     expect('name' in normalizeDoc({ name: '旧名字' }, 'zh')).toBe(false)
   })
 
-  it('尺寸钳在 64..10000，坏形状整条丢弃', () => {
+  it('尺寸钳在 8..10000，坏形状整条丢弃', () => {
     const doc = normalizeDoc(
-      { width: 20, height: 99999, shapes: [{ type: 'nope' }, { type: 'rect', w: -5 }] },
+      { width: 4, height: 99999, shapes: [{ type: 'nope' }, { type: 'rect', w: -5 }] },
       'en'
     )
-    expect([doc.width, doc.height]).toEqual([64, 10000])
+    expect([doc.width, doc.height]).toEqual([8, 10000])
     expect(doc.shapes).toHaveLength(1)
     expect(doc.shapes[0]!.type).toBe('rect')
   })

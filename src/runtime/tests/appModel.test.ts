@@ -63,20 +63,22 @@ describe('缺一件就在注册期说清', () => {
     }
   })
 
-  it('AP-002 图标有且只能有一张', () => {
-    expect(iconProblems('foo', [])[0]).toContain('缺图标')
-    const two = iconProblems('foo', ['./foo/icon.svg', './foo/icon.png'])
-    expect(two[0]).toContain('只留一张')
-    expect(two[0]).toContain('icon.svg')
-    expect(two[0]).toContain('icon.png')
-    expect(iconProblems('foo', ['./foo/icon.svg'])).toEqual([])
+  it('AP-002 源图只认 icon.png，留着退场格式点名拒绝', () => {
+    expect(iconProblems('foo', [])[0]).toContain('缺图标 apps/foo/icon.png')
 
-    // 真包根里每张图标都在，而且只有一张（只看归档根那一层，assets/ 里的不算）
+    // svg / jpg / jpeg / webp 于 2026-11-26 退场：不是"缺"，是点名拒
+    const stale = iconProblems('foo', ['./foo/icon.svg'])
+    expect(stale[0]).toContain('源图格式 runtime 不认：./foo/icon.svg')
+    expect(stale[0]).toContain('只留一张 apps/foo/icon.png')
+    // 名字钉死 icon.png 之后，同一层不可能有第二张——"多张"那条判据随格式收窄一起退场
+    expect(iconProblems('foo', ['./foo/icon.png'])).toEqual([])
+
+    // 真包根那一层只有源图 icon.png 与外壳那张 icon.ico（assets/ 里的不算）
     for (const name of packageArchivesIn(root)) {
-      const icons = archiveEntryNames(join(root, name)).filter(
-        (n) => !n.includes('/') && /^icon\.(svg|png|jpe?g|webp)$/.test(n)
-      )
-      expect(icons.length, `${name} 的图标应当有且只有一张`).toBe(1)
+      const icons = archiveEntryNames(join(root, name))
+        .filter((n) => !n.includes('/') && n.startsWith('icon.'))
+        .sort()
+      expect(icons, `${name} 包根的图标`).toEqual(['icon.ico', 'icon.png'])
     }
   })
 

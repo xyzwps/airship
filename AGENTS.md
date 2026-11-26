@@ -80,8 +80,8 @@ runtime 给应用窗口的 DOM 只有 SDK 那一份——`src/runtime` 里没有
 
 一个应用该有的文件：`package.json`、`app.ts`（纯数据清单）、`index.html`（入口文档，
 引 `./main.tsx`，**里面不写 CSP**）、`main.tsx`（一行 `createAirshipApp({ meta, component, icon })`）、
-`icon.svg|png|jpg|jpeg|webp`（**有且只有一张**，不套底板，颜色烘进图里）、
-`icon.ico`（任务栏那颗外壳图标，多尺寸 16~256，**存成文件**）；缺哪件产包期炸哪件。
+`icon.png`（**只认这一张源图**，不套底板，颜色烘进图里；svg / jpg / jpeg / webp 于 2026-11-26 退场，留着会点名拒绝）、
+`icon.ico`（任务栏那颗外壳图标，多尺寸 16~256，**存成文件**）；缺哪件产包期炸哪件。图标标准见 [docs/apps/icon.md](docs/apps/icon.md)。
 **产包与安装期都不转图标格式**——`.ico` 就是应用目录里存的那份，改了源图要自己重出，产包只把它随源图搬进包根。
 **runtime 侧任何文件都不用改**——runtime 运行期注册命令行指来的包（`airship.exe <id>.airship`），
 不扫磁盘、没有"包根"那回事。这条有用例守着（AP-010：runtime 产品代码里不许出现具体应用 id 的字面量）。

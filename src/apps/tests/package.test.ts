@@ -14,7 +14,7 @@ import {
   referenceProblems
 } from '../../../code/pack-app.mjs'
 import { packPackage } from '@airship/cli/pack'
-import { compileBackend } from '@airship/cli'
+import { compileBackend, copyIcons } from '@airship/cli'
 import { WINDOWS_ICON_NAME as CONTRACT_WINDOWS_ICON_NAME, PACKAGE_BACKEND_ENTRY } from '@airship/contract'
 import { badAppId } from '@airship/contract'
 import { APP_ID_PATTERN as CONTRACT_APP_ID_PATTERN } from '@airship/contract'
@@ -39,8 +39,8 @@ import { writeArchive } from '../../runtime/tests/helpers/packages'
 
 let work = ''
 
-/** 包根那张源图在用例里的样子（产包期不转格式，它只是随包带着的一张图） */
-const ICON_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"></svg>'
+/** 包根那张源图在用例里的样子：产包期只认这个名字、不看字节，所以喂一段 PNG 签名就够 */
+const ICON_PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 /** 应用作者自备的那份外壳图标：ICO 头是保留字节 0、类型 1（单图图标），用例只需要形状合格 */
 const WINDOWS_ICON = Buffer.from([0, 0, 1, 0, 1, 0, 0, 0])
 
@@ -59,7 +59,7 @@ function fixture(
       '</html>'
     ].join('\n')
   writeFileSync(join(dir, 'index.html'), html, 'utf8')
-  for (const icon of options?.icons ?? ['icon.svg']) writeFileSync(join(dir, icon), ICON_SVG, 'utf8')
+  for (const icon of options?.icons ?? ['icon.png']) writeFileSync(join(dir, icon), ICON_PNG)
   if (options?.windowsIcon !== false) writeFileSync(join(dir, WINDOWS_ICON_NAME), WINDOWS_ICON)
   mkdirSync(join(dir, 'assets'))
   writeFileSync(join(dir, 'assets', 'main.js'), 'console.log(1)', 'utf8')
@@ -153,18 +153,22 @@ describe('包是一个自带清单的归档，名字由 id 定', () => {
 })
 
 describe('包清单只写应用自己的事实', () => {
-  it('PK-004 图标是文件不是字段：字段被拒，缺一张或多一张也被拒', () => {
-    expect(manifestProblems({ ...goodManifest, iconPath: 'icon.svg' })[0]).toContain('图标是包根那一张文件')
+  it('PK-004 图标是文件不是字段：字段被拒，缺源图或留着退场格式也被拒', () => {
+    expect(manifestProblems({ ...goodManifest, iconPath: 'icon.png' })[0]).toContain('图标是包根那一张文件')
     expect(manifestProblems({ ...goodManifest, order: 3 })[0]).toContain('顺序由 runtime 按名字典序定')
 
     const none = layoutProblems({ fileNames: ['index.html'], manifest: goodManifest })
-    expect(none[0]).toContain('缺图标 icon.svg')
+    expect(none[0]).toBe('包里缺图标 icon.png：包根的源图只认那一张 png')
 
-    const two = layoutProblems({ fileNames: ['index.html', 'icon.svg', 'icon.png'], manifest: goodManifest })
-    expect(two[0]).toBe('包里的图标有多张，只留一张：icon.svg, icon.png')
+    // 源图名字钉死 icon.png，"多张"不再可能；退场格式（svg 那一批）点名拒绝
+    const stale = layoutProblems({ fileNames: ['index.html', 'icon.png', 'icon.svg'], manifest: goodManifest })
+    expect(stale[0]).toBe('包里的源图格式 runtime 不认：icon.svg——源图只认 icon.png（icon.ico 是外壳图标，不算源图）')
+    expect(layoutProblems({ fileNames: ['index.html', 'icon.webp'], manifest: goodManifest })[0]).toContain(
+      '源图格式 runtime 不认：icon.webp'
+    )
 
-    // 随包备好的 icon.ico（PK-036）不算第二张图标：外壳只认磁盘上的 .ico
-    expect(layoutProblems({ fileNames: ['index.html', 'icon.svg', 'icon.ico'], manifest: goodManifest })).toEqual([])
+    // 随包备好的 icon.ico（PK-036）不算源图：与 icon.png 同放包根是正常形状
+    expect(layoutProblems({ fileNames: ['index.html', 'icon.png', 'icon.ico'], manifest: goodManifest })).toEqual([])
   })
 
   it('PK-005 runtime 不认的键、不像话的值，都点名到字段与收到的东西', () => {
@@ -178,6 +182,25 @@ describe('包清单只写应用自己的事实', () => {
     expect(manifestProblems({ ...goodManifest, defaultWidth: 'wide' })).toContain(
       '包清单 defaultWidth 必须是正整数像素值，收到 "wide"'
     )
+  })
+})
+
+describe('应用目录根那张源图只认 png', () => {
+  it('AP-002 留着已退场的源图格式，搬图这一步就点名拒绝，一个字节都不往产物里写', () => {
+    const appDir = mkdtempSync(join(work, 'appdir-'))
+    writeFileSync(join(appDir, 'icon.svg'), '<svg/>', 'utf8')
+    writeFileSync(join(appDir, WINDOWS_ICON_NAME), WINDOWS_ICON)
+    const built = mkdtempSync(join(work, 'built-'))
+
+    expect(() => copyIcons(appDir, built)).toThrow(/源图只认 icon\.png.*icon\.svg/)
+    expect(readdirSync(built), '拒绝时不留半张图').toEqual([])
+
+    // 换成 icon.png 就搬得动：源图与自备的那张外壳图标一起进产物目录
+    const fixed = mkdtempSync(join(work, 'appdir-'))
+    writeFileSync(join(fixed, 'icon.png'), ICON_PNG)
+    writeFileSync(join(fixed, WINDOWS_ICON_NAME), WINDOWS_ICON)
+    copyIcons(fixed, built)
+    expect(readdirSync(built).sort()).toEqual(['icon.ico', 'icon.png'])
   })
 })
 
@@ -243,7 +266,7 @@ describe('包里的东西只能在包内互相引用', () => {
     expect(statSync(file).isFile(), '包是 <id>.airship 一个文件').toBe(true)
     const entries = archiveEntryNames(file)
     expect(entries).toContain(MANIFEST_NAME)
-    expect(entries, '产物与图标都要在归档里').toEqual(expect.arrayContaining(['index.html', 'icon.svg', 'assets/main.js']))
+    expect(entries, '产物与图标都要在归档里').toEqual(expect.arrayContaining(['index.html', 'icon.png', 'assets/main.js']))
     expect(readArchiveText(file, 'assets/main.js')).toContain('console.log')
     expect(JSON.parse(readArchiveText(file, MANIFEST_NAME) ?? '{}').id).toBe('demo')
   })
@@ -255,12 +278,12 @@ describe('包里的东西只能在包内互相引用', () => {
 
     const broken = writeArchive(join(dir, 'demo.airship'), {
       [MANIFEST_NAME]: '{ 残缺',
-      'icon.svg': '<svg/>'
+      'icon.png': '\u0089PNG\r\n\u001a\n'
     })
     const brokenBytes = readFileSync(broken)
     const missingEntry = writeArchive(join(dir, 'noentry.airship'), {
       [MANIFEST_NAME]: json({ id: 'noentry', entry: 'page.html' }),
-      'icon.svg': '<svg/>'
+      'icon.png': '\u0089PNG\r\n\u001a\n'
     })
     const missingBytes = readFileSync(missingEntry)
 

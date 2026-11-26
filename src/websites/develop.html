@@ -100,7 +100,7 @@
     backend.ts          随包后台的入口：这份文件在，包根就有 backend.js（约定）
     index.html          入口文档，引 ./main.tsx；里面不写 CSP
     main.tsx            一行 createAirshipApp({ meta, component, icon })
-    icon.svg            包根源图：有且只有一张，不套底板
+    icon.png            包根那张源图：只认 png，不套底板
     icon.ico            外壳图标：自己备一张多尺寸的（见第四步）</code></pre>
 
           <h2 class="sub" id="install">装上依赖，产第一个包</h2>
@@ -155,7 +155,7 @@ import { createAirshipApp } from '@airship/sdk'
 import { app } from './app.ts'
 import App from './App.tsx'
 
-createAirshipApp({ meta: app, component: App, icon: './icon.svg' })</code></pre>
+createAirshipApp({ meta: app, component: App, icon: './icon.png' })</code></pre>
           <p>
             组件就是普通 React。两条纪律：配色只用 <code>var(--fg)</code>、<code>var(--bg-elev)</code> 这一族宿主 CSS 变量，别写死颜色（否则与标题栏那颗主题键打架）；
             想碰系统就经 <code>api.</code> 的对应域，<strong>并回 <code>app.ts</code> 把那个能力声明上</strong>——没声明的一律拒绝，且拒绝时界面收到的是一句中文人话。
@@ -515,8 +515,8 @@ export default function App({ api }: { api: AppApi }): JSX.Element {
           <pre><code>$ npm run pack
 已产包 C:\Users\…\my-todo\dist-apps\my-todo.airship</code></pre>
           <p>归档条目——后端入口进去了（它不在前端模块图里，vite 不搬，是产包流水把 <code>src/backend.ts</code> 单独编成包根这一份的）：</p>
-          <pre><code>assets/index-BnLxDDbL.css,  assets/index-cYvn_Dqi.js,  <span class="k">backend.js</span>,
-icon.ico,  icon.svg,  index.html,  manifest.json</code></pre>
+          <pre><code>assets/index-BUvjHg-n.js,  assets/index-BnLxDDbL.css,  <span class="k">backend.js</span>,
+icon.ico,  icon.png,  index.html,  manifest.json</code></pre>
 
           <h2 class="part-head" id="dev">第三步 · 以开发模式运行程序</h2>
           <pre><code>$ npm run dev
@@ -561,7 +561,7 @@ SHA256 26bf86dab56782fcf170c4c25286b30fe2fe2b417caae3045b3917b05cb701f9
           <h2 class="sub" id="ico">icon.ico 由你自备</h2>
           <p>
             任务栏与快捷方式那颗外壳图标只认磁盘上的 <code>.ico</code>——runtime 不会现场转格式。模板各带一张占位 <code>icon.ico</code>，发版前换成你自己的<strong>多尺寸</strong>
-            <code>.ico</code>（16 / 32 / 48 / 256 齐）。源图 <code>icon.svg</code> 仍是"有且只有一张"，<code>.ico</code> 是产物、不算第二张图标。缺了它，产包响亮失败：
+            <code>.ico</code>（16 / 32 / 48 / 256 齐）。源图只认那张 <code>icon.png</code>（svg / jpg / webp 那批 2026-11-26 起退场，留着产包会点名拒绝），<code>.ico</code> 不算源图、与它同放包根是正常形状。缺了它，产包响亮失败：
           </p>
           <pre><code>包根没有 icon.ico：任务栏与快捷方式那颗外壳图标只认磁盘上的 .ico</code></pre>
 

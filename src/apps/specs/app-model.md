@@ -6,14 +6,15 @@
 
 ### Requirement: 应用由目录里的文件定义，不靠 runtime 写名单
 #### Scenario: AP-001 四份文件缺一件，产包期就说清缺什么
-- **WHEN** 某应用目录没有 `app.ts`、没有 `index.html`、没有 `main.tsx`，或图标一张都没有
-- **THEN** 报错逐条列出缺的是哪一份（点名 `apps/<id>/index.html`、`apps/<id>/main.tsx`、`apps/<id>/icon.svg`）
-- **AND** 说明图标 png / jpg / jpeg / webp 也接受
+- **WHEN** 某应用目录没有 `app.ts`、没有 `index.html`、没有 `main.tsx`，或源图没有
+- **THEN** 报错逐条列出缺的是哪一份（点名 `apps/<id>/index.html`、`apps/<id>/main.tsx`、`apps/<id>/icon.png`）
+- **AND** 源图只认 `icon.png` 那一张 png（svg / jpg / jpeg / webp 于 2026-11-26 退场）
 - **AND** 不留"注册了一半"的状态：有问题就不产出这个包
 
-#### Scenario: AP-002 图标有且只能有一张
-- **WHEN** 某应用目录里同时放了 `icon.svg` 与 `icon.png`
-- **THEN** 报错点出这两张的名字，说清"只留一张"
+#### Scenario: AP-002 应用目录根留着已退场的源图格式，产包期点名拒绝
+- **WHEN** 某应用目录根上放着 `icon.svg`（jpg / jpeg / webp / gif / bmp 同档）
+- **THEN** 产包失败，报错点出那张的名字，说清源图只认 `icon.png`、要作者在外部工具里重出
+- **AND** 补上 `icon.png` 并删掉旧的那张之后产包成功
 
 #### Scenario: AP-003 清单 id 必须等于目录名
 - **WHEN** 目录叫 `foo`，清单里 id 写成 `bar`
@@ -96,5 +97,7 @@
   活动包表只装命令行指来的包，与仓库里有几份清单无关。
   AP-017 于 2026-11-24 删除：`net` 能力位整族退场，CSP 只剩产包与开发两档，"按清单分档放宽外连"失去对象——
   要连外部服务的应用把请求交给随包自带的后端进程（backend.md），那与窗口文档的 CSP 无关。
+  AP-002 于 2026-11-26 改写：源图格式收窄成只认 icon.png，"同时放两张"在文件名层面不再可能，
+  那条判据改成"目录根留着已退场格式就点名拒绝"。
   编号不复用、不重排。
 -->
