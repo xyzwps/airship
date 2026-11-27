@@ -183,7 +183,7 @@ describe('窗口尺寸只认清单，位置与尺寸都不记', () => {
 })
 
 /**
- * 每个应用窗口同一套收紧的 webPreferences（原 BR-011 的豁免随 `net` 能力位整族退场，注记见 bridge.md 末尾）。
+ * 每个应用窗口同一套收紧的 webPreferences（原 BR-011 的豁免已退场，注记见 bridge.md 末尾）。
  *
  * 这里钉的是建窗口那一刻传进去的安全参数：要连外部服务的应用把请求交给自带的后台进程，
  * 没有任何窗口需要豁免同源策略——豁免这个概念本身不该再存在。
@@ -266,7 +266,6 @@ describe('任务栏上每个应用是自己的那颗按钮', () => {
       id: 'noico',
       name: '没图标',
       description: '验图标回落的那一个包',
-      capabilities: [],
       schemaVersion: SCHEMA_VERSION,
       sdkVersion: '0.0.0-test'
     })

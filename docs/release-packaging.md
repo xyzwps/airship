@@ -98,10 +98,10 @@ just installers           # 只重出全部应用的安装器（先产全部的�
    - 向导语言按系统界面语言自动选中简中或英文。
 4. `just app-installer <id>` → `code/make-app-installer.mjs` 把 `dist-apps/<id>.airship` 裹成每用户
    `setup.exe`（契约 PK-031~035）。NSIS `RequestExecutionLevel user`：
-   - 界面走 MUI2 向导（欢迎 / 进度 / 完成 + 卸载三页，简中+英文，图标用包内那张 `.ico`）：
-     欢迎页念安装目录，进度页不刷日志，完成页点「完成」直接关窗。
-   - `.onInit` 先念能力清单（措辞从 `@airship/contract` 烘进脚本，单一真源），取消就中止、一个文件都不写；
-     再找 runtime（`AIRSHIP_PATH` > `~\.airship\runtime`），找不到念一句"没找到 airship runtime"中止。
+   - 界面走 MUI2 向导（欢迎 / 进度 / 完成 + 卸载三页，简中+英文，图标用包根存着的那张 `.ico`）：
+     欢迎页念安装目录，带后台的多念一句功能，进度页不刷日志，完成页点「完成」直接关窗。
+   - `.onInit` 找 runtime（`AIRSHIP_PATH` > `~\.airship\runtime`），找不到念一句"没找到 airship runtime"中止、一个文件都不写。
+     措辞从 `@airship/contract` 烘进脚本，脚本里不另写一份人话。
    - 落点 `$PROFILE\.airship\apps\<id>`，放进归档与包内那张 `icon.ico`。
    - 桌面 + 开始菜单各一枚快捷方式：目标 `"<runtime>\airship.exe"`，参数 `"<安装目录>\<id>.airship"`，
      两段都带引号，图标用应用自己那张 `.ico`（不是 runtime 的）。
@@ -137,8 +137,8 @@ just installers           # 只重出全部应用的安装器（先产全部的�
 - **runtime 安装包出包 + 自检通过**：`just build-runtime` 产 `airship-runtime-Setup-0.4.0-x64.exe`，
   六件自检全绿（MZ 头、NSIS 签名、SHA256、win-unpacked 主 exe、纯 runtime、产物无 renderer/启动器通道）。
 - **本轮四处安装 UX 改动**（2026-11-19）：runtime 欢迎页念固定安装目录（`installer.nsh` 的 `customWelcomePage`）、
-  完成页点「完成」直接关窗（`runAfterFinish: false`）；应用安装器套 MUI2 向导；首次直跑的能力确认卡片删除
-  （授权只在安装期，PK-033）。验证到：`just check` 全绿（558 过 / 10 跳过，casecov 零差集）、runtime 安装包重出六检全绿、
+  完成页点「完成」直接关窗（`runAfterFinish: false`）；应用安装器套 MUI2 向导；首次直跑的确认卡片删除
+  （运行期不再有任何确认弹窗）。验证到：`just check` 全绿（558 过 / 10 跳过，casecov 零差集）、runtime 安装包重出六检全绿、
   八个应用安装器带 MUI2 真编译产出。**真机安装走查**（欢迎页真念出路径、完成真不弹窗、双击应用真不再弹卡片）
   要装一遍才算数——装 runtime、动 `~\.airship` 下的旧数据是系统级动作，由使用者执行。
 - **应用安装器真装真卸过**（第三档样件，airship-life-game）：双击快捷方式跑得起（日志 `[airship-life-game] 应用窗口已打开`）；

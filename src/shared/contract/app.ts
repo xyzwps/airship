@@ -1,10 +1,10 @@
-import type { Capability, PlatformId, SharedNamespace, ToolName } from './protocol.ts'
+import type { PlatformId, SharedNamespace, ToolName } from './protocol.ts'
 
 /**
  * The pure-data half of an app manifest: `AppMeta` and `APP_ID_PATTERN`.
  * Kept in its own component-free file because the main process reads it for
- * capability checks and package layout. Conventions for other files
- * (entry document, icons) live in docs/apps/files.md.
+ * package layout and the two name lists (sharedNamespaces / tools).
+ * Conventions for other files (entry document, icons) live in docs/apps/files.md.
  */
 
 /**
@@ -27,9 +27,7 @@ export interface AppMeta {
   name: string
   /** One sentence on what the app does */
   description: string
-  /** Declared permissions; anything missing is refused with a readable reason */
-  capabilities: Capability[]
-  /** Runtime-managed shared namespaces to access; only meaningful with the 'shared' capability */
+  /** Shared namespaces this app may touch; the only gate for the shared area */
   sharedNamespaces?: SharedNamespace[]
   /** Drop the runtime's default content padding (apps that control their own layout) */
   flush?: boolean

@@ -41,7 +41,7 @@ just e2e / just wsld-real           要真环境的那两档（ffmpeg / wslc）
 ## 每个区都是一个包，方向不许反
 
 ```
-src/runtime            @airship/runtime      主进程、preload、窗口、能力实现、包协议、单实例转发；不认识任何具体应用
+src/runtime            @airship/runtime      主进程、preload、窗口、系统面实现、包协议、单实例转发；不认识任何具体应用
 src/sdk                @airship/sdk          宿主（标题栏 / 主题落地 / 留白 / 占位）、图标键、CSP、工装钩子
                                              子入口：./testing（假 runtime 与挂载器）、./styles.css、./vite（CSP 注入插件）
 src/apps/<id>          @airship/<id>         八个应用，各自自持 index.html + main.tsx
@@ -86,13 +86,12 @@ runtime 给应用窗口的 DOM 只有 SDK 那一份——`src/runtime` 里没有
 **runtime 侧任何文件都不用改**——runtime 运行期注册命令行指来的包（`airship.exe <id>.airship`），
 不扫磁盘、没有"包根"那回事。这条有用例守着（AP-010：runtime 产品代码里不许出现具体应用 id 的字面量）。
 
-清单只写"这个应用自己的事实"：`name / description / capabilities / platforms / tools /
+清单只写"这个应用自己的事实"：`name / description / platforms / tools /
 sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `id`——它的唯一真源是项目 `package.json`
 的 `name`（本仓就是 `src/apps/<id>` 的目录名），产包期注入 `manifest.json`；清单里再写一遍就有写岔的机会（AP-003）。
 **不写** `iconPath`、`order` 这类表现或关系字段
 （都被驳回过）——图标是文件约定，排序不存在（没有启动器格子要排）。
-`capabilities` 是唯一授权面，没声明的一律拒绝；用不到就写 `[]`（生命游戏就是这么起的）。
-用了 `api.settings.` / `api.proc.` 这些域就必须声明对应能力，AP-011 会扫。
+剩下的边界只有两份真名单——`sharedNamespaces`（共享区）与 `tools`（外部工具）——加上 grants 的文件路径表。
 
 包格式（**归档文件名** `<id>.airship`——里面是一个 zip，条目名就是包内路径；`manifest.json` 的字段、id 的形状、引用不许越出包）
 的唯一叙述是 `src/apps/specs/package.md`；**判据只有 `@airship/contract` 那一份**（`packageRules.ts`），
@@ -146,19 +145,17 @@ Node 脚本走软链读的就是那份 JS；这两区**源码里**的相对 impo
 
 **装包只有一条路：跑应用自己的安装器**（契约 PK-031~035）。从前"把归档拖到启动器上"那一族随启动器退场了
 （PK-015~019、PK-021~026 已显式删除，见 package.md 末尾注记）。安装器 `.onInit` 先找 runtime
-（`AIRSHIP_PATH` > `~\.airship\runtime`，找不到念 `runtimeNotFound` 中止），再念能力清单确认。
-能力措辞由 `@airship/contract` 供（`CAPABILITY_LABEL` / `capabilitiesPhrase` / `installConfirmMessage`），
-**别在界面或 NSI 里另写一份**——安装器安装页念的就是契约层这一份。
+（`AIRSHIP_PATH` > `~\.airship\runtime`，找不到念 `runtimeNotFound` 中止），欢迎页念落点，带后台的念一句功能。
+后台那句由 `@airship/contract` 供（`BACKEND_PHRASE`），**别在界面或 NSI 里另写一份**——安装器欢迎页念的就是契约层这一份。
 路径只能由 preload 的 `webUtils.getPathForFile(file)` 换出来——渲染侧拿不到绝对路径，也拿不到 ipcRenderer。
 
 `just build-apps` 的产物只落在 `dist-apps/`，**不进 runtime 安装包**：runtime 是纯的，`resources/` 里只有 `app.asar`。
 `just verify-installer` 因此钉的是反面：`resources/` 里**不该**有任何 airship 包，runtime 产物里也不该有
 `out/renderer` 或启动器通道（`launcher:` / `airshipShell`）。
 
-**授权在安装期一次完成**（PK-033）：应用安装器装前念能力清单，装完双击快捷方式直接开窗口。
-从前"首次直跑陌生包弹能力确认卡片"那一族（`runConfirm`，PK-027~030）已于 2026-11-19 退场——
-双击应用先弹一张卡片太烦，而装的时候已经念过清单、点过确定。`run-confirm.json` 与契约层
-`runConfirmMessage` / `runConfirmDetail` / `runDeclined` 一并删除，直跑不再有任何确认闸门。
+**运行期没有任何确认闸门**：装完双击快捷方式直接开窗口，安装器与 runtime 都不弹确认。
+从前"首次直跑陌生包弹确认卡片"那一族（`runConfirm`，PK-027~030）已于 2026-11-19 退场，
+`run-confirm.json` 与契约层 `runConfirmMessage` / `runConfirmDetail` / `runDeclined` 一起删除。
 
 ## 写用例的规矩
 

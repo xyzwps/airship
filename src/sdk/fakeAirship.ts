@@ -1,6 +1,5 @@
 import {
   backendAbsent,
-  capDenied,
   dupJob,
   exeDenied,
   needString,
@@ -14,7 +13,6 @@ import type {
   AirshipBridge,
   AppApi,
   AppPaths,
-  Capability,
   DirEntry,
   DroppedFile,
   FileStat,
@@ -35,8 +33,8 @@ import type {
  * runtime 的测试替身 —— 应用侧用例的地基，地位等同 wslc-desktop 里的 FakeWslcCli。
  *
  * 它按契约把 `window.airship` 装成一个内存里的小 runtime：
- *   - 能力闸门照主进程的样子判，**措辞直接从 shared/errors 取**（那里是唯一的措辞真源），
- *     所以"应用没声明 settings 时用户看到的那句中文"在测试里就是真实界面里的那句；
+ *   - 拒绝措辞**直接从 shared/errors 取**（那里是唯一的措辞真源），
+ *     所以越界、未声明名单这类场景里用户看到的那句中文，在测试里就是真实界面里的那句；
  *   - 文件走一个内存卷，授权规则与 runtime 一致：自己的 data/cache 自由读写，
  *     声明过的共享命名空间可读写，别的路径必须先用对话框"选中"；
  *   - proc 只跑已解析的工具路径（白名单），命令行全记下来供断言；
@@ -65,7 +63,6 @@ export interface StreamCtl {
 
 export interface FakeOptions {
   id: string
-  capabilities?: Capability[]
   sharedNamespaces?: SharedNamespace[]
   tools?: ToolName[]
   /** 预置文件：假路径 → 内容 */
@@ -102,7 +99,6 @@ export interface BackendCtl {
 
 export class FakeAirship implements AirshipBridge {
   readonly id: string
-  readonly capabilities: Set<Capability>
   readonly sharedNamespaces: SharedNamespace[]
   readonly declaredTools: ToolName[]
 
@@ -135,7 +131,6 @@ export class FakeAirship implements AirshipBridge {
 
   constructor(private readonly opts: FakeOptions) {
     this.id = opts.id
-    this.capabilities = new Set(opts.capabilities ?? [])
     this.sharedNamespaces = opts.sharedNamespaces ?? []
     this.declaredTools = opts.tools ?? []
     this.toolPaths = opts.toolPaths ?? {}
@@ -160,7 +155,7 @@ export class FakeAirship implements AirshipBridge {
     return `${ROOT}/shared/${ns}`
   }
 
-  /** 直接往卷里写，不经能力与授权闸门（造场景用） */
+  /** 直接往卷里写，不经任何闸门（造场景用） */
   seed(path: string, content: Content): void {
     this.vol.set(path, content)
   }
@@ -189,10 +184,6 @@ export class FakeAirship implements AirshipBridge {
   }
 
   /* ---------------- 闸门 ---------------- */
-
-  private needCap(cap: Capability): void {
-    if (!this.capabilities.has(cap)) throw new Error(capDenied(this.id, cap))
-  }
 
   private needString(value: unknown, label: string): string {
     if (typeof value !== 'string' || value.length === 0) throw new Error(needString(label, value))
@@ -257,7 +248,7 @@ export class FakeAirship implements AirshipBridge {
   readonly theme = async (): Promise<ThemeSnapshot> => this.themeSnapshot()
 
   /**
-   * 改本应用的主题档。窗口观感族，**不占 settings 能力**——
+   * 改本应用的主题档。窗口观感族，**不走 settings 面**——
    * 与主进程 theme:set 同一套规矩：写 'theme'/'lastResolved' 两个键，不广播。
    */
   readonly setTheme = async (mode: ThemeSnapshot['mode'], resolvedHint?: 'light' | 'dark'): Promise<ThemeSnapshot> => {
@@ -288,20 +279,17 @@ export class FakeAirship implements AirshipBridge {
 
   readonly settings = {
     get: async <T,>(key: string, fallback: T): Promise<T> => {
-      this.needCap('settings')
       this.settingsLog.push(['get', key])
       const hit = this.settingsStore[key]
       return hit === undefined ? fallback : (hit as T)
     },
     set: async <T,>(key: string, value: T): Promise<void> => {
-      this.needCap('settings')
       this.needString(key, 'key')
       this.settingsLog.push(['set', key])
       if (value === undefined) delete this.settingsStore[key]
       else this.settingsStore[key] = value
     },
     dump: async (): Promise<Record<string, unknown>> => {
-      this.needCap('settings')
       this.settingsLog.push(['dump', '-'])
       return { ...this.settingsStore }
     }
@@ -309,7 +297,6 @@ export class FakeAirship implements AirshipBridge {
 
   readonly dialog = {
     openFiles: async (options?: OpenFilesOptions): Promise<string[] | null> => {
-      this.needCap('dialog')
       const hit = this.nextPick()
       if (hit === null) return null
       const picked = Array.isArray(hit) ? hit : [hit]
@@ -320,14 +307,12 @@ export class FakeAirship implements AirshipBridge {
       return picked
     },
     openDirectory: async (options?: { title?: string }): Promise<string | null> => {
-      this.needCap('dialog')
       const hit = this.nextPick()
       const dir = Array.isArray(hit) ? (hit[0] ?? null) : hit
       if (dir) this.readGrants.add(dir)
       return dir
     },
     saveFile: async (options?: SaveFileOptions): Promise<string | null> => {
-      this.needCap('dialog')
       const hit = this.nextPick()
       const target = Array.isArray(hit) ? (hit[0] ?? null) : hit
       if (target) {
@@ -340,7 +325,6 @@ export class FakeAirship implements AirshipBridge {
 
   readonly fs = {
     read: async (path: string): Promise<Uint8Array> => {
-      this.needCap('fs.read')
       const p = this.needString(path, 'path')
       this.assertRead(p)
       const hit = this.vol.get(p)
@@ -348,7 +332,6 @@ export class FakeAirship implements AirshipBridge {
       return typeof hit === 'string' ? Buffer.from(hit, 'utf8') : Buffer.from(hit)
     },
     readRange: async (path: string, start: number, length: number): Promise<Uint8Array> => {
-      this.needCap('fs.read')
       const p = this.needString(path, 'path')
       this.assertRead(p)
       const hit = this.vol.get(p)
@@ -360,14 +343,12 @@ export class FakeAirship implements AirshipBridge {
       return new Uint8Array(buf.subarray(start, start + readable))
     },
     write: async (path: string, data: Uint8Array | string): Promise<void> => {
-      this.needCap('fs.write')
       const p = this.needString(path, 'path')
       this.assertWrite(p)
       this.vol.set(p, typeof data === 'string' ? data : new Uint8Array(data))
       this.dirSet.add(parentOf(p))
     },
     stat: async (path: string): Promise<FileStat | null> => {
-      this.needCap('fs.read')
       const p = this.needString(path, 'path')
       this.assertRead(p)
       if (this.dirSet.has(FakeAirship.norm(p))) return { size: 0, isDirectory: true, mtimeMs: 0 }
@@ -377,7 +358,6 @@ export class FakeAirship implements AirshipBridge {
       return { size, isDirectory: false, mtimeMs: 0 }
     },
     list: async (dir: string): Promise<DirEntry[]> => {
-      this.needCap('fs.read')
       const d = FakeAirship.norm(this.needString(dir, 'dir'))
       this.assertRead(d)
       const out: DirEntry[] = []
@@ -396,21 +376,17 @@ export class FakeAirship implements AirshipBridge {
       return out.sort((a, b) => a.name.localeCompare(b.name))
     },
     ensureDir: async (dir: string): Promise<void> => {
-      this.needCap('fs.write')
       const d = this.needString(dir, 'dir')
       this.assertWrite(d)
       this.dirSet.add(FakeAirship.norm(d))
     },
     remove: async (path: string): Promise<void> => {
-      this.needCap('fs.write')
       const p = this.needString(path, 'path')
       this.assertWrite(p)
       this.vol.delete(p)
       this.dirSet.delete(FakeAirship.norm(p))
     },
     copy: async (src: string, dest: string): Promise<void> => {
-      this.needCap('fs.read')
-      this.needCap('fs.write')
       const s = this.needString(src, 'src')
       const d = this.needString(dest, 'dest')
       this.assertRead(s)
@@ -427,7 +403,7 @@ export class FakeAirship implements AirshipBridge {
     },
     resolveInShared: async (ns: SharedNamespace, ...segments: string[]): Promise<string> => {
       const namespace = this.needString(ns, 'ns') as SharedNamespace
-      if (!this.capabilities.has('shared') || !this.sharedNamespaces.includes(namespace)) {
+      if (!this.sharedNamespaces.includes(namespace)) {
         throw new Error(nsDenied(this.id, namespace))
       }
       const clean = segments.map((s) => this.needString(s, 'segment'))
@@ -441,7 +417,6 @@ export class FakeAirship implements AirshipBridge {
 
   readonly proc = {
     run: async (request: Omit<ProcRequest, 'jobId'>): Promise<ProcResult> => {
-      this.needCap('proc')
       const exe = this.needString(request.exe, 'request.exe')
       this.assertWhitelisted(exe)
       this.procCalls.push({ exe, args: request.args })
@@ -449,7 +424,6 @@ export class FakeAirship implements AirshipBridge {
       return { code: 0, signal: null, stdout: '', stderr: '', ...part }
     },
     start: async (request: ProcRequest): Promise<void> => {
-      this.needCap('proc')
       const exe = this.needString(request.exe, 'request.exe')
       const jobId = this.needString(request.jobId, 'request.jobId')
       this.assertWhitelisted(exe)
@@ -471,20 +445,17 @@ export class FakeAirship implements AirshipBridge {
       else ctl.exit()
     },
     kill: async (jobId: string): Promise<boolean> => {
-      this.needCap('proc')
       if (!this.jobs.has(jobId)) return false
       this.finishJob(jobId, { code: null, signal: 'SIGKILL' })
       return true
     },
     list: async (): Promise<string[]> => {
-      this.needCap('proc')
       return [...this.jobs.keys()]
     }
   }
 
   readonly tools = {
     path: async (name: ToolName): Promise<string | null> => {
-      this.needCap('proc')
       if (!this.declaredTools.includes(name)) throw new Error(toolDenied(this.id, name))
       return this.toolPaths[name] ?? null
     }
@@ -493,7 +464,7 @@ export class FakeAirship implements AirshipBridge {
   readonly backend = {
     invoke: async <T,>(method: string, payload?: unknown): Promise<T> => {
       const m = this.needString(method, 'method')
-      // 与真机同判据：有没有后端看"包"，不看能力位——替身里 options.backend 没装就等于包里没有 backend.js
+      // 与真机同判据：有没有后端看"包"——替身里 options.backend 没装就等于包里没有 backend.js
       if (!this.opts.backend) throw new Error(backendAbsent(this.id))
       this.backendCalls.push({ method: m, payload })
       const ctl: BackendCtl = {
@@ -505,44 +476,36 @@ export class FakeAirship implements AirshipBridge {
 
   readonly tray = {
     set: async (state: TrayState): Promise<void> => {
-      this.needCap('tray')
       this.trayState = state
     },
     clear: async (): Promise<void> => {
-      this.needCap('tray')
       this.trayState = null
     }
   }
 
   readonly notify = {
     show: async (options: NotifyOptions): Promise<void> => {
-      this.needCap('notify')
       this.notifications.push(options)
     }
   }
 
   readonly clipboard = {
     writeText: async (text: string): Promise<void> => {
-      this.needCap('clipboard')
       this.clipboardText = text
     },
     readText: async (): Promise<string> => {
-      this.needCap('clipboard')
       return this.clipboardText
     }
   }
 
   readonly log = {
     info: async (message: string, detail?: unknown): Promise<void> => {
-      this.needCap('log')
       this.logs.push({ level: 'info', message, detail })
     },
     warn: async (message: string, detail?: unknown): Promise<void> => {
-      this.needCap('log')
       this.logs.push({ level: 'warn', message, detail })
     },
     error: async (message: string, detail?: unknown): Promise<void> => {
-      this.needCap('log')
       this.logs.push({ level: 'error', message, detail })
     }
   }

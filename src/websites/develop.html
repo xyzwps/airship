@@ -94,7 +94,7 @@
   README.md
   .gitignore
   src/
-    app.ts              纯数据清单：name / description / capabilities（id 不写，真源是 package.json 的 name）
+    app.ts              纯数据清单：name / description（id 不写，真源是 package.json 的 name）
     App.tsx             组件本体，宿主把 api 当 prop 递进来
     app.css             版心：配色只用宿主给的 CSS 变量
     backend.ts          随包后台的入口：这份文件在，包根就有 backend.js（约定）
@@ -145,8 +145,7 @@ import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
   name: 'my-todo',
-  description: '一句话说清这个应用是干什么的',
-  capabilities: []        <span class="c">// 唯一授权面，用不到就写空数组；后台不在这行里（见下）</span>
+  description: '一句话说清这个应用是干什么的'
 }</code></pre>
           <p>入口脚本把清单与组件交给 SDK 宿主，这是应用侧唯一知道"外面有个 runtime"的地方：</p>
           <pre><code>// src/main.tsx
@@ -157,7 +156,7 @@ import App from './App.tsx'
 createAirshipApp({ meta: app, component: App, icon: './icon.png' })</code></pre>
           <p>
             组件就是普通 React。两条纪律：配色只用 <code>var(--fg)</code>、<code>var(--bg-elev)</code> 这一族宿主 CSS 变量，别写死颜色（否则与标题栏那颗主题键打架）；
-            想碰系统就经 <code>api.</code> 的对应域，<strong>并回 <code>app.ts</code> 把那个能力声明上</strong>——没声明的一律拒绝，且拒绝时界面收到的是一句中文人话。
+            想碰系统就经 <code>api.</code> 的对应域；要碰共享数据区或外部工具得<strong>回 <code>app.ts</code> 把它写进 <code>sharedNamespaces</code> / <code>tools</code> 名单</strong>——没声明的一律拒绝，且拒绝时界面收到的是一句中文人话。
           </p>
           <p>
             那颗计数器的数字住在 <code>src/backend.ts</code> 的内存里。整份文件就这么长——启动后第一件事报就绪，来一条 <code>{ seq, method }</code> 回一条 <code>{ seq, ok, value }</code>：
@@ -215,14 +214,13 @@ parent.postMessage({ ready: true })</code></pre>
           <p>界面上加一条待办，它就落进 <code>~\.airship\data\my-todo\todos.json</code>——每个应用独享 <code>data\&lt;id&gt;</code> 那一族（后端进程里就是 <code>AIRSHIP_DATA_DIR</code>），别的应用碰不到，卸载也不跟着删。</p>
 
           <h2 class="sub" id="todoapp">后端靠约定，不进清单</h2>
-          <p>清单只把显示名和描述换成待办那两行，能力位照旧空数组：能力位收的是宿主代管的资源（读写设置、开文件…），"随包自带一段 Node 代码"是这个包自己的构成物——从起点到待办，它都不占能力位、也不写进清单。</p>
+          <p>清单只把显示名和描述换成待办那两行，别的一行不加：有没有后台不靠声明，它由包形状决定——<code>src/backend.ts</code> 在，就有后台。从起点到待办，清单都是这两行。</p>
           <pre><code>// src/app.ts
 import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
   name: '待办清单',
-  description: '数据由随包自带的后端写进磁盘 JSON 的待办清单',
-  capabilities: []        <span class="c">// 后台不在这行里——src/backend.ts 在，就有后台（约定）</span>
+  description: '数据由随包自带的后端写进磁盘 JSON 的待办清单'
 }</code></pre>
 
           <h2 class="sub" id="backend">后端程序</h2>
@@ -532,7 +530,7 @@ icon.ico,  icon.png,  index.html,  manifest.json</code></pre>
               <strong>前端源码走 dev server</strong>：改 <code>App.tsx</code>、<code>app.css</code> 刷新即见，不用重新产包。
             </li>
             <li>
-              <strong>清单、图标与后端走包</strong>：窗口标题、尺寸与能力都是 <code>app.ts</code> 的投影，后端进程跑的也是<strong>包里</strong>那份 <code>backend.js</code>——产包流水把 <code>src/backend.ts</code> 现编出来的就是它。
+              <strong>清单、图标与后端走包</strong>：窗口标题与尺寸都是 <code>app.ts</code> 的投影，后端进程跑的也是<strong>包里</strong>那份 <code>backend.js</code>——产包流水把 <code>src/backend.ts</code> 现编出来的就是它。
               所以改了 <code>app.ts</code> 或 <code>src/backend.ts</code> 要<strong>重跑 <code>dev</code></strong>（它开局重新产一次包），只刷新界面没用。
             </li>
             <li>
@@ -570,7 +568,7 @@ SHA256 26bf86dab56782fcf170c4c25286b30fe2fe2b417caae3045b3917b05cb701f9
               它先找 runtime，找不到就中止念出来——装应用不重新送 runtime。
             </li>
             <li>
-              <strong>授权在安装期一次完成</strong>：安装页念契约层那份能力清单；归档根带 <code>backend.js</code> 的，末尾多念一句「跑它自带的后台程序」——这句从包形状读，不占能力位。装完双击直接开窗口，运行期不再弹确认卡片。
+              <strong>运行期没有任何确认闸门</strong>：欢迎页念安装落点；归档根带 <code>backend.js</code> 的多念一句「跑它自带的后台程序」（<code>BACKEND_PHRASE</code>，从包形状读，措辞在契约层）。装完双击快捷方式直接开窗口。
             </li>
             <li>
               版本号读项目根 <code>package.json</code> 的 <code>version</code>（要盖一次给 <code>--version</code>）；<code>.exe</code> 旁落同名 <code>.sha256</code>；旧包先删再产——<strong>宁可报错没有，不许旧包冒充新包</strong>。
@@ -649,13 +647,13 @@ SHA256 26bf86dab56782fcf170c4c25286b30fe2fe2b417caae3045b3917b05cb701f9
             <a class="card i1" href="./docs.html">
               <div class="tag">文档</div>
               <h3>为什么这样搭，规矩是什么</h3>
-              <p>系统组成、依赖方向、包格式的判据、能力与边界图，以及规格册与用例互相钉住的那套做法。</p>
+              <p>系统组成、依赖方向、包格式的判据、分层与边界图，以及规格册与用例互相钉住的那套做法。</p>
               <span class="more">读文档 →</span>
             </a>
             <a class="card i2" href="./apps.html">
               <div class="tag">预置应用</div>
               <h3>看八个真应用怎么写</h3>
-              <p>各自的窗口实拍与能力声明。想知道"什么都不碰"起步长什么样，看 airship-life-game；想知道外部工具怎么声明，看 airship-ffmpeg 与 airship-wsld。</p>
+              <p>各自的窗口实拍与边界名单。想知道两份名单都空着起步长什么样，看 airship-life-game；想知道外部工具怎么声明，看 airship-ffmpeg 与 airship-wsld。</p>
               <span class="more">看应用 →</span>
             </a>
           </div>

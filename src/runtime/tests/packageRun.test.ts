@@ -21,7 +21,7 @@ import { REAL_APPS, manifestOf } from './helpers/realApps'
  * 命令行解包、注册判定、协议解析三段都是真产品代码：
  * 只把 Electron 换成记账的替身（userData 指到临时目录）。
  * setup.ts 已把仓库真清单注册进活动包表，这里直接拿 life 的真归档做判据。
- * 授权在安装期完成（应用安装器念能力清单，PK-033）；直跑不再弹确认卡片，
+ * 授权在安装期一次完成（应用安装器欢迎页只念落点与后台两句，PK-033）；直跑不再弹确认卡片，
  * 故这里没有 dialog 卡片的判据——那一族（PK-027~030）已随 runConfirm 退场。
  */
 
@@ -47,8 +47,8 @@ const { resolvePackageEntry } = await import('../main/services/packageProtocol')
 const life = REAL_APPS.find((m) => m.id === 'airship-life-game')!
 
 /** 造一份最小包清单（直跑判据用，不借任何真应用的名字；id 是产包注入那一步的投影） */
-function minimalMeta(id: string, capabilities: AppMeta['capabilities'] = []): AppMeta & { id: string } {
-  const meta: AppMeta = { name: `样件 ${id}`, description: '直跑判据用的最小清单', capabilities }
+function minimalMeta(id: string): AppMeta & { id: string } {
+  const meta: AppMeta = { name: `样件 ${id}`, description: '直跑判据用的最小清单' }
   return { ...meta, id }
 }
 

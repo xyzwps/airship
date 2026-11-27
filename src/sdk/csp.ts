@@ -36,7 +36,7 @@ export const AIRSHIP_CSP_DEV =
  * 产包与开发选哪一条——唯一的一处选择逻辑。
  *
  * 依据只有一个：`bundle` 分产包与开发（react-refresh 要一段内联脚本）。
- * 从前这里还看清单的 `net` 选放宽外连的档，随那个能力位一起退场了（注记见 app-model.md AP-017）——
+ * 从前这里还看清单的 `net` 选放宽外连的档，随 `net` 整族一起退场了（注记见 app-model.md AP-017）——
  * 要连外部服务的应用把请求交给自带的后台进程，窗口本身不再需要任何外连许可。
  */
 export function pickCsp(input: { bundle: boolean }): string {

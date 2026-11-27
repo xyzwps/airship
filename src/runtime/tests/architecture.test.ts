@@ -238,8 +238,7 @@ describe('应用只引 SDK 与契约层（§4 / I-6）', () => {
    *
    * 八个应用各抄一条权限字符串，就会有第八个版本悄悄少一个 `worker-src`；
    * 注入器还顺手把"应用自己写了 CSP"当成错误抛出来，所以这条路不会被动破。
-   * 选哪一条的逻辑也归 csp.ts（`pickCsp`）：依据只剩"产包还是开发"一个——
-   * 从前按清单 `net` 分档的那一档随能力位一起退场了（注记见 app-model.md AP-017）。
+   * 选哪一条的逻辑也归 csp.ts（`pickCsp`）：依据只剩"产包还是开发"一个。
    */
   it('AP-014 CSP 的唯一真源在 SDK，应用入口 html 里没有那一条', () => {
     const cspSource = readFileSync(join(SRC, 'sdk', 'csp.ts'), 'utf8')

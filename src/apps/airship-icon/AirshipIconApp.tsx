@@ -9,8 +9,8 @@ import './airship-icon.css'
 /**
  * Icon Helper：一份 SVG 进，`icon.png` 与 `icon.ico` 出（标准见 docs/apps/icons.md）。
  *
- * 三条约束照旧：只引 sdk 与 contract（AP-013）、碰系统只经 `api.` 且能力位在 `app.ts`
- * 里声明齐（AP-011）、配色一律用宿主给的变量。
+ * 三条约束照旧：只引 sdk 与 contract（AP-013）、碰系统只经 `api.`、
+ * 配色一律用宿主给的变量。
  *
  * 输入三条来路里，只有「选文件」那条走闸门（`dialog.openFiles` 会把选中路径授一次读）；
  * 拖进来那个 File 对象能不能直接读出字节，是这台机器上的 Electron 行为，用例里验不了——

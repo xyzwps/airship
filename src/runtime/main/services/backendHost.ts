@@ -20,7 +20,7 @@ import { log } from './logging'
 /**
  * 应用自带的后台程序：一份随包归档的 Node 脚本，runtime 用 utilityProcess 为它单独起进程。
  *
- * 有没有后端不读清单、不读能力位，读**包形状**：归档根有 `backend.js` 这个条目就有
+ * 有没有后端不读清单，读**包形状**：归档根有 `backend.js` 这个条目就有
  * （源项目里的 `src/backend.ts|js` 由产包流水按约定编进来）。
  *
  * 为什么不直接 fork 包里的路径：fork 要的是磁盘上的真文件，而包是一个 zip 归档。
@@ -283,7 +283,7 @@ export const backendHost = {
     return promise
   },
 
-  /** 一次请求-回话。身份 / 能力 / 参数已由 ipc.ts 判过 */
+  /** 一次请求-回话。身份 / 参数已由 ipc.ts 判过 */
   async invoke(app: AppId, method: string, payload: unknown): Promise<unknown> {
     const be = await backendHost.ensure(app, method)
     const seq = ++seqCounter

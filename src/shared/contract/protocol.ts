@@ -1,13 +1,13 @@
 import type { AppMeta } from './app.ts'
 
 /**
- * runtime 与应用之间的能力契约。
+ * runtime 与应用的 API 契约。
  *
  * 这是 airship 唯一重要的文件：应用能做什么，全部由这里声明，
  * 其余一概拿不到。preload 只按这张表暴露，主进程只按这张表实现。
  *
- * 注意边界性质：一个应用一个窗口一个渲染进程，所以 capabilities 是**强制边界**而不只是约定——
- * 主进程按 event.sender 反查归属再查能力表，应用既看不到 ipcRenderer，也冒充不了别的应用。
+ * 注意边界性质：一个应用一个窗口一个渲染进程，归属由主进程按 event.sender 反查——
+ * 应用既看不到 ipcRenderer，也冒充不了别的应用。
  * 加接口就在这一层加，实现（主进程）与桥（preload）都跟着这张表走。
  */
 
@@ -26,7 +26,7 @@ export type AppId = string
 /**
  * 设置作用域：应用各自的命名空间，一个应用一份。
  * runtime 自己不持有设置屏：主题这类窗口观感也落在应用自己那份设置文件里
- * （由 theme:set 这条窗口面通道写，不占应用的 settings 能力）。
+ * （由 theme:set 这条窗口面通道写，不走应用的 settings 面）。
  */
 export type SettingsScope = AppId
 
@@ -72,61 +72,16 @@ export const TOOL_NAMES = ['ffmpeg', 'wslc'] as const
 export type ToolName = (typeof TOOL_NAMES)[number]
 
 
-/** 应用能力位。应用在自己的 manifest 里声明，runtime 按声明放行。 */
-export type Capability =
-  /** 读文件：限应用数据目录内，或本次会话中用户通过系统对话框显式选中的路径 */
-  | 'fs.read'
-  /** 写文件：限应用数据目录内 */
-  | 'fs.write'
-  /** 弹系统文件/目录选择框（选中结果自动进入本应用的可读路径集合） */
-  | 'dialog'
-  /** 读写本应用命名空间下的设置项 */
-  | 'settings'
-  /** 访问 runtime 级共享命名空间（见 SHARED_NAMESPACES），具体哪几个由 manifest 声明 */
-  | 'shared'
-  /** 派生子进程并接收 stdout/stderr 流（vcp 的 ffmpeg 编排用） */
-  | 'proc'
-  /** 托盘图标与提示文字（dagogo 替代 Android 桌面小组件） */
-  | 'tray'
-  /** 系统通知 */
-  | 'notify'
-  /** 剪贴板 */
-  | 'clipboard'
-  /** 写日志（日志按应用分命名空间） */
-  | 'log'
-
 /**
- * 能力位的界面说法。首次直跑一个陌生包时要把它念给人听——capabilities 是授权面，
- * 而直跑让"用户自己决定给谁授权"第一次成为必须：不念清单就开窗口等于绕过授权面。
- * 应用安装器的安装页念的也是这一份。措辞只这一处，界面上不许再抄一遍。
- */
-export const CAPABILITY_LABEL: Record<Capability, string> = {
-  'fs.read': '读你的文件',
-  'fs.write': '写你的文件',
-  dialog: '弹系统选择框',
-  settings: '存自己的设置',
-  shared: '碰共享数据区',
-  proc: '跑外部程序',
-  tray: '占托盘',
-  notify: '发系统通知',
-  clipboard: '读写剪贴板',
-  log: '写日志'
-}
-
-/**
- * 后台程序的界面说法。它**不是能力位**：自带一段 Node 代码是包形状读出来的事实
+ * 后台程序的界面说法。自带一段 Node 代码是包形状读出来的事实
  * （归档根有没有 `backend.js`，见 packageRules.ts 的 PACKAGE_BACKEND_ENTRY），
- * 不是向宿主求的授权。念白与能力清单同一条线，措辞只这一处。
+ * 安装器欢迎页要念它，措辞只这一处。
  */
 export const BACKEND_PHRASE = '跑它自带的后台程序'
 
-/** 能力清单的人话摘要：空清单念不碰你的文件，而不是念一个空字符串 */
-export function capabilitiesPhrase(list: readonly Capability[], hasBackend = false): string {
-  const parts: string[] = []
-  if (list.length > 0) parts.push(list.map((c) => CAPABILITY_LABEL[c]).join('、'))
-  if (hasBackend) parts.push(BACKEND_PHRASE)
-  if (parts.length === 0) return '不碰你的文件'
-  return parts.join('、')
+/** 安装器欢迎页念的功能句：有后台才念，没有就什么都不用说 */
+export function backendPhrase(hasBackend: boolean): string {
+  return hasBackend ? BACKEND_PHRASE : ''
 }
 
 export interface AppPaths {
@@ -266,7 +221,7 @@ export interface AirshipBridge {
   /**
    * 改本应用的主题档并立刻生效。mode 是 'system' 时，实际亮暗由渲染侧用 matchMedia
    * 算好传进来——主进程没有 matchMedia，不该去猜。
-   * 这是窗口观感的一部分（与最小化/关闭同族），不占应用的 settings 能力。
+   * 这是窗口观感的一部分（与最小化/关闭同族），不走应用的 settings 面。
    */
   setTheme(mode: ThemeSnapshot['mode'], resolvedHint?: 'light' | 'dark'): Promise<ThemeSnapshot>
 
@@ -297,15 +252,15 @@ export interface AirshipBridge {
     resolveInData(...segments: string[]): Promise<string>
     /**
      * 把路径解析到 runtime 级共享命名空间下。
-     * 应用必须在自己的清单里声明了该命名空间，否则主进程拒绝。
+     * 应用必须在自己的清单 `sharedNamespaces` 里声明了该命名空间，否则主进程拒绝。
      */
     resolveInShared(ns: SharedNamespace, ...segments: string[]): Promise<string>
     /**
      * 拖放/选择事件里那个 File 对象对应的本机路径；换不出路径（JS 自造、没盘上真身）就是空字符串。
      *
      * 整件事留在渲染进程内：preload 用 Electron 的 `webUtils.getPathForFile` 就地算，
-     * 不过桥、不占 fs 能力位——它只是"读出浏览器已经给你的那个对象的名字"，
-     * 能不能读那份文件仍由 fs.read / fs.write 的闸门说了算。
+     * 不过桥——它只是"读出浏览器已经给你的那个对象的名字"，
+     * 能不能读那份文件仍由 grants 的路径表说了算。
      */
     pathForFile(file: DroppedFile): string
   }
@@ -320,14 +275,14 @@ export interface AirshipBridge {
   }
 
   /**
-   * runtime 已发现的外部工具。要 proc 能力，**并且**要在自己的清单 `tools` 里声明过这一个。
+   * runtime 已发现的外部工具，**前提**是在自己的清单 `tools` 里声明过这一个。
    * 应用既不能自己找一个来跑，也不能借 runtime 发现的名义跑没声明的工具。
    */
   tools: { path(name: ToolName): Promise<string | null> }
 
   /**
    * 应用自带的后台程序（包根那份 `backend.js`，runtime 为它单独起进程）。
-   * 不要能力位：包里有那个条目就有它——约定，不是授权。invoke 是一次请求-回话；
+   * 包里有那个条目就有它——约定，不是授权。invoke 是一次请求-回话；
    * 后台主动推的事件走 on() 收 `backend:event`。
    * 后台没起来时 invoke 会先把它拉起来；它崩了不影响窗口，下一次 invoke 再拉一个新的。
    * 包里没有 `backend.js` 时 invoke 拒，并念出这条约定。

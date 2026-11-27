@@ -59,7 +59,6 @@ export const ALLOWED_KEYS = [
   'id',
   'name',
   'description',
-  'capabilities',
   'sharedNamespaces',
   'flush',
   'defaultWidth',
@@ -123,7 +122,7 @@ export function idShapeProblem(id: unknown): string | null {
 /**
  * 包清单的形状判定。返回**人读的原因列表**，空数组就是通过。
  *
- * 不判能力名与工具名——那两条住在 `manifestProblems()`（app.ts 与包清单共用的那份），
+ * 不判工具名——那条住在 `manifestProblems()`（app.ts 与包清单共用的那份），
  * 注册期两边都调；这里判的是包格式独有的那一圈。
  */
 export function packageManifestProblems(manifest: unknown, at = ''): string[] {
@@ -151,9 +150,6 @@ export function packageManifestProblems(manifest: unknown, at = ''): string[] {
     if (typeof v !== 'string' || v.trim() === '') {
       out.push(`${p}包清单 ${key} 必须是非空字符串，收到 ${JSON.stringify(v)}`)
     }
-  }
-  if (!Array.isArray(m.capabilities) || m.capabilities.some((c) => typeof c !== 'string')) {
-    out.push(`${p}包清单 capabilities 必须是字符串数组，用不到就写空数组`)
   }
   if (m.entry !== undefined && typeof m.entry !== 'string') {
     out.push(

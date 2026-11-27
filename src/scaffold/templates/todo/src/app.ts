@@ -8,6 +8,5 @@ import type { AppMeta } from '@airship/contract'
  */
 export const app: AppMeta = {
   name: '__APP_NAME__',
-  description: '数据由随包自带的后端写进磁盘 JSON 的待办清单',
-  capabilities: []
+  description: '数据由随包自带的后端写进磁盘 JSON 的待办清单'
 }

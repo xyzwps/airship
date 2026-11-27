@@ -11,7 +11,7 @@ import type { AppMeta } from '@airship/contract'
  * **注册失败要响亮**——命令行指来的包不合格就把原因抛出去，由入口念给人听，
  * 不存在"静默少一个应用"这条路。
  *
- * 能力边界照旧由"谁调用（event.sender 反查）+ 那份清单声明了什么"决定，
+ * 边界照旧由"谁调用（event.sender 反查）+ 那份清单的两份名单"决定，
  * 读法全部直接转给 packageRegistry：表是进程级的，没有"扫没扫过"这种时序问题。
  */
 
@@ -35,8 +35,6 @@ export {
   availableOn,
   canAccessShared,
   canUseTool,
-  capabilitiesOf,
-  hasCapability,
   isKnownApp,
   packageFor,
   registeredPackages,

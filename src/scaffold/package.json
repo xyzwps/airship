@@ -1,6 +1,6 @@
 {
   "name": "create-airship-app",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "airship 应用项目手脚架：npx create-airship-app <目录> [--template minimal|todo]",
   "license": "MIT",
   "type": "module",
@@ -12,6 +12,6 @@
     "templates"
   ],
   "dependencies": {
-    "@airship/contract": "^0.4.6"
+    "@airship/contract": "^0.4.7"
   }
 }

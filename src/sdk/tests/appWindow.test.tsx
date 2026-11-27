@@ -20,12 +20,12 @@ import type { AppApi, AppMeta } from '@airship/contract'
 const ICON = 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='
 
 function meta(name: string, over: Partial<AppMeta> = {}): AppMeta {
-  return { name, description: '测试用', capabilities: [], ...over } as AppMeta
+  return { name, description: '测试用', ...over } as AppMeta
 }
 
 /** 宿主自己从 `window.airship` 造 api，所以这里只需要把替身挂上去；id 走宿主显式参数（用例没有构建期注入） */
 function mountSdkHost(id: string, manifest: AppMeta, component: ComponentType<{ api: AppApi }>, icon: string | undefined = ICON) {
-  const fake = new FakeAirship({ id, capabilities: manifest.capabilities as never })
+  const fake = new FakeAirship({ id })
   return mountUi(<AirshipRoot id={id} meta={manifest} component={component} icon={icon} />, { fake })
 }
 

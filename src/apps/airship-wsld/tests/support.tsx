@@ -17,8 +17,6 @@ import type { ProcResult } from '@airship/contract'
 
 export const WSLC_EXE = 'C:/fake/wslc.exe'
 
-const CAPS = ['fs.read', 'fs.write', 'dialog', 'settings', 'proc', 'notify', 'clipboard', 'log']
-
 export interface FakeSetup {
   /** 一次性调用的应答；不给就是干净退出 */
   run?: (exe: string, args: string[]) => Partial<ProcResult>
@@ -32,7 +30,6 @@ export interface FakeSetup {
 export function makeFake(setup: FakeSetup = {}): FakeAirship {
   return new FakeAirship({
     id: 'airship-wsld',
-    capabilities: [...CAPS],
     tools: ['wslc'],
     toolPaths: { wslc: setup.wslc === undefined ? WSLC_EXE : setup.wslc },
     run: setup.run,

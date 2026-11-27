@@ -119,12 +119,10 @@ vi.mock('foliate-js/view.js', () => {
 })
 
 const SHARED = '/fake/.airship/shared/library'
-const CAPS = ['fs.read', 'fs.write', 'dialog', 'settings', 'shared', 'notify', 'clipboard', 'log'] as const
 
 function shelf(picks?: Array<string[] | string | null>, files?: Record<string, string>): FakeAirship {
   return new FakeAirship({
     id: 'airship-reader',
-    capabilities: [...CAPS],
     sharedNamespaces: ['library'],
     picks,
     files

@@ -3,7 +3,7 @@
 airship 应用项目的手脚架：一条命令落出一个能直接跑起来的普通项目。
 
 ```
-npx create-airship-app my-todo                 # 最小起点：一扇窗口、一个组件，不碰任何能力
+npx create-airship-app my-todo                 # 最小起点：一扇窗口、一个组件
 npx create-airship-app my-todo --template todo # 前端 + 随包自带的后端：数据落磁盘 JSON 的待办清单
 ```
 
@@ -15,7 +15,7 @@ npx create-airship-app my-todo --template todo # 前端 + 随包自带的后端�
 my-todo/
   package.json
   src/
-    app.ts      纯数据清单（id / name / description / capabilities）
+    app.ts      纯数据清单（name / description）
     App.tsx     组件本体，宿主把 api 当 prop 递进来
     app.css     版心：配色只用宿主给的 CSS 变量
     index.html  入口文档

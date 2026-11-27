@@ -2,7 +2,7 @@
   "name": "@airship/runtime",
   "version": "0.4.6",
   "private": true,
-  "description": "飞船的 runtime：窗口、能力实现、包协议与单实例转发",
+  "description": "飞船的 runtime：窗口、API 实现、包协议与单实例转发",
   "main": "out/main/index.js",
   "author": "xyzwps",
   "devDependencies": {

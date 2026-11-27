@@ -76,7 +76,6 @@ const goodManifest = {
   id: 'demo',
   name: '示范',
   description: '一个用来验形状的最小包',
-  capabilities: [],
   schemaVersion: SCHEMA_VERSION,
   sdkVersion: '1.0.0'
 }
@@ -108,7 +107,7 @@ describe('包是一个自带清单的归档，名字由 id 定', () => {
     // 适配层露出的名字就是契约那一份（同源才谈得上"逐字相同"）
     expect(idShapeProblem('墨读')).toBe(badAppId('墨读'))
     expect(APP_ID_PATTERN.source).toBe(CONTRACT_APP_ID_PATTERN.source)
-    const fromContract = registryManifestProblems('apps/墨读/app.ts', { id: '墨读', name: '墨读', description: '', capabilities: [] }, [])
+    const fromContract = registryManifestProblems('apps/墨读/app.ts', { id: '墨读', name: '墨读', description: '' }, [])
     expect(fromContract).toEqual([`apps/墨读/app.ts: ${badAppId('墨读')}`])
 
     // 现有八个应用的 id 全部通过这一条
@@ -167,13 +166,10 @@ describe('包清单只写应用自己的事实', () => {
   })
 
   it('PK-005 runtime 不认的键、不像话的值，都点名到字段与收到的东西', () => {
-    expect(manifestProblems({ ...goodManifest, capabilitis: [] })).toContain(
-      '包清单有 runtime 不认的键 "capabilitis"（要么拼错，要么包格式与 runtime 不同档）'
+    expect(manifestProblems({ ...goodManifest, author: 'someone' })).toContain(
+      '包清单有 runtime 不认的键 "author"（要么拼错，要么包格式与 runtime 不同档）'
     )
     expect(manifestProblems({ ...goodManifest, name: '  ' })).toContain('包清单 name 必须是非空字符串，收到 "  "')
-    expect(manifestProblems({ ...goodManifest, capabilities: 'fs.read' })).toContain(
-      '包清单 capabilities 必须是字符串数组，用不到就写空数组'
-    )
     expect(manifestProblems({ ...goodManifest, defaultWidth: 'wide' })).toContain(
       '包清单 defaultWidth 必须是正整数像素值，收到 "wide"'
     )

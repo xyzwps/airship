@@ -22,7 +22,6 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import {
   type AppId,
-  type Capability,
   type SharedNamespace,
   type ThemeSnapshot,
   type ToolName,
@@ -30,7 +29,6 @@ import {
 } from '@airship/contract'
 import {
   badToolName,
-  capDenied,
   identityMismatch,
   needScopeString,
   needString,
@@ -43,7 +41,6 @@ import {
   metaOf,
   canAccessShared,
   canUseTool,
-  hasCapability,
   isKnownApp,
   sharedNamespacesOf
 } from './services/appRegistry'
@@ -80,9 +77,11 @@ import type {
  *   1. `assertSender` —— 从 event.sender 反查这个窗口归属哪个应用。查不到就是野窗口，拒。
  *   2. `assertApp`    —— 调用方传来的 app 必须等于归属。**身份由 preload 注入，
  *      应用改不了；就算改了，这里也对不上。**
- *   3. `assertCap`    —— 归属应用必须在自己的清单里声明过这个能力。
  *
- * 顺序是刻意的：先确认"你是谁"，再确认"你能不能"。
+ * 边界各自成立：grants 的路径表（文件）、sharedNamespaces 名单（共享区）、
+ * tools 名单 + proc.ts 的 exe 白名单（外部程序）。
+ *
+ * 顺序是刻意的：先确认"你是谁"，再判"这份路径/这个工具你声明过没有"。
  */
 
 function senderOwner(event: IpcMainInvokeEvent): string {
@@ -102,16 +101,8 @@ function assertApp(event: IpcMainInvokeEvent, appArg: unknown): AppId {
   return appArg
 }
 
-function assertCap(app: AppId, cap: Capability): void {
-  if (!hasCapability(app, cap)) {
-    log.warn(app, '能力未声明，已拒绝', { capability: cap })
-    throw new Error(capDenied(app, cap))
-  }
-}
-
-/** 工具路径只给"有 proc 能力 + 清单里声明了这个工具"的应用 */
+/** 工具路径只给"清单里声明了这个工具"的应用 */
 function assertTool(app: AppId, tool: ToolName): void {
-  assertCap(app, 'proc')
   if (!(TOOL_NAMES as readonly string[]).includes(tool)) {
     log.warn(app, '问了 runtime 不认识的工具', { tool })
     throw new Error(badToolName(tool))
@@ -186,8 +177,8 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
   })
 
   /**
-   * 改本应用的主题档。窗口观感的一部分（与最小化/关闭同族），不占 settings 能力：
-   * 没声明 settings 的应用（生命游戏就是）也换得了自己的主题。
+   * 改本应用的主题档。窗口观感的一部分（与最小化/关闭同族），不走 settings 面：
+   * 主题档永远换得了，哪怕应用一行设置都不碰。
    * 只写本应用那份设置文件，不广播——一个应用只有一个窗口，没有"别的窗口跟着换"这回事。
    */
   handle('theme:set', (event, mode: unknown, resolvedHint: unknown) => {
@@ -212,19 +203,16 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('settings:get', (event, scope: unknown, key: unknown, fallback: unknown) => {
     const id = scopeOf(event, scope)
-    assertCap(id, 'settings')
     return settings.get(id, assertNonEmptyString(key, 'key'), fallback)
   })
 
   handle('settings:set', (event, scope: unknown, key: unknown, value: unknown) => {
     const id = scopeOf(event, scope)
-    assertCap(id, 'settings')
     settings.set(id, assertNonEmptyString(key, 'key'), value)
   })
 
   handle('settings:dump', (event, scope: unknown) => {
     const id = scopeOf(event, scope)
-    assertCap(id, 'settings')
     return settings.dump(id)
   })
 
@@ -232,7 +220,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('dialog:openFiles', async (event, appArg: unknown, options: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'dialog')
     const win = ownWindow(event)
     const opts = (options ?? {}) as OpenFilesOptions
     const result = await dialog.showOpenDialog(win!, {
@@ -250,7 +237,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('dialog:openDirectory', async (event, appArg: unknown, options: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'dialog')
     const win = ownWindow(event)
     const opts = (options ?? {}) as { title?: string }
     const result = await dialog.showOpenDialog(win!, {
@@ -265,7 +251,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('dialog:saveFile', async (event, appArg: unknown, options: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'dialog')
     const win = ownWindow(event)
     const opts = (options ?? {}) as SaveFileOptions
     const result = await dialog.showSaveDialog(win!, {
@@ -287,7 +272,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('fs:read', async (event, appArg: unknown, path: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'fs.read')
     const p = assertNonEmptyString(path, 'path')
     grants.assertRead(id, p)
     return readFile(p)
@@ -295,7 +279,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('fs:readRange', async (event, appArg: unknown, path: unknown, start: unknown, length: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'fs.read')
     const p = assertNonEmptyString(path, 'path')
     grants.assertRead(id, p)
 
@@ -324,7 +307,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('fs:write', (event, appArg: unknown, path: unknown, data: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'fs.write')
     const p = assertNonEmptyString(path, 'path')
     grants.assertWrite(id, p)
     mkdirSync(dirname(p), { recursive: true })
@@ -342,7 +324,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('fs:stat', (event, appArg: unknown, path: unknown): FileStat | null => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'fs.read')
     const p = assertNonEmptyString(path, 'path')
     grants.assertRead(id, p)
     try {
@@ -355,7 +336,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('fs:list', (event, appArg: unknown, dir: unknown): DirEntry[] => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'fs.read')
     const d = assertNonEmptyString(dir, 'dir')
     grants.assertRead(id, d)
     const out: DirEntry[] = []
@@ -377,7 +357,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('fs:ensureDir', (event, appArg: unknown, dir: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'fs.write')
     const d = assertNonEmptyString(dir, 'dir')
     grants.assertWrite(id, d)
     mkdirSync(d, { recursive: true })
@@ -385,7 +364,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('fs:remove', (event, appArg: unknown, path: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'fs.write')
     const p = assertNonEmptyString(path, 'path')
     grants.assertWrite(id, p)
     rmSync(p, { recursive: true, force: true })
@@ -393,8 +371,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('fs:copy', (event, appArg: unknown, src: unknown, dest: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'fs.read')
-    assertCap(id, 'fs.write')
     const s = assertNonEmptyString(src, 'src')
     const d = assertNonEmptyString(dest, 'dest')
     grants.assertRead(id, s)
@@ -430,7 +406,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('proc:run', async (event, appArg: unknown, request: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'proc')
     const req = request as Omit<ProcRequest, 'jobId'>
     if (!req || !Array.isArray(req.args)) throw new Error('request.args 必须是数组')
     assertNonEmptyString(req.exe, 'request.exe')
@@ -439,7 +414,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('proc:start', (event, appArg: unknown, request: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'proc')
     const req = request as ProcRequest
     if (!req || !Array.isArray(req.args)) throw new Error('request.args 必须是数组')
     assertNonEmptyString(req.exe, 'request.exe')
@@ -464,7 +438,7 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('backend:invoke', async (event, appArg: unknown, method: unknown, payload: unknown) => {
     const id = assertApp(event, appArg)
-    // 没有能力闸：有没有后端归包形状判，backendHost 起不来时念的就是那条约定
+    // 不设闸：有没有后端归包形状判，backendHost 起不来时念的就是那条约定
     const m = assertNonEmptyString(method, 'method')
     // 后端回的错误原样上抛：应用 catch 到的就是它自己后端写的那句话
     return backendHost.invoke(id, m, payload)
@@ -474,7 +448,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('tray:set', (event, appArg: unknown, state: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'tray')
     const s = state as TrayState
     if (!s || typeof s.tooltip !== 'string') throw new Error('state.tooltip 必须是字符串')
     trayService.set(id, s, () => bringAppToFront(id))
@@ -500,7 +473,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('notify:show', (event, appArg: unknown, options: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'notify')
     const o = options as NotifyOptions
     if (!o || typeof o.title !== 'string') throw new Error('options.title 必须是字符串')
     if (!Notification.isSupported()) return
@@ -509,13 +481,11 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
 
   handle('clipboard:writeText', (event, appArg: unknown, text: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'clipboard')
     clipboard.writeText(typeof text === 'string' ? text : String(text ?? ''))
   })
 
   handle('clipboard:readText', (event, appArg: unknown) => {
     const id = assertApp(event, appArg)
-    assertCap(id, 'clipboard')
     return clipboard.readText()
   })
 
@@ -524,7 +494,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
   for (const level of ['info', 'warn', 'error'] as const) {
     handle(`log:${level}`, (event, appArg: unknown, message: unknown, detail: unknown) => {
       const id = assertApp(event, appArg)
-      assertCap(id, 'log')
       log[level](id, typeof message === 'string' ? message : String(message), detail)
     })
   }

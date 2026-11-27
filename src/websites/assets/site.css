@@ -246,14 +246,6 @@ a.card:hover { border-color: var(--accent); text-decoration: none; }
   font-size: 12.4px; font-weight: 500; color: var(--ink-faint); margin-left: 7px; letter-spacing: 0;
 }
 .app-card .body > p { margin: 0; }
-.caps { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; }
-.caps span {
-  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 12.1px;
-  border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px;
-  background: var(--bg-soft); color: var(--ink); overflow-wrap: anywhere;
-}
-.caps span.none { border-style: dashed; color: var(--ink-faint); }
-.caps span.bypass { border-color: var(--coral); color: var(--coral); }
 .card .app-meta { margin-top: 11px; font-size: 12.8px; color: var(--ink-faint); line-height: 1.6; }
 .card .app-meta code { font-size: 12px; }
 

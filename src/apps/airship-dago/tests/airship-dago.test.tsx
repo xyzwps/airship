@@ -29,7 +29,6 @@ vi.mock('@airship/sdk', async (importOriginal) => ({
 
 const DATA_DIR = '/fake/.airship/data/airship-dago'
 const DATA = `${DATA_DIR}/dagogo.json`
-const CAPS = ['dialog', 'settings', 'tray', 'notify', 'log'] as const
 
 /** 后端的盘上事接到替身的卷上：同一份 vol，用例的 seed/text 断言照旧好使 */
 function fakeIo(fake: FakeAirship): BackendIo {
@@ -57,7 +56,6 @@ function fakeIo(fake: FakeAirship): BackendIo {
 function shell(files?: Record<string, string>, picks?: Array<string[] | string | null>): FakeAirship {
   const fake = new FakeAirship({
     id: 'airship-dago',
-    capabilities: [...CAPS],
     files,
     picks,
     backend: (method, payload) => handle(method, payload, fakeIo(fake))

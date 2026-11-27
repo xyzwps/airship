@@ -6,7 +6,7 @@ import type { SettingsScope } from '@airship/contract'
 
 /**
  * 设置存储：每个应用一个 JSON 文件。runtime 自己不持有设置文件——
- * 主题这类窗口观感也落在应用自己那份里（theme:set 通道写，不占 settings 能力）。
+ * 主题这类窗口观感也落在应用自己那份里（theme:set 通道写，不走 settings 面）。
  *
  * 内存里保留一份，写盘用"临时文件 + rename"落，避免中途崩掉写坏原文件。
  * 键是扁平的字符串，值必须是可 JSON 序列化的东西。

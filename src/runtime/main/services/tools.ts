@@ -7,7 +7,7 @@ import { TOOL_NAMES, type ToolName } from '@airship/contract'
 /**
  * 外部工具发现与可执行文件白名单。
  *
- * proc 是最危险的能力，所以能跑的东西只有一个来历：**runtime 发现的**。
+ * 外部程序是最危险的一条线，所以能跑的东西只有一个来历：**runtime 发现的**。
  * 这张表就是"runtime 发现"的全部知识面——加一个新工具在这儿加一条，应用侧只能声明自己要哪一个。
  *
  * 本机事实（已实测）：没有系统 ffmpeg、也没有 ffprobe，ffmpeg 是 imageio_ffmpeg 带的静态 exe，

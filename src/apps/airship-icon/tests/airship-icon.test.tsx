@@ -44,7 +44,7 @@ const FOREIGN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
 const UNCLOSED_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24"/>'
 
 function makeFake(picks: Array<string[] | string | null> = [], files: Record<string, string> = {}) {
-  return new FakeAirship({ id: app.id, capabilities: app.capabilities, picks, files })
+  return new FakeAirship({ id: app.id, picks, files })
 }
 
 async function open(picks: Array<string[] | string | null> = [], files: Record<string, string> = {}) {

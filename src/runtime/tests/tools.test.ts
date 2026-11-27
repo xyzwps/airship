@@ -112,7 +112,7 @@ describe('应用只能问自己声明过的工具', () => {
     expect(canUseTool('airship-ffmpeg', 'ffmpeg')).toBe(true)
     expect(canUseTool('airship-ffmpeg', 'wslc')).toBe(false)
     expect(canUseTool('airship-dago', 'ffmpeg')).toBe(false)
-    // 有 proc 能力是前提（appRegistry 里那条与 ipc 的闸一致）
+    // 名单只认 tools 这一份（reader 声明的是别的工具）
     expect(canUseTool('airship-reader', 'ffmpeg')).toBe(false)
   })
 })

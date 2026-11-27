@@ -8,7 +8,7 @@
  * 占位换成真名。装依赖、起窗口都是后面的事，它会打出来。
  *
  * 模板两种：
- *   minimal  只有前端：一扇窗口、一个组件，不碰任何能力（capabilities 写空数组）；
+ *   minimal  只有前端：一扇窗口、一个组件，什么都不碰；
  *   todo     前端 + 随包自带的后端程序：数据由后端写进 AIRSHIP_DATA_DIR 下的 todos.json。
  *
  * id 的形状这里判一次只是为了**早失败**——判据就是 @airship/contract 的 APP_ID_PATTERN 那一条，

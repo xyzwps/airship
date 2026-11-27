@@ -80,7 +80,6 @@ async function openAlbedo(fake: FakeAirship): Promise<Mount> {
 function freshFake(overrides: Partial<{ doc: string }> = {}): FakeAirship {
   const fake = new FakeAirship({
     id: app.id,
-    capabilities: app.capabilities,
     theme: { mode: 'light', resolved: 'light' }
   })
   if (overrides.doc) fake.settingsStore[STORE_KEY_DOC] = overrides.doc
@@ -876,7 +875,6 @@ describe('导出与复制', () => {
   it('AL-029 导出走系统另存为并把串写进去', async () => {
     const fake = new FakeAirship({
       id: app.id,
-      capabilities: app.capabilities,
       picks: ['C:/fake/Downloads/画稿.svg']
     })
     const m = await openAlbedo(fake)
@@ -898,7 +896,7 @@ describe('导出与复制', () => {
   })
 
   it('AL-031 没选字体的文字层拦住导出', async () => {
-    const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities, picks: ['never.svg'] })
+    const fake = new FakeAirship({ id: app.id, picks: ['never.svg'] })
     const m = await openAlbedo(fake)
     hook().load({ width: 400, height: 300, shapes: [{ type: 'text', id: 't1', name: '文字 1', x: 10, y: 10, text: '你好', fontSize: 40 }] })
     await m.settle()
@@ -958,7 +956,6 @@ describe('导出与复制', () => {
     pngCalls.length = 0
     const fake = new FakeAirship({
       id: app.id,
-      capabilities: app.capabilities,
       picks: ['C:/fake/Downloads/画稿.png']
     })
     const m = await openAlbedo(fake)
@@ -981,7 +978,7 @@ describe('导出与复制', () => {
 
   it('AL-051 没选字体的文字层同样拦住 PNG 导出', async () => {
     pngCalls.length = 0
-    const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities, picks: ['never.png'] })
+    const fake = new FakeAirship({ id: app.id, picks: ['never.png'] })
     const m = await openAlbedo(fake)
     hook().load({ width: 400, height: 300, shapes: [{ type: 'text', id: 't1', name: '文字 1', x: 10, y: 10, text: '你好', fontSize: 40 }] })
     await m.settle()

@@ -89,7 +89,7 @@ function spyTheme(fake: FakeAirship): Array<[string, string | undefined]> {
 const THEME_BTN = '.titlebar__controls button:first-child'
 
 async function mountTitlebar(theme: ThemeSnapshot): Promise<{ m: Awaited<ReturnType<typeof mountUi>>; fake: FakeAirship; calls: Array<[string, string | undefined]> }> {
-  const fake = new FakeAirship({ id: 'airship-ffmpeg', capabilities: [], theme })
+  const fake = new FakeAirship({ id: 'airship-ffmpeg', theme })
   const calls = spyTheme(fake)
   const m = await mountUi(<Titlebar here="用例" />, { fake })
   return { m, fake, calls }
@@ -110,16 +110,16 @@ beforeEach(() => {
 })
 
 describe('每个应用改自己的主题档', () => {
-  it('TH-002 应用改得了自己的主题，不占 settings 能力', async () => {
-    // 渲染侧：没声明任何能力的应用窗口也拿得到 setter，不存在"只读"的答复
+  it('TH-002 应用改得了自己的主题，不碰设置面', async () => {
+    // 渲染侧：窗口拿得到 setter，不存在"只读"的答复
     const seen: boolean[] = []
     const m = await mountUi(<Probe onResult={(c) => seen.push(c)} />, {
-      fake: new FakeAirship({ id: 'airship-life-game', capabilities: [] })
+      fake: new FakeAirship({ id: 'airship-life-game' })
     })
     expect(seen.at(-1)).toBe(true)
     m.unmount()
 
-    // 主进程侧：生命游戏一个能力都没声明，theme:set 照样落进它自己那份设置文件
+    // 主进程侧：生命游戏不写任何名单，theme:set 照样落进它自己那份设置文件
     resetDisk('airship-life-game')
     const res = await setTheme(103, 'dark')
     expect(res.ok, res.error).toBe(true)
@@ -212,7 +212,7 @@ describe('每个窗口自己把主题落到文档上', () => {
 
   it('TH-006 桥还没回话时先按系统偏好画', async () => {
     prefs.__prefersDark = true
-    const fake = new FakeAirship({ id: 'airship-ffmpeg', capabilities: [] })
+    const fake = new FakeAirship({ id: 'airship-ffmpeg' })
     fake.theme = () => new Promise<ThemeSnapshot>(() => undefined)
     const m = await mountUi(<Probe onResult={() => undefined} />, { fake })
     expect(document.documentElement.dataset.theme).toBe('dark')

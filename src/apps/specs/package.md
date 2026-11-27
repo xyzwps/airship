@@ -39,20 +39,20 @@
 - **AND** `icon.ico` 是 PK-036 那份外壳图标，不算源图，与 `icon.png` 同放包根是正常形状
 
 #### Scenario: PK-005 清单里不许有 runtime 不认的键
-- **WHEN** 包清单写了一个允许字段之外的键，例如 `capabilitis`
-- **THEN** 产包失败，原因点出「包清单有 runtime 不认的键 "capabilitis"」
-- **AND** `name`、`description` 缺或为空、`capabilities` 不是字符串数组、
+- **WHEN** 包清单写了一个允许字段之外的键，例如 `author`
+- **THEN** 产包失败，原因点出「包清单有 runtime 不认的键 "author"」
+- **AND** `name`、`description` 缺或为空、
   `defaultWidth` 不是正整数，各自在产包期点名是哪个字段与收到了什么
 
 ### Requirement: 随包自带的后台程序按约定进包，归档根只有一份 `backend.js`
-依据：后台不是清单字段也不是能力位——有没有它是包形状的事实。源项目在应用目录平铺
+依据：后台不是清单字段——有没有它是包形状的事实。源项目在应用目录平铺
 一份 `backend.ts` 或 `backend.js`（有且只有一处），产包流水把它编成包根 `backend.js`；
 runtime 见到那个条目才起进程（通道侧契约见 `src/runtime/specs/backend.md`）。
 
 #### Scenario: PK-040 应用目录里有后端入口，产出来的包根就有 `backend.js`
 - **WHEN** 应用目录里有 `backend.ts`（或 `backend.js`），走产包流水编译并装包
 - **THEN** 归档根上有 `backend.js` 条目，那是编好的 JS（`fork` 吃磁盘真文件，包里不许躺着一份没编的 TS）
-- **AND** 应用目录里没有这个文件，归档根就不带 `backend.js`——manifest 里没有任何键或能力位表述它
+- **AND** 应用目录里没有这个文件，归档根就不带 `backend.js`——manifest 里没有任何键表述它
 
 #### Scenario: PK-041 `backend.ts` 与 `backend.js` 都在，产期响亮失败
 - **WHEN** 应用目录里两份后端入口同时存在
@@ -98,7 +98,7 @@ runtime 见到那个条目才起进程（通道侧契约见 `src/runtime/specs/b
 ### Requirement: 应用安装器自己找 runtime，装完留一个快捷方式
 依据：runtime 与应用的落点在同一棵树里——runtime 装 `~\.airship\runtime`，应用装 `~\.airship\apps\<id>\`
 （都是每用户、不要管理员，PK-035）；数据在第三族 `~\.airship\data\<id>\`，由 runtime 管（见 `src/runtime/specs/storage.md`）。
-安装器由 `code/make-app-installer.mjs` 从归档生成，能力措辞产安装器时从契约层烘进脚本。
+安装器由 `code/make-app-installer.mjs` 从归档生成，界面措辞产安装器时从契约层烘进脚本。
 安装与卸载真机走查归 `just app-installer`；这里钉的是生成出来的安装脚本里读得到的判据。
 
 #### Scenario: PK-031 找 runtime 按顺序，找不到念原话不装
@@ -111,11 +111,11 @@ runtime 见到那个条目才起进程（通道侧契约见 `src/runtime/specs/b
 - **THEN** 归档落在 `~\.airship\apps\<id>\<id>.airship`，桌面快捷方式的目标是那个 runtime 目录里的 `airship.exe`，参数是归档的绝对路径，两段都带引号
 - **AND** 快捷方式的图标用包内那份 `icon.ico`（PK-036 随包备好的那一份），不是 runtime 的图标
 
-#### Scenario: PK-033 装之前念能力清单
+#### Scenario: PK-033 欢迎页念落点，带后台的念一句功能
 - **WHEN** 安装器启动
-- **THEN** 先念「<名字> 要装到这台机器上」与「它要的能力：<人话摘要>」，确定才装、取消就中止
-- **AND** 空清单念的是「不碰你的文件」；措辞与 `CAPABILITY_LABEL` 逐字一致（生成时烘进脚本，不在脚本里另写一份）
-- **AND** 归档根带 `backend.js`（PK-040）的，清单末尾多念一句「跑它自带的后台程序」——这条事实从包形状读，不占能力位
+- **THEN** 欢迎页念出应用名与安装目录，点下一页才开装
+- **AND** 页面上读不到「它要的能力」这句，欢迎页只有落点与后台两句
+- **AND** 归档根带 `backend.js`（PK-040）的，欢迎页念一句「跑它自带的后台程序」（措辞与 `BACKEND_PHRASE` 逐字一致，生成时烘进脚本）
 
 #### Scenario: PK-034 卸载删归档留数据
 - **WHEN** 走控制面板的卸载项或安装目录里的卸载器
@@ -142,7 +142,9 @@ runtime 见到那个条目才起进程（通道侧契约见 `src/runtime/specs/b
   PK-004 原有一条"归档根上的图标多于一张"于 2026-11-26 删除：源图格式收窄成只认 icon.png
   （svg / jpg / jpeg / webp 同日退场），名字钉死之后同一层不可能出现第二张同名文件，那条判据失去对象；
   改写为"缺 icon.png"与"出现已退场格式"两条各念一句原话。
-  PK-007 原为"装包失败旧包原样还在"，现改写为直跑注册的只读判定。
+  PK-007 原为"装包失败旧包原样还在"，现改写为直跑的只读判定。
+  PK-033 原文"装之前念能力清单"于 2026-11-27 随 capabilities 整族退场改写：渲染进程没有沙箱，
+  那份清单念了也拦不住什么；欢迎页只剩落点与后台两句。编号是稳定句柄，改写不换新号。
   PK-020 于 2026-11-07 删除：安装包改成纯 runtime、不带任何应用，"出厂根"这一族整个退场。
   编号按规矩不复用、不重排。
 -->

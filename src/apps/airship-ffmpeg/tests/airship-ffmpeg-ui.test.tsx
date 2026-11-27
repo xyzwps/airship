@@ -23,7 +23,6 @@ function appApi(fake: FakeAirship): AppApi {
   })
 }
 
-const CAPS = ['fs.read', 'fs.write', 'dialog', 'settings', 'proc', 'notify', 'clipboard', 'log'] as const
 const FFMPEG = 'T:/ffmpeg.exe'
 const SOURCE = 'T:/media/4k_demo.mkv'
 const OUT = 'T:/media/4k_demo.mp4'
@@ -52,7 +51,6 @@ function rig(opts: Options = {}): { fake: FakeAirship; api: AppApi; calls: strin
   const calls: string[][] = []
   const fake = new FakeAirship({
     id: 'airship-ffmpeg',
-    capabilities: [...CAPS],
     tools: ['ffmpeg'],
     toolPaths: { ffmpeg: 'ffmpeg' in opts ? (opts.ffmpeg ?? null) : FFMPEG },
     picks: opts.picks ?? [[SOURCE]],

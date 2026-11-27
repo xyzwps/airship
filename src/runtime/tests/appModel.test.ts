@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -34,21 +34,7 @@ import type { AppMeta } from '@airship/contract'
 
 /** 合成清单投影：app.ts 不写 id，这里模拟的是产包注入 id 之后的那份形状 */
 function meta(over: Partial<AppMeta> & { id: string; name: string }): AppMeta & { id: string } {
-  return { description: '测试', capabilities: [], ...over } as AppMeta & { id: string }
-}
-
-function sourcesOf(dir: string): string[] {
-  const out: string[] = []
-  for (const name of readdirSync(dir)) {
-    const p = join(dir, name)
-    if (statSync(p).isDirectory()) {
-      if (name === 'tests' || name === 'specs' || name === '__tests__' || name === 'fixtures') continue
-      out.push(...sourcesOf(p))
-    } else if (/\.(ts|tsx)$/.test(name)) {
-      out.push(p)
-    }
-  }
-  return out
+  return { description: '测试', ...over } as AppMeta & { id: string }
 }
 
 const root = packageFixtureRoot()
@@ -90,7 +76,7 @@ describe('缺一件就在注册期说清', () => {
     // "写一遍"那一半：产包流水读到 app.ts 里留着 id，当场点名抛
     const work = mkdtempSync(join(tmpdir(), 'airship-ap003-'))
     const staleManifest = join(work, 'app.ts')
-    writeFileSync(staleManifest, "export const app = { id: 'dup', name: 'x', description: '', capabilities: [] }\n", 'utf8')
+    writeFileSync(staleManifest, "export const app = { id: 'dup', name: 'x', description: '' }\n", 'utf8')
     await expect(readAppManifest({ appTs: staleManifest, workDir: work, id: 'dup', sdkVersion: '0.0.0-test' })).rejects.toThrow(
       '不该再写 id'
     )
@@ -228,47 +214,6 @@ describe('命令行指来的包就是应用名单', () => {
     for (const id of REAL_APP_IDS) {
       const html = readFileSync(join(APPS_DIR, id, DEFAULT_ENTRY), 'utf8')
       expect(html, `${id} 的入口 html 要引 ./main.tsx`).toContain('src="./main.tsx"')
-    }
-  })
-
-  it('AP-011 应用用到的每个契约域，清单里都声明过', () => {
-    // 用到的域 → 需要的能力
-    const needs: Record<string, string[]> = {
-      settings: ['settings'],
-      dialog: ['dialog'],
-      tray: ['tray'],
-      notify: ['notify'],
-      clipboard: ['clipboard'],
-      log: ['log'],
-      proc: ['proc'],
-      tools: ['proc']
-    }
-    for (const m of REAL_APPS) {
-      const dir = join(APPS_DIR, m.id)
-      const code = sourcesOf(dir)
-        .map((f) => readFileSync(f, 'utf8'))
-        .join('\n')
-      const declared = new Set(m.capabilities as string[])
-
-      for (const [domain, required] of Object.entries(needs)) {
-        if (new RegExp(`api\\.${domain}\\.`).test(code)) {
-          for (const cap of required) expect(declared.has(cap), `${m.id} 用了 api.${domain} 却没声明 ${cap}`).toBe(true)
-        }
-      }
-
-      // 读写分别核对
-      if (/api\.fs\.(read|readRange|stat|list)\(/.test(code)) expect(declared.has('fs.read'), `${m.id} 缺 fs.read`).toBe(true)
-      if (/api\.fs\.(write|ensureDir|remove|copy)\(/.test(code)) expect(declared.has('fs.write'), `${m.id} 缺 fs.write`).toBe(true)
-      if (/resolveInShared\(\s*['"]([a-z]+)/.test(code)) {
-        const ns = code.match(/resolveInShared\(\s*['"]([a-z]+)/)![1]!
-        expect(declared.has('shared'), `${m.id} 用共享区却没声明 shared`).toBe(true)
-        expect(m.sharedNamespaces ?? [], `${m.id} 没声明 ${ns}`).toContain(ns)
-      }
-
-      // 问了哪个工具，清单里就得写哪个
-      for (const matched of code.matchAll(/tools\.path\(\s*['"]([a-z]+)['"]/g)) {
-        expect(m.tools ?? [], `${m.id} 用了 ${matched[1]} 却没在清单 tools 里写`).toContain(matched[1]!)
-      }
     }
   })
 

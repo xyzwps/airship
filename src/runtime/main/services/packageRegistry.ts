@@ -11,7 +11,7 @@ import {
   type PackageManifest
 } from '@airship/contract'
 import type { AppMeta } from '@airship/contract'
-import type { Capability, PlatformId, SharedNamespace, ToolName } from '@airship/contract'
+import type { PlatformId, SharedNamespace, ToolName } from '@airship/contract'
 import { platformIssue } from '@airship/contract'
 import { archiveEntryNames, readArchiveText } from './packageArchive'
 
@@ -167,7 +167,7 @@ export function packageFor(id: string): InstalledPackage | null {
   return byId.get(id) ?? null
 }
 
-/* ---------------- 读法：能力边界只问这张表 ---------------- */
+/* ---------------- 读法：两份名单（sharedNamespaces / tools）只问这张表 ---------------- */
 
 export function appIds(): string[] {
   return [...byId.keys()]
@@ -182,17 +182,8 @@ export function isKnownApp(value: unknown): value is string {
   return typeof value === 'string' && byId.has(value)
 }
 
-export function capabilitiesOf(app: string): readonly Capability[] {
-  return byId.get(app)?.meta.capabilities ?? []
-}
-
-export function hasCapability(app: string, capability: Capability): boolean {
-  return capabilitiesOf(app).includes(capability)
-}
-
-/** 应用能不能碰某个共享命名空间：既要有 shared 能力，也要在名单里 */
+/** 应用能不能碰某个共享命名空间：只问清单声明的那份名单 */
 export function canAccessShared(app: string, ns: string): ns is SharedNamespace {
-  if (!hasCapability(app, 'shared')) return false
   const meta = byId.get(app)?.meta
   return (meta?.sharedNamespaces ?? []).includes(ns as SharedNamespace)
 }
@@ -206,7 +197,7 @@ export function toolsOf(app: string): ToolName[] {
 }
 
 export function canUseTool(app: string, tool: ToolName): boolean {
-  return hasCapability(app, 'proc') && toolsOf(app).includes(tool)
+  return toolsOf(app).includes(tool)
 }
 
 export function unavailableReason(app: string, platform: PlatformId | 'unknown'): string | null {

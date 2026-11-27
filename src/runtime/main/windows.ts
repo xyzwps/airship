@@ -15,7 +15,7 @@ import type { ShellEvent } from '@airship/contract'
 /**
  * 窗口管理：一个应用一个独立窗口，runtime 自己没有窗口。
  *
- * 这是能力边界从"设计"变"强制"的地方：
+ * 这是隔离边界从"设计"变"强制"的地方：
  *   1. 每个应用窗口是独立渲染进程，一个崩了不影响别人；
  *   2. 窗口的 preload 被注入 `--airship-app=<id>`，应用侧拿到的 bridge 身份是 runtime 给的，改不了；
  *   3. 主进程按 `event.sender` 反查归属，传上来的 id 与归属不符就拒——
@@ -46,7 +46,7 @@ function baseWebPreferences(owner: Owner): Electron.WebPreferences {
    * 每个应用窗口同一套收紧的默认：同源策略不豁免。
    *
    * 从前声明了 `net` 的窗口会换到 `webSecurity: false` 那一档（对象存储的响应没有跨源许可，
-   * 渲染侧直连就得豁免，判据见已删除的 BR-011 注记）。那条能力位整族退场后没有窗口需要豁免——
+   * 渲染侧直连就得豁免，判据见已删除的 BR-011 注记）。`net` 整族退场后没有窗口需要豁免——
    * 要连外部服务的应用把请求交给自带的后台进程（Node 侧，不受同源策略与 CSP 管），
    * 窗口本身只剩包内的东西。
    */
@@ -170,7 +170,7 @@ export function openAppWindow(appId: string): BrowserWindow {
   wireWindow(window, appId, meta.name)
   loadPackageEntry(window, pkg.entryUrl)
   // 包根带 backend.js 的应用：窗口一开就把后端拉起来预热。
-  // 判据是包形状，不是清单字段也不是能力位——没这个条目就没有，白起一个进程才是真浪费。
+  // 判据是包形状，不是清单字段——没这个条目就没有，白起一个进程才是真浪费。
   // 起不来只进日志不开错误弹窗——窗口的第一句错误该由应用自己的界面念。
   if (backendHost.hasBackend(appId)) {
     backendHost.ensure(appId).catch((err: unknown) => {

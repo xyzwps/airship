@@ -47,6 +47,6 @@ Lifecycle (spawn on window open, teardown on close, crash-isolated) and where th
 
 ## The bridge: runtime main process (shared by all apps)
 
-Not a file in the app directory, but the manifest's `capabilities` is exactly its gate: the renderer's only outward face is `window.airship`, injected by preload. Any capability not declared is refused; failures come back in plain Chinese wording, not Electron internals; events are delivered only to their owning window — dropped if the app isn't open, never broadcast.
+Not a file in the app directory, but the bridge itself is the whole outward face: the renderer reaches the system only through `window.airship`, injected by preload. settings, log, tray and notify are base functions, open to every app — the renderer has no sandbox, so a declared permission bitmap could never stop anyone determined to bypass it. What still gates: the two manifest name lists — `sharedNamespaces` and `tools` — plus the identity check (the main process re-derives your app from `event.sender`). Refusals come back in plain Chinese wording, not Electron internals; events are delivered only to their owning window — dropped if the app isn't open, never broadcast.
 
-Beyond the capability bits, `fs` must also pass a path table: anything inside the app's own data directory is read/write by nature; outside it, only paths the user explicitly picked via a system dialog during this session.
+On top of the name lists, `fs` must also pass a path table: anything inside the app's own data directory is read/write by nature; outside it, only paths the user explicitly picked via a system dialog during this session.

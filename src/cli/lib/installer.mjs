@@ -4,7 +4,7 @@
  * 从产物视角看它只做四件事：读包里的清单、抽包根那份 icon.ico（取，不转——
  * 全仓没有任何地方转图标，那张 ico 与应用目录里的源图一起随包走，PK-036/PK-039）、
  * 生成 NSIS 脚本、跑 makensis。
- * 措辞（能力清单、找不到 runtime 那句）全部从 @airship/contract 烘进脚本。
+ * 措辞（后台那句、找不到 runtime 那句）全部从 @airship/contract 烘进脚本。
  *
  * makensis 的来源是**注入的**：这台机器上 `just installers` 用 electron-builder 缓存里那份
  * （仓库的 code/make-app-installer.mjs 负责找）；外部作者按 `--makensis` > `AIRSHIP_MAKENSIS`
@@ -22,7 +22,7 @@ import {
   PACKAGE_BACKEND_ENTRY,
   PACKAGE_SUFFIX,
   WINDOWS_ICON_NAME,
-  capabilitiesPhrase,
+  BACKEND_PHRASE,
   runtimeNotFound
 } from '@airship/contract'
 
@@ -33,14 +33,14 @@ export function nsisText(text) {
 
 /**
  * 生成安装脚本（纯函数，用例钉的就是这份文本）。
- * 能力措辞在这里烘进去：capabilitiesPhrase / runtimeNotFound 全部来自契约层，脚本里不另写一份人话。
- * 后台那句念的是**包形状**（hasBackend 由调用方从归档条目读出来），不是能力位。
- * 界面走 MUI2 向导（欢迎 / 进度 / 完成 + 卸载三页，简中+英文）：欢迎页念安装目录与能力清单，
- * 进度页不刷日志，完成页点「完成」直接关窗。能力清单并进欢迎页（PK-033），不再弹 MessageBox。
+ * 措辞在这里烘进去：BACKEND_PHRASE / runtimeNotFound 全部来自契约层，脚本里不另写一份人话。
+ * 后台那句念的是**包形状**（hasBackend 由调用方从归档条目读出来）。
+ * 界面走 MUI2 向导（欢迎 / 进度 / 完成 + 卸载三页，简中+英文）：欢迎页念安装目录，带后台的念一句功能，
+ * 进度页不刷日志，完成页点「完成」直接关窗。
  */
-export function installerScript({ id, name, version, capabilities, hasBackend = false, publisher = 'airship' }) {
+export function installerScript({ id, name, version, hasBackend = false, publisher = 'airship' }) {
   const displayName = nsisText(name)
-  const capsPhrase = nsisText(capabilitiesPhrase(capabilities, hasBackend))
+  const backendLine = hasBackend ? `${nsisText(BACKEND_PHRASE)}。$\\r$\\n$\\r$\\n` : ''
   const notFound = nsisText(runtimeNotFound())
   const archiveName = `${id}${PACKAGE_SUFFIX}`
   const regKey = `Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\airship-${id}`
@@ -53,14 +53,14 @@ RequestExecutionLevel user
 InstallDir "$PROFILE\\.airship\\apps\\${id}"
 
 ; ---- MUI2 向导 ----
-; 欢迎页念安装目录与能力清单，进度页干净不刷日志，完成页点「完成」直接关窗（不带「运行」勾选）。
+; 欢迎页念安装目录（带后台的多念一句功能），进度页干净不刷日志，完成页点「完成」直接关窗（不带「运行」勾选）。
 ; 图标用包根那份 icon.ico（与快捷方式同一张）；简中在前作默认语言。
 !include "MUI2.nsh"
 !define MUI_ICON "icon.ico"
 !define MUI_UNICON "icon.ico"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE "安装 ${displayName}"
-!define MUI_WELCOMEPAGE_TEXT "${displayName} 要装到这台机器上。$\\r$\\n$\\r$\\n安装目录：$INSTDIR$\\r$\\n$\\r$\\n它要的能力：${capsPhrase}。$\\r$\\n$\\r$\\n装完在桌面与开始菜单各留一枚快捷方式，双击它就用 airship runtime 打开这个应用。$\\r$\\n$\\r$\\n点「下一步」继续。"
+!define MUI_WELCOMEPAGE_TEXT "${displayName} 要装到这台机器上。$\\r$\\n$\\r$\\n安装目录：$INSTDIR$\\r$\\n$\\r$\\n${backendLine}装完在桌面与开始菜单各留一枚快捷方式，双击它就用 airship runtime 打开这个应用。$\\r$\\n$\\r$\\n点「下一步」继续。"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
@@ -185,7 +185,6 @@ export function buildInstaller({ archivePath, version, publisher, outDir, makens
         id,
         name: manifest.name,
         version,
-        capabilities: manifest.capabilities,
         hasBackend: archiveHasBackend(archivePath),
         publisher
       }),

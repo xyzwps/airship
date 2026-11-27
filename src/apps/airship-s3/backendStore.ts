@@ -19,7 +19,7 @@ import type { Source } from './connection.ts'
 /**
  * 后端进程里的全部网络活：与对象存储端点说话，也搬本地文件的字节。
  *
- * 这一族从前住在渲染进程（`client.ts` + `transfer.ts` + 那条 `net` 能力位），
+ * 这一族从前住在渲染进程（`client.ts` + `transfer.ts` + 那条 `net` 声明），
  * 2026-11-24 整族搬到这里：窗口不再直连外部服务，SDK 的 fetch 换成后端进程的 HTTPS 模块，
  * CSP 与同源策略都不需要为它放宽——所以这份文件里没有一处 `fetch`。
  *

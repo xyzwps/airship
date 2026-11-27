@@ -4,7 +4,7 @@ import type { AppApi } from '@airship/contract'
  * runtime 侧设置与 localStorage 形状之间的适配器。
  *
  * Albedo 的自动保存、语言、最近字体原来都走 localStorage（同步读写、失败靠抛）；
- * 在包里这层换成 `api.settings`（能力 settings），但给上层留**同一个同步面**：
+ * 在包里这层换成 `api.settings`，但给上层留**同一个同步面**：
  *   读：内存镜像，立刻有值；
  *   写：先进镜像再进待落盘队列，`flush()` 由 saveNow 那层 await。
  * flush 中途失败要抛出去——保存状态灯念"未保存"靠的就是这一下，不能咽。

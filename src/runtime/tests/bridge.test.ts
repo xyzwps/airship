@@ -140,23 +140,7 @@ describe('身份由 runtime 注入，冒充不了别人', () => {
   })
 })
 
-describe('未声明的能力一律拒绝', () => {
-  it('BR-006 没声明的能力，原因点出能力名与清单路径', async () => {
-    const why = reason(await call('clipboard:writeText', DAGOGO, 'airship-dago', '你好'))
-    expect(why).toBe('airship-dago 没有声明 clipboard 能力（要用它就在 apps/airship-dago/app.ts 的 capabilities 里声明）')
-
-    // 工具既要有 proc 能力，也要在清单里声明过：没 proc 的先被能力闸拦住
-    expect(reason(await call('tools:path', DAGOGO, 'airship-dago', 'ffmpeg'))).toBe(
-      'airship-dago 没有声明 proc 能力（要用它就在 apps/airship-dago/app.ts 的 capabilities 里声明）'
-    )
-    // 有 proc 但清单里没声明这个工具
-    expect(reason(await call('tools:path', VCP, 'airship-ffmpeg', 'wslc'))).toBe(
-      'airship-ffmpeg 没有声明 wslc 工具（要用它就在 apps/airship-ffmpeg/app.ts 的 tools 里声明）'
-    )
-    // runtime 的工具表里根本没有这个名字
-    expect(reason(await call('tools:path', VCP, 'airship-ffmpeg', 'nope'))).toContain('runtime 不认识的工具：nope')
-  })
-
+describe('没声明过的名单一律拒绝', () => {
   it('BR-007 共享命名空间没声明就用不了', async () => {
     const why = reason(await call('fs:resolveInShared', VCP, 'airship-ffmpeg', 'library', ['library.json']))
     expect(why).toBe('airship-ffmpeg 没有声明共享命名空间 library（在 apps/airship-ffmpeg/app.ts 的 sharedNamespaces 里声明）')
@@ -164,6 +148,12 @@ describe('未声明的能力一律拒绝', () => {
     // 声明了的应用走同一条路就给的出路径
     const ok = await call<string>('fs:resolveInShared', BOOKS, 'airship-reader', 'library', ['library.json'])
     expect(ok.ok ? ok.value.replace(/\\/g, '/') : ok).toMatch(/shared\/library\/library\.json$/)
+
+    // 同一份"名单闸"在 tools 那一条上的两句原话（真 ipc.ts 的措辞）
+    expect(reason(await call('tools:path', VCP, 'airship-ffmpeg', 'wslc'))).toBe(
+      'airship-ffmpeg 没有声明 wslc 工具（要用它就在 apps/airship-ffmpeg/app.ts 的 tools 里声明）'
+    )
+    expect(reason(await call('tools:path', VCP, 'airship-ffmpeg', 'nope'))).toContain('runtime 不认识的工具：nope')
   })
 })
 

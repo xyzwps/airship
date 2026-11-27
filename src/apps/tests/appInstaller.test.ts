@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { installerScript, nsisText } from '../../../code/make-app-installer.mjs'
-import { BACKEND_PHRASE, capabilitiesPhrase, runtimeNotFound } from '@airship/contract'
+import { BACKEND_PHRASE, runtimeNotFound } from '@airship/contract'
 import { REAL_APPS } from '../../runtime/tests/helpers/realApps'
 
 /**
@@ -10,7 +10,7 @@ import { REAL_APPS } from '../../runtime/tests/helpers/realApps'
  *
  * 真装一遍、快捷方式真双击归真机走查（just app-installer airship-life-game）；
  * 这里钉的是生成器的纯函数输出：找 runtime 的顺序、落点、快捷方式命令行、
- * 能力措辞（与契约层逐字一致）、卸载带走什么、两个安装器都装进 ~/.airship 且都不提权。
+ * 欢迎页念的那两句（措辞与契约层逐字一致）、卸载带走什么、两个安装器都装进 ~/.airship 且都不提权。
  */
 
 const REPO = join(__dirname, '..', '..', '..')
@@ -18,7 +18,7 @@ const game = REAL_APPS.find((m) => m.id === 'airship-life-game')!
 const ffmpeg = REAL_APPS.find((m) => m.id === 'airship-ffmpeg')!
 
 function scriptOf(meta: (typeof REAL_APPS)[number]): string {
-  return installerScript({ id: meta.id, name: meta.name, version: '0.0.0-test', capabilities: meta.capabilities })
+  return installerScript({ id: meta.id, name: meta.name, version: '0.0.0-test' })
 }
 
 describe('安装器找 runtime', () => {
@@ -44,30 +44,27 @@ describe('装完留下什么', () => {
     expect(script).toContain('InstallDir "$PROFILE\\.airship\\apps\\airship-life-game"')
     expect(script).toContain('SetOutPath "$INSTDIR"')
     expect(script).toContain('File "airship-life-game.airship"')
-    // 目标与参数两段都带引号；图标是包内那张转的 .ico
+    // 目标与参数两段都带引号；图标是包根存着的那份 .ico（取，不转）
     expect(script).toContain(
       `CreateShortcut "$DESKTOP\\${game.name}.lnk" "$RuntimeDir\\airship.exe" '"$INSTDIR\\airship-life-game.airship"' "$INSTDIR\\icon.ico"`
     )
     expect(script).toContain('File "icon.ico"')
   })
 
-  it('PK-033 装之前念能力清单（并进欢迎页，不再弹窗）', () => {
-    const script = scriptOf(ffmpeg)
-    expect(script).toContain(nsisText(`它要的能力：${capabilitiesPhrase(ffmpeg.capabilities)}`))
+  it('PK-033 欢迎页念落点，带后台的念一句功能', () => {
+    // 欢迎页只有落点与后台两句：应用名与 $INSTDIR 都在
+    const script = scriptOf(game)
+    expect(script).toContain(nsisText(game.name))
+    expect(script).toContain('安装目录：$INSTDIR')
+    expect(script).not.toContain('它要的能力')
+    expect(script).not.toContain('app.capabilities')
 
-    // 空清单念的是「不碰你的文件」；每个应用的措辞都与契约层逐字一致（烘进，不另写）
-    const gameScript = scriptOf(game)
-    expect(gameScript).toContain(nsisText('它要的能力：不碰你的文件'))
-    for (const meta of REAL_APPS) {
-      expect(scriptOf(meta), `${meta.id} 的能力措辞与契约层分叉了`).toContain(
-        nsisText(`它要的能力：${capabilitiesPhrase(meta.capabilities)}`)
-      )
-    }
-
-    // 包根带 backend.js（hasBackend 由调用方从归档条目读出来）：末尾多念一句后台，不占能力位
-    const backendScript = installerScript({ id: 'demo', name: '示范', version: '0.0.0-test', capabilities: [], hasBackend: true })
-    expect(backendScript).toContain(nsisText(`它要的能力：${capabilitiesPhrase([], true)}`))
+    // 归档根带 backend.js（hasBackend 由调用方从归档条目读出来，PK-040）：多念一句后台，措辞与契约层逐字一致
+    const backendScript = installerScript({ id: 'demo', name: '示范', version: '0.0.0-test', hasBackend: true })
     expect(backendScript).toContain(nsisText(BACKEND_PHRASE))
+    expect(backendScript).not.toContain('它要的能力')
+    // 没后台的不烘这一句
+    expect(scriptOf(ffmpeg)).not.toContain(nsisText(BACKEND_PHRASE))
   })
 })
 

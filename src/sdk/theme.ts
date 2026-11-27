@@ -63,7 +63,7 @@ function publish(snapshot: ThemeSnapshot): void {
   for (const fn of [...subscribers]) fn(snapshot)
 }
 
-/** 改本应用的主题档，立刻生效；不占 settings 能力（窗口观感族） */
+/** 改本应用的主题档，立刻生效；不走 settings 面（窗口观感族） */
 function setMode(mode: ThemeMode): void {
   // 'system' 这一档的实际亮暗由本窗口算：主进程没有 matchMedia，不该去猜
   const hint = mode === 'system' ? (prefersDark() ? 'dark' : 'light') : undefined

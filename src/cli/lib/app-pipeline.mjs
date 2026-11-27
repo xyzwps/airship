@@ -84,7 +84,7 @@ export function copyIcons(appDir, outDir) {
 
 /**
  * 后端按约定走：应用目录里有 `backend.ts` 或 `backend.js` 就有后台，没有就没有。
- * 不读清单、不认能力位——简单应用平铺一个文件；复杂应用在这个文件底下自己组织目录，
+ * 不读清单、不进配置——简单应用平铺一个文件；复杂应用在这个文件底下自己组织目录，
  * esbuild 把 import 的东西全 bundle 成包根那一份 `backend.js`（utilityProcess.fork 吃磁盘真文件，
  * 所以包里必须是编好的 JS；node 内置模块保持 external，其余随包带着走）。
  * 两份都在是作者没想清楚，响亮失败；编译失败也响亮失败，不产一个"安静没有后端"的包。

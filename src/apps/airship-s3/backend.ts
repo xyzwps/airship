@@ -4,7 +4,7 @@
  * 有它靠的是约定，不是清单：产包流水把这份文件（连同它 import 的 `backendStore.ts`）
  * 编成包根那份 `backend.js`，runtime 在包里看到那个条目才起进程。
  * 网络的事全在这里——渲染侧只剩填表、列表与进度条，清单因此不再要 `net`、
- * fs.read / fs.write 这三档（那条能力位与它的 CSP、同源豁免整族已于 2026-11-24 退场）。
+ * fs.read / fs.write 这三档（那一族与它的 CSP、同源豁免整族已于 2026-11-24 退场）。
  *
  * 线与规矩（契约见 airship 文档的 backend 一节）：
  *   - 启动后**第一件事**发 `{ ready: true }`，runtime 才把调用喂进来；

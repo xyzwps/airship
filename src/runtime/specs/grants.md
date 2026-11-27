@@ -10,7 +10,7 @@
 #### Scenario: GR-001 自己目录里的文件直接读得到
 - **WHEN** 应用读自己数据目录里一个存在的文件
 - **THEN** 拿到内容；读它的 `cache\` 同样直接给
-- **AND** 没声明 `dialog` 也能读写自己目录，两条不互相牵扯
+- **AND** 这份读写不需要任何清单声明，与对话框许可互不牵扯
 
 #### Scenario: GR-002 别的应用的地盘读不到也写不进
 - **WHEN** airship-ffmpeg 试着读写 `~\.airship\data\airship-s3\` 下的路径
@@ -26,7 +26,7 @@
 #### Scenario: GR-004 声明过的共享区可读写，未声明的拒
 - **WHEN** 一个声明了 `library` 的应用解析共享区里的路径
 - **THEN** 给出 `~\.airship\shared\library\...` 且能读写
-- **AND** 没 `shared` 能力或没声明这个命名空间的应用走同一条路会被拒（措辞见 `bridge.md` BR-007）
+- **AND** 没在这个命名空间的名单里应用走同一条路会被拒（措辞见 `bridge.md` BR-007）
 
 ### Requirement: 其余路径必须本次会话里用户显式选中
 #### Scenario: GR-005 对话框选中的文件才读得到

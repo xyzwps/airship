@@ -15,7 +15,7 @@ import App from './App.tsx'
 createAirshipApp({ meta: app, component: App, icon: './icon.png' })
 ```
 
-组件里拿到的 `api` 就是 runtime 的全部通道：用了 `api.settings.` / `api.proc.` 这类域，就回清单把对应能力声明上——没声明的一律拒绝，且拒绝时收到的是句人话。
+组件里拿到的 `api` 就是 runtime 的全部通道，随取随用。真正的边界只有三份名单：共享区看清单的 `sharedNamespaces`，外部工具看清单的 `tools`，文件路径看 grants 的授权表；越界时拒绝你收到的是一句人话。
 
 常用导出：`createAirshipApp`、`useTheme`、`Titlebar` / `IconButton` / `Glyph`、`AIRSHIP_CSP`。
 
@@ -28,6 +28,6 @@ createAirshipApp({ meta: app, component: App, icon: './icon.png' })
 ```tsx
 import { FakeAirship, mountUi } from '@airship/sdk/testing'
 
-const fake = new FakeAirship({ id: app.id, capabilities: app.capabilities })
+const fake = new FakeAirship({ id: 'hello', sharedNamespaces: [], tools: [] })
 const m = await mountUi(<MyApp api={fake.api} />, { fake })
 ```

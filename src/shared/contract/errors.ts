@@ -1,5 +1,5 @@
-import { TOOL_NAMES, capabilitiesPhrase } from './protocol.ts'
-import type { Capability, PlatformId } from './protocol.ts'
+import { TOOL_NAMES } from './protocol.ts'
+import type { PlatformId } from './protocol.ts'
 import type { AppMeta } from './app.ts'
 
 /**
@@ -9,10 +9,6 @@ import type { AppMeta } from './app.ts'
  * （src/runtime/specs/bridge.md）。所以主进程与测试替身必须共用一份：
  * 各写各的，就会出现"测试绿着但真实界面念的是另一句"。
  */
-
-/** 能力未声明 */
-export const capDenied = (app: string, cap: string): string =>
-  `${app} 没有声明 ${cap} 能力（要用它就在 apps/${app}/app.ts 的 capabilities 里声明）`
 
 /** 读未授权路径 */
 export const readDenied = (path: string): string =>
@@ -78,12 +74,6 @@ export const runtimeNotFound = (): string =>
   '找不到 airship runtime：先装 runtime（固定装在 %USERPROFILE%\\.airship\\runtime），' +
   '或把 AIRSHIP_PATH 指到它所在的目录。'
 
-/** 装应用前的能力确认念的那两句（与直跑那份同一套人话摘要；后台事实从包形状来） */
-export const installConfirmMessage = (name: string): string => `${name} 要装到这台机器上`
-export const installConfirmDetail = (list: readonly Capability[], hasBackend = false): string =>
-  `它要的能力：${capabilitiesPhrase(list, hasBackend)}。\n` +
-  '装完会在桌面留一个快捷方式，双击它就用 airship runtime 打开这个应用。'
-
 /* ---------------- 装包失败的措辞（应用安装器与直跑共用） ---------------- */
 
 /** 归档不合格：原因逐条列出来，一条都不抹 */
@@ -116,7 +106,7 @@ export const toolDenied = (app: string, tool: string): string =>
 
 /* ---------------- 后台程序的措辞（包根 backend.js 约定 ↔ api.backend） ---------------- */
 
-/** 包里没有 backend.js 却调了 api.backend：念约定，不念能力 */
+/** 包里没有 backend.js 却调了 api.backend：念约定 */
 export const backendAbsent = (app: string): string =>
   `${app} 没有自带后台程序：包根要有 backend.js——源项目里放一个 src/backend.ts 或 src/backend.js，产包就会带上`
 

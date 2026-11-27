@@ -1,30 +1,35 @@
 # @airship/contract
 
-airship 运行时与应用之间的契约层：能力表、清单类型、拒绝措辞、注册与包形状的判据。
+The contract layer between the airship runtime and its apps: manifest types,
+rejection wordings, and the single set of rules for registration and package layout.
 
-这一层只有类型、常量与纯函数，不 import 任何东西——产包侧、runtime 注册侧与应用安装器念的是**同一批函数**，所以"包能不能注册"这件事在全链路只有一份答案。
+Types, constants and pure functions only — it imports nothing. The packing pipeline,
+runtime registration and the app installer call the **same functions**, so whether a
+package is valid has exactly one answer across the whole chain.
 
-## 给应用作者的用途
+## For app authors
 
-应用清单（`src/app.ts`）用的类型从这儿来：
+The app manifest (`src/app.ts`) takes its types from here:
 
 ```ts
 import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
   name: 'My Todo',
-  description: '一句话说清这个应用是干什么的',
-  capabilities: []          // 唯一授权面，用不到就写空数组
+  description: 'One sentence on what this app does'
 }
 ```
 
-清单里**不写 id**：id 的唯一真源是项目 `package.json` 的 `name`，产包时注入包根 `manifest.json`。
+The manifest does NOT declare `id`: its only source is the project `package.json`
+`name`, injected into `manifest.json` at packing time.
 
-常用导出：
+Key exports:
 
-- `AppMeta` / `Capability` / `CAPABILITY_LABEL`——清单形状、能力位名单与每一位的中文念法；
-- `APP_ID_PATTERN`——应用 id 的规矩（1~32 位，小写字母开头，其后小写字母、数字与连字符）；id 取自 `package.json` 的 `name`，不在清单里声明；
-- `packageRules`——包（zip 归档 `<id>.airship`）的注册判据；
-- 各条拒绝路径的中文措辞——错误话术也只有一份真源。
+- `AppMeta` — the manifest shape; the remaining gates are the two name lists
+  (`sharedNamespaces`, `tools`) plus the grants path table;
+- `APP_ID_PATTERN` — id rules (1–32 chars, lowercase letter first, then lowercase
+  letters, digits, hyphens);
+- `packageRules` — rules for the package (zip archive `<id>.airship`);
+- rejection wordings — every refusal sentence has one source, too.
 
-装它通常不是你直装，而是 `npx create-airship-app` 建出来的项目骨架里已经带上。
+You usually get it through the skeleton created by `npx create-airship-app`.

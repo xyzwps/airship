@@ -3,7 +3,7 @@
 ## Purpose
 vcp —— FFmpeg 编排台：打开一个媒体文件，挑要保留的流、勾处理链、看将要执行的那行命令，
 把任务丢进串行队列。这本册子钉的是界面念得出什么、发给 ffmpeg 的命令行是什么形状、任务栏里念得出什么。
-窗口、主题、能力闸门、路径授权与 proc 白名单归 runtime（`src/runtime/specs/`），不在这里重复。
+窗口、主题、路径授权与 proc 白名单归 runtime（`src/runtime/specs/`），不在这里重复。
 
 > 真素材与真编码那一档（`just e2e`）要本机 ffmpeg 与素材才跑，
 > 默认跳过；实测数据记在 [架构](../../../../docs/architecture.md) §3.1。

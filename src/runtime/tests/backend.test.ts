@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
-import type { Capability } from '@airship/contract'
 
 /**
  * BE-001 ~ BE-014：应用自带后台程序的通道与生命周期。
@@ -170,7 +169,7 @@ const DAGOGO = 102
 const TODO = 104
 const NOTE = 106
 
-const base = { description: '带后端的示例应用', capabilities: [] as Capability[] }
+const base = { description: '带后端的示例应用' }
 
 // 两份额外夹具：todo / note 的包根带 backend.js（有后台由包形状判）；
 // dagogo 用真清单那份——夹具本就不往归档里放应用代码，包根没有那个条目，正是 BE-001 要念约定的对象。

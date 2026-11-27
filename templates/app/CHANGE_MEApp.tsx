@@ -8,7 +8,7 @@ import './CHANGE_ME.css'
  *
  * 三条约束是这个仓库的规矩，不是建议：
  *   1. 只引 `@airship/sdk` 与 `@airship/contract`，不许引 runtime（AP-013）；
- *   2. 碰系统只经 `api.`，用到哪个域就得在 `app.ts` 里声明哪个能力（AP-011）；
+ *   2. 碰系统只经 `api.`，共享区与外部工具要在 `app.ts` 的名单里声明（两份真名单）；
  *   3. 配色用宿主给的 CSS 变量（`var(--fg)` 那一族），不自己另调一套（主题三档由标题栏那颗键改，各应用各记各的）。
  */
 export default function ChangeMeApp({ api }: { api: AppApi }): JSX.Element {
@@ -16,7 +16,7 @@ export default function ChangeMeApp({ api }: { api: AppApi }): JSX.Element {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    // 应用专用接口都要声明能力：这里想读写设置，就把 'settings' 加进 app.ts 的 capabilities
+    // api 的通道随取随用：想读写设置，直接 api.settings. 就行，清单不再声明能力
     setReady(true)
   }, [api])
 

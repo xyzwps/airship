@@ -11,7 +11,7 @@ import { pickCsp } from './csp.ts'
  * dev 注入带 localhost 的那条（react-refresh 要一段
  * 内联脚本，`script-src 'self'` 会把它挡掉），产包注入收紧的那条。
  * 判据是 ctx 里有没有 bundle：build 才有 bundle，dev 没有。
- * 每个窗口注入的都是同一条——从前按清单 `net` 分档的那一档随能力位一起退场了（选档逻辑见 `csp.ts`）。
+ * 每个窗口注入的都是同一条——从前按清单 `net` 分档的那一档随 `net` 整族退场了（选档逻辑见 `csp.ts`）。
  */
 
 export function airshipCspPlugin(): {

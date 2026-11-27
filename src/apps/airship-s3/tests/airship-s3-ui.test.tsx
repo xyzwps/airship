@@ -111,7 +111,6 @@ function newFake(
   let io!: BackendIo
   const fake = new FakeAirship({
     id: app.id,
-    capabilities: app.capabilities,
     files: options.files,
     picks: options.picks,
     dropPaths: options.dropPaths,

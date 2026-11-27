@@ -44,7 +44,6 @@ function appImgSchemes(): string[] {
 function shelf(id: string): FakeAirship {
   return new FakeAirship({
     id,
-    capabilities: ['fs.read', 'fs.write', 'dialog', 'settings', 'shared', 'log'],
     sharedNamespaces: ['library']
   })
 }
