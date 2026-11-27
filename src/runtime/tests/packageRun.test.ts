@@ -46,9 +46,10 @@ const { resolvePackageEntry } = await import('../main/services/packageProtocol')
 
 const life = REAL_APPS.find((m) => m.id === 'airship-life-game')!
 
-/** 造一份最小清单（直跑判据用，不借任何真应用的名字） */
-function minimalMeta(id: string, capabilities: AppMeta['capabilities'] = []): AppMeta {
-  return { id, name: `样件 ${id}`, description: '直跑判据用的最小清单', capabilities }
+/** 造一份最小包清单（直跑判据用，不借任何真应用的名字；id 是产包注入那一步的投影） */
+function minimalMeta(id: string, capabilities: AppMeta['capabilities'] = []): AppMeta & { id: string } {
+  const meta: AppMeta = { name: `样件 ${id}`, description: '直跑判据用的最小清单', capabilities }
+  return { ...meta, id }
 }
 
 describe('命令行里挑包', () => {

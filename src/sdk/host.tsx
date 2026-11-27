@@ -23,12 +23,36 @@ import type { AppMeta } from '@airship/contract'
  */
 
 export interface AirshipAppOptions {
-  /** 应用自己的清单，就是 `app.ts` 导出的那份 */
+  /** 应用自己的清单，就是 `app.ts` 导出的那份（不含 id——id 另有三条来路，见 `resolveAppId`） */
   meta: AppMeta
   /** 应用组件：`({ api }) => …` */
   component: ComponentType<{ api: AppApi }>
   /** 包根那张源图的相对路径，只认 `'./icon.png'`；标题栏用它画那枚 15px 记号 */
   icon?: string
+  /** 工装与不走产包流水的入口显式给 id；不给就走下面两条自动来路 */
+  id?: string
+}
+
+/**
+ * 窗口身份里 id 的三条来路（优先级从高到低）：
+ *   1. 显式参数（用例与工装）；
+ *   2. 构建期注入的 `import.meta.env.AIRSHIP_APP_ID`——产包与 CLI 构建从 package.json 的 name 带来；
+ *   3. 文档自身的地址——`airship://<id>/…` 或 dev server 的 `/apps/<id>/index.html`。
+ * id 的真源是包名/目录名，不在 app.ts 里；三条都落空就响亮失败。
+ */
+export function resolveAppId(explicit?: string): string {
+  if (explicit) return explicit
+  const injected = import.meta.env.AIRSHIP_APP_ID
+  if (injected) return injected
+  const url = document.location.href
+  const pkg = url.match(/^airship:\/\/([^/]+)\//)
+  if (pkg?.[1]) return pkg[1]
+  const dev = url.match(/\/apps\/([^/]+)\/(?:index\.html)?(?:[?#]|$)/)
+  if (dev?.[1]) return dev[1]
+  throw new Error(
+    '认不出这个窗口的应用 id：走 airship 包或 CLI 构建时 id 由 package.json 的 name 注入，' +
+      '用例里给 AirshipRoot 传 id'
+  )
 }
 
 /**
@@ -54,9 +78,10 @@ export function createAirshipApp(options: AirshipAppOptions): void {
  * 画完没有"这三条判据有用例可挂（`src/sdk/tests/appWindow.test.tsx`）。
  * 走的是同一条渲染路径，不存在"测试里绿的那个宿主不是产品里那个宿主"。
  */
-export function AirshipRoot({ meta, component: Component, icon }: AirshipAppOptions): JSX.Element {
+export function AirshipRoot({ meta, component: Component, icon, id }: AirshipAppOptions): JSX.Element {
+  const appId = resolveAppId(id)
   const [docTitle, setDocTitle] = useState<string | null>(null)
-  const [api] = useState<AppApi>(() => createAirshipApi(meta.id, { onWindowTitle: setDocTitle }))
+  const [api] = useState<AppApi>(() => createAirshipApi(appId, { onWindowTitle: setDocTitle }))
   // 把主题画出来；改档的键在标题栏上，改完本文档所有 useTheme 实例一起跟上
   useTheme()
 
@@ -65,9 +90,9 @@ export function AirshipRoot({ meta, component: Component, icon }: AirshipAppOpti
    * 截出一张加载占位看着像跑起来了，其实什么都没验。
    */
   useEffect(() => {
-    document.documentElement.dataset.airshipMounted = meta.id
-  }, [meta.id])
-  useReportShotReady([meta.id])
+    document.documentElement.dataset.airshipMounted = appId
+  }, [appId])
+  useReportShotReady([appId])
 
   return (
     <div className="app-window">

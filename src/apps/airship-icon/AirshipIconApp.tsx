@@ -7,7 +7,7 @@ import { looksLikeSvg, svgBox } from './svgFit.ts'
 import './airship-icon.css'
 
 /**
- * 图标工坊：一份 SVG 进，`icon.png` 与 `icon.ico` 出（标准见 docs/apps/icon.md）。
+ * Icon Helper：一份 SVG 进，`icon.png` 与 `icon.ico` 出（标准见 docs/apps/icons.md）。
  *
  * 三条约束照旧：只引 sdk 与 contract（AP-013）、碰系统只经 `api.` 且能力位在 `app.ts`
  * 里声明齐（AP-011）、配色一律用宿主给的变量。
@@ -130,10 +130,10 @@ export default function AirshipIconApp({ api }: { api: AppApi }): JSX.Element {
 
   return (
     <div className="airship-icon">
-      <h2>图标工坊</h2>
+      <h2>Icon Helper</h2>
       <p className="hint">
         给一份 SVG，出这两张：`icon.png`（标题栏左上角那枚 15 × 15 记号的源图）与 `icon.ico`（外壳那 7 帧）。
-        标准与尺寸见 docs/apps/icon.md；现在亮的是{resolved === 'dark' ? '暗色' : '亮色'}那一档。
+        标准与尺寸见 docs/apps/icons.md；现在亮的是{resolved === 'dark' ? '暗色' : '亮色'}那一档。
       </p>
 
       <div className="row">

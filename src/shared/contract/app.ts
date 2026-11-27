@@ -1,73 +1,52 @@
 import type { Capability, PlatformId, SharedNamespace, ToolName } from './protocol.ts'
 
 /**
- * 应用清单里的**纯数据**部分。
- *
- * 单独一个文件、不带任何组件引用，是有意的：主进程也要读它做能力校验和
- * 包布局，而主进程不该 import 任何渲染侧代码。所以约定是——
- *
- *   apps/<id>/app.ts     导出 `app: AppMeta`（纯数据，产包器与 runtime 都能读）
- *   apps/<id>/index.html + main.tsx  入口文档与挂载脚本，包自持
- *   apps/<id>/icon.*     图标文件约定，有且只有一张
- *
- * 图标**不在这里**：它是表现层的东西，而且形式不该被限死——
- * 可能是多条 path，可能是 circle/rect/渐变，也可能就是一张位图。
- * 清单里写 `iconPath: string` 等于假定"图标必须是单条 path 的 SVG"，两个假定都错。
+ * The pure-data half of an app manifest: `AppMeta` and `APP_ID_PATTERN`.
+ * Kept in its own component-free file because the main process reads it for
+ * capability checks and package layout. Conventions for other files
+ * (entry document, icons) live in docs/apps/files.md.
  */
 
 /**
- * 应用 id 的唯一形状。
- *
- * id 同时是包文件名前段（`<id>.airship`）、`~/.airship/data` 下的数据目录名、`airship://<id>/…` 里的那一段，
- * 以及 `relaunchCommand` 里的一个命令行 token（见 docs/todo.md TD-001）。
- * 这四处的硬性要求实测下来只有四条会坏：
- *   `#` 与 `?` 把 URL 里的 id 截断（错到别的应用上，且看不见）；
- *   `%` 让"校验用的串"和"解码后要用的目录名"分叉；
- *   `: < > " | * / \` 这些在 Windows 上做不了目录名；
- *   空白进 URL 段整个地址无效。全小写顺带把大小写折叠的撞名消掉。
- *
- * 界面显示名在 `name` 字段，那里不限字符——「墨读」「打勾勾」都是这么写的。
- * 产包器 code/pack-app.mjs 里另有一份（Node 跑不了本仓 TS），
- * 两份由 src/apps/tests/package.test.ts 钉成相等。
+ * The one and only shape of an app id — packing, registration, CLI and the
+ * scaffold all import this single check. app.ts does NOT declare the id: its
+ * only source is the project's package.json name (in this repo: the directory
+ * name under src/apps), injected by packing into manifest.json. The id doubles
+ * as the archive name (`<id>.airship`), the data dir (`~/.airship/data/<id>`),
+ * the URL segment (`airship://<id>/…`) and a token in `relaunchCommand`,
+ * which rules out: `#` / `?` (silently truncate the URL), `%` (validated
+ * string diverges from the decoded dir name), `: < > " | * / \` (illegal in
+ * Windows dir names) and whitespace (invalid URL segment). Lowercase avoids
+ * case-folded collisions. Display names are unrestricted — that is what
+ * `name` is for.
  */
 export const APP_ID_PATTERN = /^[a-z][a-z0-9-]{0,31}$/
 
 export interface AppMeta {
-  /** 唯一 id，同时是它在 userData 下的数据目录名；形状见 APP_ID_PATTERN */
-  id: string
-  /** 界面显示名 */
+  /** Display name shown in the UI */
   name: string
-  /** 一句话说清它是干什么的 */
+  /** One sentence on what the app does */
   description: string
-  /** 声明式权限。没写的一律拒绝，且抛可读原因 */
+  /** Declared permissions; anything missing is refused with a readable reason */
   capabilities: Capability[]
-  /** 要访问的 runtime 托管共享命名空间；必须含 'shared' 能力才有意义 */
+  /** Runtime-managed shared namespaces to access; only meaningful with the 'shared' capability */
   sharedNamespaces?: SharedNamespace[]
-  /** 内容区是否去掉 runtime 给的默认内边距（要自己控制版心的应用用） */
+  /** Drop the runtime's default content padding (apps that control their own layout) */
   flush?: boolean
   /**
-   * 这个应用窗口的尺寸。**不写就用 runtime 的默认（1100×740）**，两个字段各自独立：
-   * 只写宽度就是宽度自定、高度跟 runtime。
-   *
-   * 这是应用自身的事实：wsld 是两栏表格、打勾勾是一列清单，最佳版心宽度本来就不一样，
-   * 让 runtime 去猜每个应用的版式等于 runtime 替应用做决定。
-   *
-   * runtime **不记窗口状态**（尺寸与位置都不记），所以改这两个数立刻生效，也不需要先清掉什么记忆
-   * ——判据见 `src/runtime/specs/runtime.md` SH-015 / SH-016 / SH-018。
+   * Window size; omit either field to take the runtime default (1100×740).
+   * Layout is the app's own fact, not a runtime guess. The runtime persists
+   * no window state, so edits here take effect immediately
+   * (see src/runtime/specs/runtime.md SH-015 / SH-016 / SH-018).
    */
   defaultWidth?: number
   defaultHeight?: number
   /**
-   * 只在这些平台上可用。**不写 = 全平台**，写了 = 只有列出的平台算可用。
-   *
-   * 这是应用自身的事实，不是 runtime 的表现决定：依赖 `wslc.exe` 的东西在别的环境上
-   * 根本跑不起来，硬开只会给用户一句错误。
-   * runtime 开窗口时按它拒绝（措辞见 shared/errors.ts）。
+   * Platforms where the app works; omitted = all platforms.
+   * The runtime refuses to open a window otherwise (wording: `platformIssue`
+   * in src/shared/contract/errors.ts).
    */
   platforms?: PlatformId[]
-  /**
-   * 这个应用要用的外部工具（runtime 的工具表里的名字）。
-   * 声明了才拿得到路径，也只有这些路径能进 proc 白名单。
-   */
+  /** External tools from the runtime's tool table; declared names get their paths and the proc whitelist */
   tools?: ToolName[]
 }

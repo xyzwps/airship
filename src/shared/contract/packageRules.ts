@@ -74,8 +74,10 @@ export const ALLOWED_KEYS = [
 /** 被明确驳回过的表现字段（与 AP-007 同一理由） */
 export const REJECTED_KEYS = ['iconPath', 'icon', 'order'] as const
 
-/** 包清单 = 应用清单 + 包格式的三个字段 */
+/** 包清单 = 应用清单 + id（由产包从 package.json name 注入，app.ts 不写）+ 包格式的三个字段 */
 export interface PackageManifest extends AppMeta {
+  /** Unique id; also its data dir name under `~/.airship/data/` */
+  id: string
   schemaVersion: number
   sdkVersion: string
   entry?: string

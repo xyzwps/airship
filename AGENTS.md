@@ -81,13 +81,15 @@ runtime 给应用窗口的 DOM 只有 SDK 那一份——`src/runtime` 里没有
 一个应用该有的文件：`package.json`、`app.ts`（纯数据清单）、`index.html`（入口文档，
 引 `./main.tsx`，**里面不写 CSP**）、`main.tsx`（一行 `createAirshipApp({ meta, component, icon })`）、
 `icon.png`（**只认这一张源图**，不套底板，颜色烘进图里；svg / jpg / jpeg / webp 于 2026-11-26 退场，留着会点名拒绝）、
-`icon.ico`（任务栏那颗外壳图标，多尺寸 16~256，**存成文件**）；缺哪件产包期炸哪件。图标标准见 [docs/apps/icon.md](docs/apps/icon.md)。
+`icon.ico`（任务栏那颗外壳图标，多尺寸 16~256，**存成文件**）；缺哪件产包期炸哪件。图标标准见 [docs/apps/icons.md](docs/apps/icons.md)。
 **产包与安装期都不转图标格式**——`.ico` 就是应用目录里存的那份，改了源图要自己重出，产包只把它随源图搬进包根。
 **runtime 侧任何文件都不用改**——runtime 运行期注册命令行指来的包（`airship.exe <id>.airship`），
 不扫磁盘、没有"包根"那回事。这条有用例守着（AP-010：runtime 产品代码里不许出现具体应用 id 的字面量）。
 
-清单只写"这个应用自己的事实"：`id / name / description / capabilities / platforms / tools /
-sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `iconPath`、`order` 这类表现或关系字段
+清单只写"这个应用自己的事实"：`name / description / capabilities / platforms / tools /
+sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `id`——它的唯一真源是项目 `package.json`
+的 `name`（本仓就是 `src/apps/<id>` 的目录名），产包期注入 `manifest.json`；清单里再写一遍就有写岔的机会（AP-003）。
+**不写** `iconPath`、`order` 这类表现或关系字段
 （都被驳回过）——图标是文件约定，排序不存在（没有启动器格子要排）。
 `capabilities` 是唯一授权面，没声明的一律拒绝；用不到就写 `[]`（生命游戏就是这么起的）。
 用了 `api.settings.` / `api.proc.` 这些域就必须声明对应能力，AP-011 会扫。

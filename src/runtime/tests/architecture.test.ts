@@ -134,7 +134,7 @@ function areaTarget(file: string, spec: string): string | null {
 }
 
 describe('应用注册', () => {
-  it('每个应用目录都有 app.ts、index.html、main.tsx 与一张图标，且 id 与目录名一致', () => {
+  it('每个应用目录都有 app.ts、index.html、main.tsx 与一张图标，且 app.ts 不写 id', () => {
     const dirs = readdirSync(APPS_DIR).filter(
       (n) => statSync(join(APPS_DIR, n)).isDirectory() && n !== 'specs' && n !== 'tests'
     )
@@ -155,7 +155,7 @@ describe('应用注册', () => {
       const stale = readdirSync(join(APPS_DIR, dir)).filter((n) => /^icon\.(svg|jpe?g|jpeg|webp|gif|bmp)$/.test(n))
       expect(stale, `${dir}/ 根上不许留已退场的源图格式：${stale.join(', ')}`).toEqual([])
       const meta = readFileSync(join(APPS_DIR, dir, 'app.ts'), 'utf8')
-      expect(meta, `${dir}/app.ts 的 id 必须等于目录名`).toContain(`id: '${dir}'`)
+      expect(meta, `${dir}/app.ts 不该写 id（唯一真源是目录名 / package.json 的 name，产包注入）`).not.toMatch(/^\s*id:/m)
     }
   })
 

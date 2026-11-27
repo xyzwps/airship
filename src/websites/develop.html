@@ -94,7 +94,7 @@
   README.md
   .gitignore
   src/
-    app.ts              纯数据清单：id / name / description / capabilities
+    app.ts              纯数据清单：name / description / capabilities（id 不写，真源是 package.json 的 name）
     App.tsx             组件本体，宿主把 api 当 prop 递进来
     app.css             版心：配色只用宿主给的 CSS 变量
     backend.ts          随包后台的入口：这份文件在，包根就有 backend.js（约定）
@@ -139,12 +139,11 @@ $ npm run pack
           </div>
 
           <h2 class="sub" id="minimal">读一读这个起点</h2>
-          <p>清单只写这个应用自己的事实——被驳回过的字段（<code>iconPath</code>、<code>order</code>）不在里面，后台也不在这里：</p>
+          <p>清单只写这个应用自己的事实——<code>id</code> 不在里面（真源是根 <code>package.json</code> 的 <code>name</code>，产包时注入 <code>manifest.json</code>），被驳回过的字段（<code>iconPath</code>、<code>order</code>）也不在，后台更不在这里：</p>
           <pre><code>// src/app.ts（手脚架起点）
 import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
-  id: 'my-todo',
   name: 'my-todo',
   description: '一句话说清这个应用是干什么的',
   capabilities: []        <span class="c">// 唯一授权面，用不到就写空数组；后台不在这行里（见下）</span>
@@ -221,7 +220,6 @@ parent.postMessage({ ready: true })</code></pre>
 import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
-  id: 'my-todo',
   name: '待办清单',
   description: '数据由随包自带的后端写进磁盘 JSON 的待办清单',
   capabilities: []        <span class="c">// 后台不在这行里——src/backend.ts 在，就有后台（约定）</span>
@@ -624,9 +622,9 @@ SHA256 26bf86dab56782fcf170c4c25286b30fe2fe2b417caae3045b3917b05cb701f9
                 <td><code>cd</code> 进项目根再跑。</td>
               </tr>
               <tr>
-                <td><code>app.ts 的 id "other-todo" 与 package.json 的 name "my-todo" 不一致：id 只有一个真源，改齐再产包</code></td>
-                <td>产包期两处对照——id 写进了两份文件，只许一处说了算。</td>
-                <td>把 <code>app.ts</code> 的 <code>id</code> 改成与根 <code>package.json</code> 的 <code>name</code> 相等。</td>
+                <td><code>…\src\app.ts 不该再写 id：清单的 id 由产包从 package.json 的 name 注入（唯一真源），把这一行删掉</code></td>
+                <td>id 只许一处说了算——写两遍就有写岔的机会，所以产包直接从根 <code>package.json</code> 的 <code>name</code> 注入 <code>manifest.json</code>。</td>
+                <td>删掉 <code>app.ts</code> 里的 <code>id</code> 那一行，再产包。</td>
               </tr>
               <tr>
                 <td><code>没有 C:\…\dist-apps\my-todo.airship：先跑 airship pack</code></td>

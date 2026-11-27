@@ -12,18 +12,14 @@ import { PLATFORM_IDS, TOOL_NAMES } from './protocol.ts'
  * 返回值是**人读的原因列表**——注册期直接炸，比运行到一半"能力查不到"好解释得多。
  */
 
-/** 清单本身的规矩：id 与目录名一致、字段合法、id 不重复 */
+/** 清单本身的规矩：id 合形状、id 不重复、字段合法。id 由产包注入，这里不再与目录名对账 */
 export function manifestProblems(
   file: string,
-  dirId: string,
-  meta: AppMeta | undefined,
+  meta: { id: string } & AppMeta,
   seen: readonly string[]
 ): string[] {
-  if (!meta) return [`${file}: 没导出 app`]
   const out: string[] = []
-  // 先判形状再判一致：id 写成「墨读」时，"与目录名不一致"是最没用的那句
   if (!APP_ID_PATTERN.test(meta.id)) out.push(`${file}: ${badAppId(meta.id)}`)
-  if (meta.id !== dirId) out.push(`${file}: 清单 id "${meta.id}" 与目录名 "${dirId}" 不一致`)
   if (seen.includes(meta.id)) out.push(`${file}: id 重复 "${meta.id}"`)
   for (const tool of meta.tools ?? []) {
     if (!(TOOL_NAMES as readonly string[]).includes(tool)) out.push(`${file}: ${unknownTool(meta.id, tool)}`)

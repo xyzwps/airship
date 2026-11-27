@@ -1,18 +1,18 @@
 # airship-icon
 
 ## Purpose
-图标工坊管的是"给一份 SVG，出这两张图"这一件事：`icon.png`（包根那张源图）与 `icon.ico`（外壳那 7 帧）。
+Icon Helper 管的是"给一份 SVG，出这两张图"这一件事：`icon.png`（包根那张源图）与 `icon.ico`（外壳那 7 帧）。
 一本册子只管这块用户可见的东西——产包与安装期不转格式（AGENTS.md 本机事实），所以"转换"必须发生在应用里，
 而应用里出的东西对不对，就看这本册子。像素本身画得好不好归截图走查（`just check-ui`）。
 
 ### Requirement: 输入只接 SVG，读不到就说读不到
-依据：`docs/apps/icon.md` 那份标准的上游就是一份 SVG；窗口侧拿到盘上的真路径只有一条合法来路
+依据：`docs/apps/icons.md` 那份标准的上游就是一份 SVG；窗口侧拿到盘上的真路径只有一条合法来路
 （`dialog.openFiles` 会把选中路径授一次读，见 grants.md），拖进来的 File 对象能不能读出字节是 Electron 的行为，
 验不了就不能当它成立（AGENTS.md：没解决就说没解决）。
 
 #### Scenario: IC-001 第一屏读得到三条来路
 - **WHEN** 打开这个应用
-- **THEN** 界面上读得到「图标工坊」与「选 SVG 文件」
+- **THEN** 界面上读得到「Icon Helper」与「选 SVG 文件」
 - **AND** 读得到那句「拖一份 .svg 进来、按「选 SVG 文件」，或把源码贴进下面那个框。」
 
 #### Scenario: IC-002 根标签没有 `<svg>` 的就拒在门口
@@ -70,7 +70,7 @@
 - **AND** 卷上那个路径读不到任何东西
 
 ### Requirement: 出的 icon.ico 是标准那 7 帧
-依据：标准形状由仓内 12 张真 ico 实测得出（`docs/apps/icon.md`：7 帧升序、每帧 32 位、帧内是 PNG、
+依据：标准形状由仓内 12 张真 ico 实测得出（`docs/apps/icons.md`：7 帧升序、每帧 32 位、帧内是 PNG、
 目录里 256 写成 0、planes 为 0），拼完立刻用同一份读回函数自检，界面念的就是读回来的目录。
 
 #### Scenario: IC-012 写完之后从盘上读回目录，7 帧升序且每帧 32 位 PNG

@@ -1,7 +1,6 @@
 import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
-  id: 'airship-reader',
   name: 'Reader',
   description: 'EPUB / MOBI 电子书书架与阅读器',
   capabilities: [

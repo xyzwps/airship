@@ -1,7 +1,6 @@
 import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
-  id: 'airship-ffmpeg',
   name: 'FFmpeg',
   description: 'FFmpeg 编排台：选流、加处理链、看命令、跑队列',
   capabilities: ['fs.read', 'fs.write', 'dialog', 'settings', 'proc', 'notify', 'clipboard', 'log'],

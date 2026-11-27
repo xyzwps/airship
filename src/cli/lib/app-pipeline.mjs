@@ -35,8 +35,8 @@ export function locateApp(projectRoot) {
   )
 }
 
-/** 一次构建：vite 用内联配置跑，不要求项目里有 vite.config */
-async function buildApp(appDir, outDir) {
+/** 一次构建：vite 用内联配置跑，不要求项目里有 vite.config。id 经 define 注入给 SDK 宿主（包的窗口身份） */
+async function buildApp(appDir, outDir, id) {
   const { default: react } = await import('@vitejs/plugin-react')
   const { airshipCspPlugin } = await import('@airship/sdk/vite')
   await build({
@@ -44,6 +44,7 @@ async function buildApp(appDir, outDir) {
     root: appDir,
     base: './',
     logLevel: 'warn',
+    define: { 'import.meta.env.AIRSHIP_APP_ID': JSON.stringify(id) },
     resolve: {
       // 一个包内两份 react 会让 hooks 立刻炸
       dedupe: ['react', 'react-dom', 'react/jsx-runtime']
@@ -117,12 +118,10 @@ export async function buildAndPack({ projectRoot, id, packagesOut }) {
   const work = mkdtempSync(join(tmpdir(), 'airship-cli-'))
   try {
     const appTs = findAppManifestFile(appDir)
-    const manifest = await readAppManifest({ appTs, workDir: work })
-    if (manifest.id !== id) {
-      throw new Error(`app.ts 的 id "${manifest.id}" 与 package.json 的 name "${id}" 不一致：id 只有一个真源，改齐再产包`)
-    }
+    // id 的唯一真源是 package.json 的 name（命令行已校验形状），产包注入清单，app.ts 不写
+    const manifest = await readAppManifest({ appTs, workDir: work, id })
     const built = join(work, `built-${id}`)
-    await buildApp(appDir, built)
+    await buildApp(appDir, built, id)
     copyIcons(appDir, built)
     await compileBackend(appDir, built)
     const { file } = packPackage({ srcDir: built, outRoot: resolve(projectRoot, packagesOut), manifest })

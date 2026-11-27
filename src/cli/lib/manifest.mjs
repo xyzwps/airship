@@ -23,8 +23,8 @@ export function installedSdkVersion() {
   }
 }
 
-/** app.ts → 包清单：抹掉类型、import 那份纯数据、补上包格式的两个字段 */
-export async function readAppManifest({ appTs, workDir, sdkVersion }) {
+/** app.ts → 包清单：抹掉类型、import 那份纯数据、注入 id（唯一真源是 package.json 的 name）并补上包格式的两个字段 */
+export async function readAppManifest({ appTs, workDir, id, sdkVersion }) {
   const { transformWithOxc } = await import('vite')
   const source = readFileSync(appTs, 'utf8')
   const { code } = await transformWithOxc(source, appTs, { loader: 'ts', format: 'esm' })
@@ -33,7 +33,12 @@ export async function readAppManifest({ appTs, workDir, sdkVersion }) {
   const mod = await import(pathToFileURL(flat).href)
   const meta = mod.app
   if (!meta) throw new Error(`${appTs} 没导出 app`)
-  return { ...meta, schemaVersion: SCHEMA_VERSION, sdkVersion: sdkVersion ?? installedSdkVersion() }
+  if (meta.id !== undefined) {
+    throw new Error(
+      `${appTs} 不该再写 id：清单的 id 由产包从 package.json 的 name 注入（唯一真源），把这一行删掉`
+    )
+  }
+  return { id, ...meta, schemaVersion: SCHEMA_VERSION, sdkVersion: sdkVersion ?? installedSdkVersion() }
 }
 
 /** 找应用目录里的清单源文件：app.ts 优先，app.mjs / app.js 也认（纯 JS 项目不必碰 TS 工具链） */

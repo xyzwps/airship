@@ -1,7 +1,6 @@
 import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
-  id: 'airship-dago',
   name: 'Dago',
   description: '每天要做的事，勾掉就行',
   capabilities: ['dialog', 'settings', 'tray', 'notify', 'log'],

@@ -68,7 +68,7 @@ export function writeFixturePackages(root = packageFixtureRoot()): string {
  * 往某个包根里装一个包：清单、入口文档、一张图标（点名要后台就再带上包根那份 backend.js）。
  * 只补形状，不改清单——清单里写了什么，落盘就是什么。
  */
-export function installPackageAt(root: string, meta: AppMeta, opts?: { backend?: boolean }): string {
+export function installPackageAt(root: string, meta: AppMeta & { id: string }, opts?: { backend?: boolean }): string {
   const entries: Record<string, string | Uint8Array> = {
     [MANIFEST_NAME]: `${JSON.stringify(manifestOf(meta), null, 2)}\n`,
     [DEFAULT_ENTRY]: ENTRY_HTML,

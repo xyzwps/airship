@@ -36,7 +36,7 @@ describe('create-airship-app', () => {
     const srcDir = join(work, 'my-todo', 'src')
     expect(existsSync(srcDir), '应用文件该落在 src/').toBe(true)
     const appTs = readFileSync(join(srcDir, 'app.ts'), 'utf8')
-    expect(appTs).toContain("id: 'my-todo'")
+    expect(appTs, 'app.ts 不写 id：真源是根 package.json 的 name，产包注入 manifest.json').not.toMatch(/^\s*id:/m)
     expect(appTs).toContain("name: '待办清单'")
     expect(appTs).toContain('capabilities: []')
     expect(existsSync(join(srcDir, 'backend.ts')), '后端入口按约定平铺在 src/backend.ts').toBe(true)

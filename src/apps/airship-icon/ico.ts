@@ -1,7 +1,7 @@
 /**
  * ICO 容器：只这一处懂字节布局。
  *
- * 形状按 `docs/apps/icon.md` 那份标准，而字段值取自仓内 12 张真 ico 的实测
+ * 形状按 `docs/apps/icons.md` 那份标准，而字段值取自仓内 12 张真 ico 的实测
  * （books / wsld / templates 三张逐帧读过：`reserved=0 type=1 colors=0 reserved=0 planes=0 bits=32`，
  * 帧按尺寸升序，首帧偏移 118 = 6 + 7×16）——不是照记忆写的。
  *

@@ -1,4 +1,4 @@
-/* 图标工坊的版心。配色一律用宿主给的变量（--fg / --bg-elev / --border / --danger …），这里不写死颜色。 */
+/* Icon Helper 的版心。配色一律用宿主给的变量（--fg / --bg-elev / --border / --danger …），这里不写死颜色。 */
 
 .airship-icon {
   display: flex;

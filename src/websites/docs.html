@@ -90,7 +90,7 @@
 
 应用（八个，src/apps/&lt;id&gt;/，各自一个 airship 包）
   airship-reader Reader · airship-dago Dago · airship-life-game Life Game
-  airship-ffmpeg FFmpeg · airship-wsld WSLD · airship-svg-editor SVG Editor · airship-s3 S3 · airship-icon 图标工坊
+  airship-ffmpeg FFmpeg · airship-wsld WSLD · airship-svg-editor SVG Editor · airship-s3 S3 · airship-icon Icon Helper
   每个应用 = &lt;id&gt;.airship 归档 + 它自己的每用户安装器 + 一枚快捷方式</code></pre>
           </figure>
           <p>
@@ -181,7 +181,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
               </div>
               <div class="dg-row" style="margin-top: 10px">
                 <div class="dg-cell pkg"><b>包自持</b><span class="mono">airship://&lt;id&gt;/index.html</span> · 归档 <code>&lt;id&gt;.airship</code>（一个 zip 换了扩展名）· 入口里的引用不许越出包（PK-006）</div>
-                <div class="dg-cell pkg"><b>清单 app.ts</b><span class="mono">id · name · capabilities · tools · platforms · sharedNamespaces · flush · default*</span> 只写这个应用自己的事实</div>
+                <div class="dg-cell pkg"><b>清单 app.ts</b><span class="mono">name · capabilities · tools · platforms · sharedNamespaces · flush · default*（id 由产包注入）</span> 只写这个应用自己的事实</div>
               </div>
             </div>
 
@@ -399,8 +399,9 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
           <h2 class="sub" id="package">包格式与文档加载</h2>
           <p>
             归档文件名 <code>&lt;id&gt;.airship</code>——里面是一个 zip，条目名就是包内路径。<code>manifest.json</code> 由产包器从 <code>app.ts</code>
-            投影，带 <code>schemaVersion</code>（runtime 只认 1）与 <code>sdkVersion</code>。id 的形状、引用不许越出包，产包器（<code>code/pack-app.mjs</code>）与
-            runtime 侧（<code>@airship/contract</code>）各判一遍，两份由用例比对输出相等来钉。
+            投影：注入 <code>id</code>（唯一真源是项目 <code>package.json</code> 的 <code>name</code>，<code>app.ts</code> 不写）、补上
+            <code>schemaVersion</code>（runtime 只认 1）与 <code>sdkVersion</code>。id 的形状、引用不许越出包，产包器与 runtime 注册侧过的是
+            <code>@airship/contract</code> 那同一份判据。
           </p>
           <p>
             为什么有两份判据：Node 自己解不开本仓 TS 里那种不带扩展名的相对 import，所以 <code>.mjs</code> 引不了 <code>.ts</code>。也因此，被 Node
@@ -585,7 +586,7 @@ just app-installer hello   <span class="c"># 产 release/apps/hello-Setup-&lt;�
           <h2 class="sub" id="manifest">清单怎么写</h2>
           <p>清单只写"这个应用自己的事实"：</p>
           <pre><code>export const app: AppMeta = {
-  id: 'hello',                    <span class="c">// ^[a-z][a-z0-9-]{0,31}$：同时是包名前段、数据目录名、airship:// 里那一段</span>
+                                  <span class="c">// id 不写：唯一真源是 package.json 的 name（^[a-z][a-z0-9-]{0,31}$），产包注入 manifest.json</span>
   name: '你好',                    <span class="c">// 界面显示名，不限字符</span>
   description: '一句话说清它是干什么的',
   capabilities: [],               <span class="c">// 唯一授权面，用不到就写空数组</span>
@@ -650,7 +651,7 @@ just app-installer hello   <span class="c"># 产 release/apps/hello-Setup-&lt;�
           </ul>
           <p>
             现有 24 本：runtime 8 本（bridge / grants / logging / proc-tools / runtime / storage / theme / tray）+ 应用区 2 本（app-model / package）+ 共享 2 本（library /
-            textdecode）+ 应用 12 本（Reader、Dago、Life Game、FFmpeg、SVG Editor、S3、图标工坊各一本，airship-wsld 五本）。索引与前缀表见 <code>docs/specs/index.md</code>——新能力的两字母前缀要取没被占用的，索引表里查。
+            textdecode）+ 应用 12 本（Reader、Dago、Life Game、FFmpeg、SVG Editor、S3、Icon Helper各一本，airship-wsld 五本）。索引与前缀表见 <code>docs/specs/index.md</code>——新能力的两字母前缀要取没被占用的，索引表里查。
           </p>
 
           <h2 class="sub" id="tests">用例与替身</h2>

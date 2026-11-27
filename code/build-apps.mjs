@@ -35,7 +35,7 @@ const OUT_ROOT = resolve(process.env.AIRSHIP_APPS_OUT ?? join(ROOT, 'dist-apps')
 // runtime 在安装器线，取根 package.json 等于清单在说谎
 const SDK_VERSION = JSON.parse(readFileSync(join(ROOT, 'src', 'sdk', 'package.json'), 'utf8')).version
 
-/** app.ts → 包清单：抹掉类型、import 那份纯数据、补上包格式的三个字段 */
+/** app.ts → 包清单：抹掉类型、import 那份纯数据、注入 id（目录名，唯一真源）并补上包格式的三个字段 */
 async function readManifest(dirId, work) {
   const source = readFileSync(join(SRC_APPS, dirId, 'app.ts'), 'utf8')
   const { code } = await transformWithOxc(source, `${dirId}/app.ts`, { loader: 'ts', format: 'esm' })
@@ -44,7 +44,8 @@ async function readManifest(dirId, work) {
   const mod = await import(pathToFileURL(flat).href)
   const meta = mod.app
   if (!meta) throw new Error(`src/apps/${dirId}/app.ts 没导出 app`)
-  return { ...meta, schemaVersion: SCHEMA_VERSION, sdkVersion: SDK_VERSION }
+  if (meta.id !== undefined) throw new Error(`src/apps/${dirId}/app.ts 不该再写 id：id 的真源是目录名，产包注入清单`)
+  return { id: dirId, ...meta, schemaVersion: SCHEMA_VERSION, sdkVersion: SDK_VERSION }
 }
 
 function dirBytes(dir) {

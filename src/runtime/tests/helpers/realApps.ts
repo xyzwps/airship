@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { manifestProblems } from '@airship/contract'
 import { ICON_PATTERN, RETIRED_ICON_PATTERN, entryOf, packageManifestProblems, DEFAULT_ENTRY } from '@airship/contract'
@@ -22,9 +22,15 @@ const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 export const APPS_DIR = join(SRC, 'apps')
 const manifests = import.meta.glob<{ app: AppMeta }>('../../../apps/*/app.ts', { eager: true })
 
-/** 仓库里的应用清单，按 id 序 */
-export const REAL_APPS: AppMeta[] = Object.values(manifests)
-  .map((m) => m.app)
+/**
+ * 仓库里的应用清单，按 id 序。
+ *
+ * id 由**目录名**注入——产包流水（`code/build-apps.mjs` 与 `src/cli/lib/manifest.mjs`）
+ * 认的是同一件事：`app.ts` 不写 id，真源是项目 `package.json` 的 name（本仓即目录名）。
+ * 工装在这里补上那一步，投影出的清单才与产包落盘的 `manifest.json` 同形。
+ */
+export const REAL_APPS: (AppMeta & { id: string })[] = Object.entries(manifests)
+  .map(([file, m]) => ({ ...m.app, id: basename(dirname(file)) }))
   .sort((a, b) => a.id.localeCompare(b.id))
 
 export const REAL_APP_IDS: string[] = REAL_APPS.map((m) => m.id).sort()
@@ -73,17 +79,17 @@ export function appSourceProblems(id: string): string[] {
   return out
 }
 
-/** 把源码清单投影成一份包清单（补上包格式那三个字段） */
-export function manifestOf(meta: AppMeta, sdkVersion = '0.0.0-test'): Record<string, unknown> {
+/** 把源码清单投影成一份包清单（补上产包注入的 id 与包格式那三个字段） */
+export function manifestOf(meta: AppMeta & { id: string }, sdkVersion = '0.0.0-test'): Record<string, unknown> {
   return { ...meta, schemaVersion: 1, sdkVersion, entry: DEFAULT_ENTRY }
 }
 
 /** 清单投影过的是产包器与 runtime 侧同一份判据；这里给用例一个"应该零问题"的断言入口 */
-export function manifestProblemsOf(meta: AppMeta): string[] {
-  const projected = manifestOf(meta)
+export function manifestProblemsOf(meta: AppMeta & { id: string }): string[] {
+  const projected = manifestOf(meta) as unknown as AppMeta & { id: string }
   return [
     ...packageManifestProblems(projected, `src/apps/${meta.id}/app.ts`),
-    ...manifestProblems(`src/apps/${meta.id}/app.ts`, meta.id, meta, [])
+    ...manifestProblems(`src/apps/${meta.id}/app.ts`, projected, [])
   ]
 }
 

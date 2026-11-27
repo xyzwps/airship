@@ -4,7 +4,7 @@ import { PNG_SIGNATURE, squarePng } from './helpers/png.ts'
 
 /**
  * ICO 容器层的判据（册子：specs/airship-icon.md 的「出的 icon.ico 是标准那 7 帧」）。
- * 字段值取自仓内 12 张真 ico 的实测，见 docs/apps/icon.md 与 ico.ts 的头注。
+ * 字段值取自仓内 12 张真 ico 的实测，见 docs/apps/icons.md 与 ico.ts 的头注。
  */
 function frames(sizes: readonly number[]) {
   return sizes.map((size) => ({ size, png: squarePng(size) }))

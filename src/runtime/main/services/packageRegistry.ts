@@ -31,9 +31,12 @@ import { archiveEntryNames, readArchiveText } from './packageArchive'
  *      不顶替，因为旧窗口的文档还由旧归档供着，顶替等于把它半路抽走。
  */
 
+/** 注册表读到的清单形状：AppMeta 不写 id，id 随包清单由产包注入 */
+export type RegisteredMeta = AppMeta & { id: string }
+
 export interface InstalledPackage {
-  /** runtime 侧只看应用自己的事实那一份 */
-  meta: AppMeta
+  /** runtime 侧只看应用自己的事实那一份（id 是唯一的例外：数据目录、协议段都靠它） */
+  meta: RegisteredMeta
   /** 包清单原样（含 schemaVersion / sdkVersion / entry） */
   manifest: PackageManifest
   /** 归档文件的绝对路径：`…/<id>.airship` */
@@ -61,8 +64,8 @@ function packageProblemsAt(
   const at = join(archive, MANIFEST_NAME)
   const out = [
     ...packageManifestProblems(manifest, at),
-    // 与产包期同一份清单规矩：工具表、平台名、尺寸、id 与包名一致
-    ...manifestProblems(at, dirId, manifest, [])
+    // 与产包期同一份清单规矩：工具表、平台名、尺寸、id 形状与重复
+    ...manifestProblems(at, manifest, [])
   ]
   if (namesError) {
     out.push(`${archive}: 归档读不出来：${namesError}`)
@@ -171,7 +174,7 @@ export function appIds(): string[] {
 }
 
 /** 按名字典序排好的元数据；顺序是 runtime 的表现决定，不由应用自己声明 */
-export function appsInOrder(): AppMeta[] {
+export function appsInOrder(): RegisteredMeta[] {
   return [...byId.values()].map((p) => p.meta).sort((a, b) => a.name.localeCompare(b.name, 'zh'))
 }
 
@@ -216,7 +219,7 @@ export function availableOn(app: string, platform: PlatformId | 'unknown'): bool
 }
 
 /** 当前平台用得了的应用，按名字典序（截图工装按这个顺序逐个开窗口） */
-export function appsAvailableOn(platform: PlatformId | 'unknown'): AppMeta[] {
+export function appsAvailableOn(platform: PlatformId | 'unknown'): RegisteredMeta[] {
   return registeredPackages()
     .filter((p) => availableOn(p.meta.id, platform))
     .map((p) => p.meta)

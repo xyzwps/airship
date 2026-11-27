@@ -7,7 +7,6 @@ import type { AppMeta } from '@airship/contract'
  * 产包流水把它编成包根那份 `backend.js`，runtime 在包里看到那个条目才起进程。
  */
 export const app: AppMeta = {
-  id: '__APP_ID__',
   name: '__APP_NAME__',
   description: '数据由随包自带的后端写进磁盘 JSON 的待办清单',
   capabilities: []

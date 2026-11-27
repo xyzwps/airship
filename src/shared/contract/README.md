@@ -12,17 +12,18 @@ airship 运行时与应用之间的契约层：能力表、清单类型、拒绝
 import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
-  id: 'my-todo',
-  name: 'my-todo',
+  name: 'My Todo',
   description: '一句话说清这个应用是干什么的',
   capabilities: []          // 唯一授权面，用不到就写空数组
 }
 ```
 
+清单里**不写 id**：id 的唯一真源是项目 `package.json` 的 `name`，产包时注入包根 `manifest.json`。
+
 常用导出：
 
 - `AppMeta` / `Capability` / `CAPABILITY_LABEL`——清单形状、能力位名单与每一位的中文念法；
-- `APP_ID_PATTERN`——应用 id 的规矩（1~32 位，小写字母开头，其后小写字母、数字与连字符）；
+- `APP_ID_PATTERN`——应用 id 的规矩（1~32 位，小写字母开头，其后小写字母、数字与连字符）；id 取自 `package.json` 的 `name`，不在清单里声明；
 - `packageRules`——包（zip 归档 `<id>.airship`）的注册判据；
 - 各条拒绝路径的中文措辞——错误话术也只有一份真源。
 

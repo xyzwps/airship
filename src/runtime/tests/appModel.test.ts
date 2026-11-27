@@ -1,6 +1,8 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { readAppManifest } from '@airship/cli'
 import { iconProblems, manifestProblems } from '@airship/contract'
 import { platformIssue } from '@airship/contract'
 import { PLATFORM_IDS, TOOL_NAMES } from '@airship/contract'
@@ -30,12 +32,9 @@ import type { AppMeta } from '@airship/contract'
  * ——工装在 `helpers/realApps.ts`，那里写清了它只许住在这里。
  */
 
-function meta(over: Partial<AppMeta> & { id: string; name: string }): AppMeta {
-  return {
-    description: '测试',
-    capabilities: [],
-    ...over
-  } as AppMeta
+/** 合成清单投影：app.ts 不写 id，这里模拟的是产包注入 id 之后的那份形状 */
+function meta(over: Partial<AppMeta> & { id: string; name: string }): AppMeta & { id: string } {
+  return { description: '测试', capabilities: [], ...over } as AppMeta & { id: string }
 }
 
 function sourcesOf(dir: string): string[] {
@@ -55,9 +54,8 @@ function sourcesOf(dir: string): string[] {
 const root = packageFixtureRoot()
 
 describe('缺一件就在注册期说清', () => {
-  it('AP-001 缺清单、缺入口、缺图标都点名的报出来', () => {
-    expect(manifestProblems('apps/foo/app.ts', 'foo', undefined, [])).toEqual(['apps/foo/app.ts: 没导出 app'])
-    // 源码侧的四份文件：清单、入口文档、入口脚本、图标
+  it('AP-001 四份文件缺一件，产包期就说清缺什么', () => {
+    // 源码侧的四份文件：清单、入口文档、入口脚本、图标（app.ts 没导出 app 由产包流水当场抛）
     for (const id of REAL_APP_IDS) {
       expect(appSourceProblems(id), `${id} 的四份文件该齐`).toEqual([])
     }
@@ -82,9 +80,20 @@ describe('缺一件就在注册期说清', () => {
     }
   })
 
-  it('AP-003 清单 id 必须等于归档名，产包期与运行期用的是同一份规则', () => {
-    const bad = manifestProblems('apps/foo/app.ts', 'foo', meta({ id: 'bar', name: 'x' }), [])
-    expect(bad).toEqual(['apps/foo/app.ts: 清单 id "bar" 与目录名 "foo" 不一致'])
+  it('AP-003 清单 id 等于归档名：app.ts 不写 id，产包期从项目名注入', async () => {
+    // app.ts 源码里没有 id 字段——唯一真源是目录名 / package.json 的 name，产包注入 manifest.json
+    for (const id of REAL_APP_IDS) {
+      const appTs = readFileSync(join(APPS_DIR, id, 'app.ts'), 'utf8')
+      expect(appTs, `${id} 的 app.ts 不该再写 id`).not.toMatch(/^\s*id:/m)
+    }
+
+    // "写一遍"那一半：产包流水读到 app.ts 里留着 id，当场点名抛
+    const work = mkdtempSync(join(tmpdir(), 'airship-ap003-'))
+    const staleManifest = join(work, 'app.ts')
+    writeFileSync(staleManifest, "export const app = { id: 'dup', name: 'x', description: '', capabilities: [] }\n", 'utf8')
+    await expect(readAppManifest({ appTs: staleManifest, workDir: work, id: 'dup', sdkVersion: '0.0.0-test' })).rejects.toThrow(
+      '不该再写 id'
+    )
 
     // 每个真归档都过同一份判据，清单 id 与归档名一致
     const names = packageArchivesIn(root)
@@ -103,10 +112,9 @@ describe('缺一件就在注册期说清', () => {
   })
 
   it('AP-004 id 重复被拒', () => {
-    const dup = manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A' }), ['a'])
+    const dup = manifestProblems('apps/a/app.ts', meta({ id: 'a', name: 'A' }), ['a'])
     expect(dup).toEqual(['apps/a/app.ts: id 重复 "a"'])
-    expect(manifestProblems('apps/b/app.ts', 'b', meta({ id: 'a', name: 'B' }), ['a'])).toEqual([
-      'apps/b/app.ts: 清单 id "a" 与目录名 "b" 不一致',
+    expect(manifestProblems('apps/b/app.ts', meta({ id: 'a', name: 'B' }), ['a'])).toEqual([
       'apps/b/app.ts: id 重复 "a"'
     ])
 
@@ -120,7 +128,6 @@ describe('清单只写应用自己的事实', () => {
   it('AP-005 清单里不写 runtime 不认识的工具', () => {
     const bad = manifestProblems(
       'apps/a/app.ts',
-      'a',
       meta({ id: 'a', name: 'A', tools: ['ffmpeg', 'nope'] as never }),
       []
     )
@@ -132,7 +139,7 @@ describe('清单只写应用自己的事实', () => {
   })
 
   it('AP-006 平台字段只用认识的名字，不写就是全平台', () => {
-    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', platforms: ['win'] as never }), [])).toEqual(
+    expect(manifestProblems('apps/a/app.ts', meta({ id: 'a', name: 'A', platforms: ['win'] as never }), [])).toEqual(
       ['apps/a/app.ts: 不认识的平台 "win"（清单 platforms 只认 windows / macos / linux）']
     )
 
@@ -171,19 +178,19 @@ describe('清单只写应用自己的事实', () => {
 
   it('AP-012 默认窗口尺寸必须是正整数，不写就全按 runtime 的默认', () => {
     expect(
-      manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultWidth: 900, defaultHeight: 620 }), [])
+      manifestProblems('apps/a/app.ts', meta({ id: 'a', name: 'A', defaultWidth: 900, defaultHeight: 620 }), [])
     ).toEqual([])
-    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultWidth: 1280 }), [])).toEqual([])
-    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultWidth: 0 }), [])).toEqual([
+    expect(manifestProblems('apps/a/app.ts', meta({ id: 'a', name: 'A', defaultWidth: 1280 }), [])).toEqual([])
+    expect(manifestProblems('apps/a/app.ts', meta({ id: 'a', name: 'A', defaultWidth: 0 }), [])).toEqual([
       'apps/a/app.ts: 清单 defaultWidth 必须是正整数像素值，收到 0'
     ])
-    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultHeight: -1 }), [])).toEqual([
+    expect(manifestProblems('apps/a/app.ts', meta({ id: 'a', name: 'A', defaultHeight: -1 }), [])).toEqual([
       'apps/a/app.ts: 清单 defaultHeight 必须是正整数像素值，收到 -1'
     ])
-    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultWidth: 900.5 }), [])).toEqual([
+    expect(manifestProblems('apps/a/app.ts', meta({ id: 'a', name: 'A', defaultWidth: 900.5 }), [])).toEqual([
       'apps/a/app.ts: 清单 defaultWidth 必须是正整数像素值，收到 900.5'
     ])
-    expect(manifestProblems('apps/a/app.ts', 'a', meta({ id: 'a', name: 'A', defaultWidth: 'wide' as never }), [])).toEqual(
+    expect(manifestProblems('apps/a/app.ts', meta({ id: 'a', name: 'A', defaultWidth: 'wide' as never }), [])).toEqual(
       ['apps/a/app.ts: 清单 defaultWidth 必须是正整数像素值，收到 "wide"']
     )
 
@@ -213,7 +220,7 @@ describe('命令行指来的包就是应用名单', () => {
 
   it('AP-010 加一个应用不改动 runtime 的任何文件', () => {
     // 字面量扫描住在 architecture.test.ts（它才有"runtime 侧全貌"这份清单），
-    // 这里钉的是另一半：每个应用目录该有的四份文件都在，id 与目录名一致
+    // 这里钉的是另一半：每个应用目录该有的四份文件都在，包名由目录名（= id）定
     for (const id of REAL_APP_IDS) {
       expect(appSourceProblems(id), `src/apps/${id}`).toEqual([])
     }

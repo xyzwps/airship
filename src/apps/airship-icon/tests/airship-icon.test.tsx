@@ -58,10 +58,10 @@ beforeEach(() => {
   raster.calls.length = 0
 })
 
-describe('图标工坊的输入', () => {
+describe('Icon Helper 的输入', () => {
   it('IC-001 第一屏读得到三条来路', async () => {
     const { m } = await open()
-    expect(m.text()).toContain('图标工坊')
+    expect(m.text()).toContain('Icon Helper')
     expect(m.text()).toContain('选 SVG 文件')
     expect(m.text()).toContain('拖一份 .svg 进来、按「选 SVG 文件」，或把源码贴进下面那个框。')
     m.unmount()
@@ -126,7 +126,7 @@ describe('图标工坊的输入', () => {
   })
 })
 
-describe('图标工坊的出图', () => {
+describe('Icon Helper 的出图', () => {
   it('IC-009 选好落点后，盘上读回来的开头是 PNG 签名', async () => {
     const { fake, m } = await open(['/out/icon.png'])
     await m.type('SVG 源码', GOOD_SVG)

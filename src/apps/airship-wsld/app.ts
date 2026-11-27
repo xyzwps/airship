@@ -1,7 +1,6 @@
 import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
-  id: 'airship-wsld',
   name: 'WSLD',
   description: 'WSL 容器与镜像的图形外壳：看列表、起停删、读日志、编排 run 命令',
   capabilities: ['fs.read', 'fs.write', 'dialog', 'settings', 'proc', 'notify', 'clipboard', 'log'],

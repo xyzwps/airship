@@ -17,7 +17,7 @@ airship runtime（一个 Electron 进程，src/runtime/，@airship/runtime）
 
 应用（八个，src/apps/<id>/，各自一个 airship 包）
   airship-reader Reader · airship-dago Dago · airship-life-game Life Game
-  airship-ffmpeg FFmpeg · airship-wsld WSLD · airship-svg-editor SVG Editor · airship-s3 S3 · airship-icon 图标工坊
+  airship-ffmpeg FFmpeg · airship-wsld WSLD · airship-svg-editor SVG Editor · airship-s3 S3 · airship-icon Icon Helper
   每个应用 = <id>.airship 归档 + 它自己的每用户安装器 + 一枚快捷方式
 ```
 
@@ -283,7 +283,7 @@ SDK 的流式上传与分块下载在后端进程的 HTTPS 模块上照跑，渲
 一个应用该有的文件：`package.json`、`app.ts`（纯数据清单）、`index.html`（入口文档，引 `./main.tsx`，
 **里面不写 CSP**）、`main.tsx`（一行 `createAirshipApp({ meta, component, icon })`）、
 `icon.png`（**只认这一张源图**，不套底板，颜色烘进图里；svg / jpg / jpeg / webp 于 2026-11-26 退场）。
-外加 `icon.ico`（任务栏那颗外壳图标，作者自备的多尺寸 16~256，产包只搬不转）。缺哪件产包期炸哪件，标准见 [docs/apps/icon.md](apps/icon.md)。
+外加 `icon.ico`（任务栏那颗外壳图标，作者自备的多尺寸 16~256，产包只搬不转）。缺哪件产包期炸哪件，标准见 [docs/apps/icons.md](apps/icons.md)。
 
 清单只写"这个应用自己的事实"：`id / name / description / capabilities / platforms / tools /
 sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `iconPath`、`order` 这类表现或关系字段
@@ -339,7 +339,7 @@ runtime 侧不再有扫包、拖装、启动器卸载的代码。
 | `airship-wsld` | WSLD | fs.read, fs.write, dialog, settings, proc, notify, clipboard, log | wslc | windows | 是 | 默认 |
 | `airship-svg-editor` | SVG Editor | settings, dialog, fs.read, fs.write, clipboard | — | 全 | 是 | 1440×900 |
 | `airship-s3` | S3 | settings, dialog, clipboard | — | 全 | 是 | 1180×760 |
-| `airship-icon` | 图标工坊 | dialog, fs.read, fs.write | — | 全 | 否 | 720×780 |
+| `airship-icon` | Icon Helper | dialog, fs.read, fs.write | — | 全 | 否 | 720×780 |
 
 `airship-dago` 与 `airship-s3` 各自带一份 `backend.ts`，产包后进包根 `backend.js`：盘的活与网络活都在自带的后端进程里做，
 窗口的清单不再为它们要 fs 或外连的口子（§6 末尾与 `backend.md`）。

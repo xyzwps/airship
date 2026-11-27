@@ -1,7 +1,6 @@
 import type { AppMeta } from '@airship/contract'
 
 export const app: AppMeta = {
-  id: 'airship-life-game',
   name: 'Life Game',
   description: '在 100 / 200 / 300 的网格上跑康威生命游戏，经典图形随手放，格子自己画',
   // 一件都不声明：这应用不需要文件、不需要设置、不需要通知，画完就走。

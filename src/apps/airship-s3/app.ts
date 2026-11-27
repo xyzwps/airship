@@ -12,7 +12,6 @@ import type { AppMeta } from '@airship/contract'
  * `settings` 存那一份源列表。
  */
 export const app: AppMeta = {
-  id: 'airship-s3',
   name: 'S3',
   description: '连着 S3 兼容的对象存储看桶与对象：浏览、上传、下载、预览、删除、复制临时链接',
   capabilities: ['settings', 'dialog', 'clipboard'],

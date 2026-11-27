@@ -2,7 +2,7 @@
   "name": "@airship/airship-icon",
   "version": "0.1.0",
   "private": true,
-  "description": "给一份 SVG，出符合 docs/apps/icon.md 的 icon.png 与 7 帧 icon.ico",
+  "description": "给一份 SVG，出符合 docs/apps/icons.md 的 icon.png 与 7 帧 icon.ico",
   "type": "module",
   "devDependencies": {
     "@airship/contract": "*",

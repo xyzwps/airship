@@ -11,7 +11,6 @@ import type { AppMeta } from '@airship/contract'
  * 不声明网络、不声明 proc：这应用全部东西都在本地算。
  */
 export const app: AppMeta = {
-  id: 'airship-svg-editor',
   name: 'SVG Editor',
   description: 'SVG 编辑工作台：形状与路径命令栈、布尔运算、对齐吸附、桌布描图、导出 SVG/PNG',
   capabilities: ['settings', 'dialog', 'fs.read', 'fs.write', 'clipboard'],

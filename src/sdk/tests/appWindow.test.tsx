@@ -19,19 +19,19 @@ import type { AppApi, AppMeta } from '@airship/contract'
 
 const ICON = 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='
 
-function meta(over: Partial<AppMeta> & { id: string; name: string }): AppMeta {
-  return { description: '测试用', capabilities: [], ...over } as AppMeta
+function meta(name: string, over: Partial<AppMeta> = {}): AppMeta {
+  return { name, description: '测试用', capabilities: [], ...over } as AppMeta
 }
 
-/** 宿主自己从 `window.airship` 造 api，所以这里只需要把替身挂上去 */
-function mountSdkHost(manifest: AppMeta, component: ComponentType<{ api: AppApi }>, icon: string | undefined = ICON) {
-  const fake = new FakeAirship({ id: manifest.id, capabilities: manifest.capabilities as never })
-  return mountUi(<AirshipRoot meta={manifest} component={component} icon={icon} />, { fake })
+/** 宿主自己从 `window.airship` 造 api，所以这里只需要把替身挂上去；id 走宿主显式参数（用例没有构建期注入） */
+function mountSdkHost(id: string, manifest: AppMeta, component: ComponentType<{ api: AppApi }>, icon: string | undefined = ICON) {
+  const fake = new FakeAirship({ id, capabilities: manifest.capabilities as never })
+  return mountUi(<AirshipRoot id={id} meta={manifest} component={component} icon={icon} />, { fake })
 }
 
 describe('应用窗口里宿主只添三样东西', () => {
   it('SH-011 应用窗口的标题栏只念应用名，三颗键各有可读名称', async () => {
-    const m = await mountSdkHost(meta({ id: 'airship-ffmpeg', name: 'airship-ffmpeg' }), () => <div className="app-body">编排台正文</div>)
+    const m = await mountSdkHost('airship-ffmpeg', meta('airship-ffmpeg'), () => <div className="app-body">编排台正文</div>)
     const visible = m.text()
     expect(visible).toContain('airship-ffmpeg')
     // 这扇窗就是那个应用，不需要再自报家门一次
@@ -46,14 +46,14 @@ describe('应用窗口里宿主只添三样东西', () => {
   })
 
   it('SH-012 要不要留白由清单说了算', async () => {
-    const flush = await mountSdkHost(meta({ id: 'plain', name: '素面应用', flush: true }), () => (
+    const flush = await mountSdkHost('plain', meta('素面应用', { flush: true }), () => (
       <div className="app-body">素面正文</div>
     ))
     expect(flush.container.querySelector('.app-window__body--flush'), 'flush 的包不该有内边距').not.toBeNull()
     expect(flush.text()).toContain('素面正文')
     flush.unmount()
 
-    const padded = await mountSdkHost(meta({ id: 'roomy', name: '要留白的应用' }), () => (
+    const padded = await mountSdkHost('roomy', meta('要留白的应用'), () => (
       <div className="app-body">留白正文</div>
     ))
     expect(padded.container.querySelector('.app-window__body')).not.toBeNull()
@@ -66,7 +66,7 @@ describe('应用窗口里宿主只添三样东西', () => {
     // 包自己内部再切一层懒加载：宿主那圈 Suspense 就是这时起作用
     const pending = new Promise<{ default: ComponentType<{ api: AppApi }> }>(() => undefined)
     const Slow = lazy(() => pending)
-    const m = await mountSdkHost(meta({ id: 'slow', name: '慢热应用' }), Slow)
+    const m = await mountSdkHost('slow', meta('慢热应用'), Slow)
     expect(m.container.querySelector('.spinner'), '加载途中该有占位').not.toBeNull()
     expect(m.text()).not.toContain('慢热正文')
     m.unmount()
@@ -81,7 +81,7 @@ describe('应用窗口里宿主只添三样东西', () => {
       }, [api])
       return null
     }
-    const m = await mountSdkHost(meta({ id: 'titled', name: '带标题的应用' }), Titled)
+    const m = await mountSdkHost('titled', meta('带标题的应用'), Titled)
     await m.settle()
     const center = m.container.querySelector('.titlebar__center')
     expect(center, '标题栏该有一块中段').not.toBeNull()
@@ -96,7 +96,7 @@ describe('应用窗口里宿主只添三样东西', () => {
   })
 
   it('SH-011b 包没给图标时标题栏也念得出应用名', async () => {
-    const m = await mountSdkHost(meta({ id: 'nograph', name: '没给图标的包' }), () => null, undefined)
+    const m = await mountSdkHost('nograph', meta('没给图标的包'), () => null, undefined)
     expect(m.text()).toContain('没给图标的包')
     expect(m.container.querySelector('.titlebar__brand')).not.toBeNull()
     m.unmount()

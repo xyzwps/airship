@@ -31,6 +31,8 @@ if (APP_OUT === '') throw new Error('app.vite.config.ts 要由 code/build-apps.m
 export default defineConfig({
   root: resolve(SRC, 'apps', APP_ID),
   base: './',
+  // SDK 宿主读的那份窗口身份（见 src/sdk/host.tsx）：打包注入，dev server 上则由文档 URL 现推
+  define: { 'import.meta.env.AIRSHIP_APP_ID': JSON.stringify(APP_ID) },
   resolve: {
     // 同 runtime 侧那条：一个包内两份 react 会让 hooks 立刻炸
     dedupe: ['react', 'react-dom', 'react/jsx-runtime']

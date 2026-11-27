@@ -10,9 +10,8 @@ import type { AppMeta } from '@airship/contract'
  * 核对判据在 AP-011（用了哪个域就得声明哪个能力）。
  */
 export const app: AppMeta = {
-  id: 'airship-icon',
-  name: '图标工坊',
-  description: '给一份 SVG，出符合 docs/apps/icon.md 的 icon.png 与 7 帧 icon.ico',
+  name: 'Icon Helper',
+  description: '给一份 SVG，出符合 docs/apps/icons.md 的 icon.png 与 7 帧 icon.ico',
   // dialog 问落点与选文件，fs.read 读那份 SVG，fs.write 写这两张产物（授权靠 saveFile 给的落点）
   capabilities: ['dialog', 'fs.read', 'fs.write'],
   defaultWidth: 720,

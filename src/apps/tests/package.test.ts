@@ -108,12 +108,7 @@ describe('包是一个自带清单的归档，名字由 id 定', () => {
     // 适配层露出的名字就是契约那一份（同源才谈得上"逐字相同"）
     expect(idShapeProblem('墨读')).toBe(badAppId('墨读'))
     expect(APP_ID_PATTERN.source).toBe(CONTRACT_APP_ID_PATTERN.source)
-    const fromContract = registryManifestProblems(
-      'apps/墨读/app.ts',
-      '墨读',
-      { id: '墨读', name: '墨读', description: '', capabilities: [] },
-      []
-    )
+    const fromContract = registryManifestProblems('apps/墨读/app.ts', { id: '墨读', name: '墨读', description: '', capabilities: [] }, [])
     expect(fromContract).toEqual([`apps/墨读/app.ts: ${badAppId('墨读')}`])
 
     // 现有八个应用的 id 全部通过这一条
