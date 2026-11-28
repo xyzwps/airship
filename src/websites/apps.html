@@ -41,8 +41,8 @@
           <p class="lede">
             这些是仓库里天天在用的工具（应用 id 统一带 <code>airship-</code> 前缀），每一个都是一个独立的 <code>&lt;id&gt;.airship</code> 包，跟外部写的应用走同一条路：
             <code>just app-installer &lt;id&gt;</code> 出它自己的安装器，装进每用户目录，桌面与开始菜单各留一枚快捷方式。
-            下面每张卡是它自己窗口的实拍（<code>just shot</code> 抓的），边界名单照 <code>src/apps/&lt;id&gt;/app.ts</code> 那份清单原样念——
-            <code>sharedNamespaces</code> 里没写过的共享区，runtime 一律拒绝。
+            下面每张卡是它自己窗口的实拍（<code>just shot</code> 抓的），清单照 <code>src/apps/&lt;id&gt;/app.ts</code> 原样念——
+            文件边界是 grants 的路径表：数据目录外只认本次会话里对话框显式选中的路径，越界 runtime 一律拒绝。
           </p>
 
           <div class="cards app-cards">
@@ -51,7 +51,7 @@
               <div class="body">
                 <h3>Reader <span class="id">airship-reader</span></h3>
                 <p>EPUB / MOBI 电子书书架与阅读器。</p>
-                <p class="app-meta">窗口 600×800 · <code>sharedNamespaces: ['library']</code>（runtime 托管的共享书库） · 册子 BK + 共享书库 LB</p>
+                <p class="app-meta">窗口 600×800 · 书库存在它自己数据目录的 <code>library/</code> 下 · 册子 BK + LB</p>
               </div>
             </article>
 

@@ -127,7 +127,6 @@ describe('连续写与副本', () => {
     const { paths, appDataDir, appCacheDir, appSettingsFile } = await import('../main/services/paths')
     // 先把缓存打出来：这一步模拟"runtime 刚启动、还不知道有这个应用"的那一刻
     const before = paths()
-    expect(before.shared['library'], '共享区照旧在').toBeTruthy()
 
     const data = appDataDir(late)
     expect(data).toBe(join(before.root, 'data', late))

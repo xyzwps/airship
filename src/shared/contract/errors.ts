@@ -17,10 +17,6 @@ export const readDenied = (path: string): string =>
 export const writeDenied = (path: string): string =>
   `没有写入权限：${path}（只能写应用数据目录，或用另存为对话框选定目标）`
 
-/** 共享命名空间未声明 */
-export const nsDenied = (app: string, ns: string): string =>
-  `${app} 没有声明共享命名空间 ${ns}（在 apps/${app}/app.ts 的 sharedNamespaces 里声明）`
-
 /** 拼路径越界 */
 export const pathEscape = (segments: readonly string[], label: string): string =>
   `路径越界：${segments.join('/')} 不在${label}内`

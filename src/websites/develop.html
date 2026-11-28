@@ -156,7 +156,7 @@ import App from './App.tsx'
 createAirshipApp({ meta: app, component: App, icon: './icon.png' })</code></pre>
           <p>
             组件就是普通 React。两条纪律：配色只用 <code>var(--fg)</code>、<code>var(--bg-elev)</code> 这一族宿主 CSS 变量，别写死颜色（否则与标题栏那颗主题键打架）；
-            想碰系统就经 <code>api.</code> 的对应域；要碰共享数据区得<strong>回 <code>app.ts</code> 把它写进 <code>sharedNamespaces</code> 名单</strong>——没声明的一律拒绝，且拒绝时界面收到的是一句中文人话；要跑这台机器上的外部程序，写在随包自带的 <code>backend.ts</code> 里，runtime 不认识任何具体工具。
+            想碰系统就经 <code>api.</code> 的对应域；文件边界是 <strong>grants 的路径表</strong>——数据目录外只认本次会话里对话框显式选中的路径，越界一律拒绝，且拒绝时界面收到的是一句中文人话；要跑这台机器上的外部程序，写在随包自带的 <code>backend.ts</code> 里，runtime 不认识任何具体工具。
           </p>
           <p>
             那颗计数器的数字住在 <code>src/backend.ts</code> 的内存里。整份文件就这么长——启动后第一件事报就绪，来一条 <code>{ seq, method }</code> 回一条 <code>{ seq, ok, value }</code>：

@@ -59,7 +59,6 @@ export const ALLOWED_KEYS = [
   'id',
   'name',
   'description',
-  'sharedNamespaces',
   'flush',
   'defaultWidth',
   'defaultHeight',

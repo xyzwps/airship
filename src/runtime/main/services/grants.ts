@@ -1,7 +1,6 @@
 import type { AppId } from '@airship/contract'
 import { readDenied, writeDenied } from '@airship/contract'
-import { sharedNamespacesOf } from './appRegistry'
-import { appCacheDir, appDataDir, isInside, sharedDirsFor } from './paths'
+import { appCacheDir, appDataDir, isInside } from './paths'
 import { log } from './logging'
 
 /**
@@ -9,10 +8,9 @@ import { log } from './logging'
  *
  * 规则很简单，也很好解释：
  *   1. 应用自己的 data/ 和 cache/ 目录内，随便读写。
- *   2. 应用 manifest 里声明过的共享命名空间目录内，也可读写（Reader 的书库，共享命名空间机制保留）。
- *   3. 其余路径，必须是用户本次会话里通过系统对话框显式选中的，才给读；
+ *   2. 其余路径，必须是用户本次会话里通过系统对话框显式选中的，才给读；
  *      选中目录则其后代一并可读。
- *   4. 写只额外开放给"另存为"对话框选中的那一个路径。
+ *   3. 写只额外开放给"另存为"对话框选中的那一个路径。
  *
  * 授权只在进程生命周期内有效，重启即清空——不持久化，避免越权残留。
  */
@@ -29,16 +27,8 @@ function bag(map: Map<AppId, Set<string>>, app: AppId): Set<string> {
   return set
 }
 
-/** 应用声明过的共享目录，天然可读写 */
-function sharedRoots(app: AppId): string[] {
-  const namespaces = sharedNamespacesOf(app)
-  if (namespaces.length === 0) return []
-  return Object.values(sharedDirsFor(namespaces)).filter((v): v is string => Boolean(v))
-}
-
 function inOwnSpace(app: AppId, target: string): boolean {
-  if (isInside(appDataDir(app), target) || isInside(appCacheDir(app), target)) return true
-  return sharedRoots(app).some((root) => isInside(root, target))
+  return isInside(appDataDir(app), target) || isInside(appCacheDir(app), target)
 }
 
 function granted(set: Set<string>, target: string): boolean {

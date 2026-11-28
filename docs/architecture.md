@@ -30,7 +30,7 @@ runtime 装一次，钉死在 `~\.airship\runtime`（每用户，不要管理员
 注册一份、开一个窗口；没带包路径就念一句用法退出，不存在"开一个空启动器等人挑"这条路。
 安装包的产物里没有一行应用代码，runtime 自己也没有渲染目标。加 / 更新 / 卸一个应用都不动 runtime。
 
-一个应用一个窗口一个渲染进程。应用只能通过 `window.airship` 碰系统，能碰什么必须先在自己的清单里声明。
+一个应用一个窗口一个渲染进程。应用只能通过 `window.airship` 碰系统，能碰什么由 grants 的路径表与身份闸守着。
 多个应用共用**一个 runtime 进程**：第二次启动把包路径转发给已在跑的那一份（见 §3）。
 
 代码分五个区，方向不许反（见 §4）：
@@ -41,7 +41,6 @@ runtime 装一次，钉死在 `~\.airship\runtime`（每用户，不要管理员
 | `src/sdk` | `@airship/sdk` | 宿主（标题栏 / 主题落地 / 留白 / 占位）、图标键、CSP、工装钩子；将来独立发布的那一份 |
 | `src/apps/<id>` | `@airship/<id>` | 八个应用，各自自持 `index.html` + `main.tsx` |
 | `src/shared/contract` | `@airship/contract` | 契约、清单类型、拒绝措辞、注册与包形状的规矩 |
-| `src/shared/library` | `@airship/library` | 共享书库（Reader 管的那一份） |
 | `src/shared/textdecode` | `@airship/textdecode` | 中文解码 |
 
 ## 2. 七条不变量
@@ -51,12 +50,12 @@ runtime 装一次，钉死在 `~\.airship\runtime`（每用户，不要管理员
 - **I-1 一个应用一个窗口一个渲染进程。** 隔离是窗口化真正买到的东西：一个应用崩了不带崩别人，
   改一个应用不用管其余七个。
 - **I-2 应用只能通过 `window.airship` 碰系统。** 看不到 `ipcRenderer`，也拿不到绝对路径以外的系统面；
-  越界的调用一律拒绝并给出读得懂的原因（措辞在 `@airship/contract`）。边界是一份真名单
-  （`sharedNamespaces`）加 grants 的路径表，再由身份闸守着归属。
+  越界的调用一律拒绝并给出读得懂的原因（措辞在 `@airship/contract`）。边界是 grants 的路径表，
+  再由身份闸守着归属。
 - **I-3 身份由 runtime 绑定注入，应用冒充不了别人。** preload 从启动参数注入 id，
   主进程再用 `event.sender` 反查归属二次确认。应用代码从不传自己的 id。
 - **I-4 数据由 runtime 统一托管。** 各应用的数据落在 `~\.airship\data\<id>\` 下它自己那一族，
-  应用不自己挑落盘位置。共享数据区（书库）由 runtime 创建与托管。
+  应用不自己挑落盘位置。
 - **I-5 加一个应用不改 runtime 侧任何文件。** 名单来自命令行指来的包，不是写死的 id 表。
   契约层刻意不维护 id 名单（`AppId = string`，运行期校验）。这条有 AP-010 守着：
   runtime 产品代码里不许出现具体应用 id 的字面量。
@@ -153,7 +152,7 @@ WSLD 报的是"wslc 已定位"那条）。EPUB 翻页延迟没单独采样（TD-
        │                            │                            ▲
        └──────依赖──────────────────┴────────────────────────────┘
                                     │
-                          共享包（library / textdecode）──依赖──▶ 契约
+                          共享包（textdecode）──依赖──▶ 契约
 runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM）
 ```
 
@@ -201,7 +200,7 @@ runtime 只搬运不解释。
 
 ### 5.3 主进程 IPC（`src/runtime/main/ipc.ts`）
 
-按契约表实现每个方法，按 `event.sender` 反查归属，再过共享区名单（`sharedNamespaces`）与 grants 的路径表。
+按契约表实现每个方法，按 `event.sender` 反查归属，再过 grants 的路径表。
 越界的调用一律拒绝，
 错误措辞由 `@airship/contract` 的 `errors.ts` 供（中文句子原文，不出现 "Error invoking remote method"
 这类 Electron 内部措辞）。
@@ -220,11 +219,10 @@ runtime 只搬运不解释。
 
 渲染进程没有沙箱，任何位图式的声明都拦不住真想绕的人，所以授权面立不起来；settings / log / tray / notify
 是个个要用的基础功能，clipboard 不加治理——窗口本来就是浏览器，读写剪贴板走浏览器原生面。
-真正的边界是一份真名单加一张路径表：
+真正的边界是一张路径表加一道身份闸：
 
 | 边界 | 管什么 | 在哪判 |
 |---|---|---|
-| `sharedNamespaces` 名单 | 共享数据区具体哪几个可用（目录由 runtime 创建与托管） | 注册表 + grants，措辞见 `errors.ts` |
 | grants 路径表 | 本应用数据目录内随便读写；目录外只认本次会话对话框显式选中的路径 | `grants.ts`（GR 册） |
 | 身份 | 调用只认 preload 注入、主进程按 `event.sender` 反查的归属 | I-3，`ipc.ts` 的 `assertApp` |
 
@@ -240,18 +238,12 @@ runtime 只搬运不解释。
 
 ### 6.1 路径授权（`grants.ts`，GR 册）
 
-五条规则，会话内有效：应用数据目录内随便读写；数据目录外只读用户本次会话通过对话框显式选中的路径；
-`dialog` 选中的文件自动进入可读集合（`grantParentDir` 可连父目录一起授，给 airship-ffmpeg 那种"输出落在源文件同目录"用）；
-共享命名空间要清单声明；越界直接拒。授权是会话级的，进程退出就没了。
+三条规则，会话内有效：应用数据目录（含它自己的 `cache\`）内随便读写；数据目录外只读用户本次会话
+通过对话框显式选中的路径（`dialog` 选中的文件自动进入可读集合，`grantParentDir` 可连父目录一起授，
+给 airship-ffmpeg 那种"输出落在源文件同目录"用）；写目录外只认"另存为"选定的那一个目标。越界直接拒。
+授权是会话级的，进程退出就没了。
 
-### 6.2 共享命名空间
-
-`SHARED_NAMESPACES = ['library']`，这份名单**属于 runtime**：目录由 runtime 创建与托管，
-新增一个共享数据区是 runtime 的功能变更，不是应用变更。书库开成共享命名空间，是因为它曾由墨读与 PDF 两个入口共用
-（PDF 已于 2026-11-26 退场，机制留着）——各自存一份就会"同一本书在两个入口里各有一本"。
-应用只能在清单里声明自己要访问哪个，声明了不存在的直接拒。
-
-### 6.3 外部程序（归应用随包自带的后端）
+### 6.2 外部程序（归应用随包自带的后端）
 
 **runtime 不认识任何具体工具**：没有工具登记表，清单里也没有那一栏。要跑这台机器上的命令行程序
 （ffmpeg、wslc 之类），应用随包带一份 `backend.ts`，发现与拉起都写在那一份里——先看环境变量显式指的路径
@@ -277,7 +269,7 @@ runtime 只搬运不解释。
 外加 `icon.ico`（任务栏那颗外壳图标，作者自备的多尺寸 16~256，产包只搬不转）。缺哪件产包期炸哪件，标准见 [docs/apps/icons.md](apps/icons.md)。
 
 清单只写"这个应用自己的事实"：`name / description / platforms /
-sharedNamespaces / flush / defaultWidth / defaultHeight`（`id` 由产包期注入，清单里写它就是 PK-005 的拒绝对象）。
+flush / defaultWidth / defaultHeight`（`id` 由产包期注入，清单里写它就是 PK-005 的拒绝对象）。
 **不写** `iconPath`、`order` 这类表现或关系字段
 （都被驳回过）——图标是文件约定（包根那张图），排序不存在（没有启动器格子要排）。
 
@@ -322,21 +314,20 @@ runtime 侧不再有扫包、拖装、启动器卸载的代码。
 
 ### 7.5 八个应用
 
-| id | 名称 | backend | shared | 平台 | flush | 默认尺寸 |
-|---|---|---|---|---|---|---|
-| `airship-reader` | Reader | — | library | 全 | 是 | 600×800 |
-| `airship-dago` | Dago | 有 | — | 全 | 是 | 600×800 |
-| `airship-life-game` | Life Game | — | — | 全 | 是 | 1000×720 |
-| `airship-ffmpeg` | FFmpeg | 有 | — | 全 | 是 | 默认 |
-| `airship-wsld` | WSLD | 有 | — | windows | 是 | 默认 |
-| `airship-svg-editor` | SVG Editor | — | — | 全 | 是 | 1440×900 |
-| `airship-s3` | S3 | 有 | — | 全 | 是 | 1180×760 |
-| `airship-icon` | Icon Helper | — | — | 全 | 否 | 720×780 |
+| id | 名称 | backend | 平台 | flush | 默认尺寸 |
+|---|---|---|---|---|---|
+| `airship-reader` | Reader | — | 全 | 是 | 600×800 |
+| `airship-dago` | Dago | 有 | 全 | 是 | 600×800 |
+| `airship-life-game` | Life Game | — | 全 | 是 | 1000×720 |
+| `airship-ffmpeg` | FFmpeg | 有 | 全 | 是 | 默认 |
+| `airship-wsld` | WSLD | 有 | windows | 是 | 默认 |
+| `airship-svg-editor` | SVG Editor | — | 全 | 是 | 1440×900 |
+| `airship-s3` | S3 | 有 | 全 | 是 | 1180×760 |
+| `airship-icon` | Icon Helper | — | 全 | 否 | 720×780 |
 
 `airship-dago` 与 `airship-s3` 各带一份 `backend.ts` 干盘的活与网络活，`airship-ffmpeg` 与 `airship-wsld`
-那两份负责发现并拉起这台机器上的命令行程序（§6.3）——窗口的清单不再为它们要 fs 或外连的口子（§6 末尾与 `backend.md`）。
-
-从前 books 与 pdf 都声明 `sharedNamespaces: ['library']` 共用同一份书库；PDF 退场后只剩 airship-reader 这一个消费者。
+那两份负责发现并拉起这台机器上的命令行程序（§6.2）——窗口的清单不再为它们要 fs 或外连的口子（§6 末尾与 `backend.md`）。
+Reader 的书库存在它自己数据目录的 `library/` 下，整份索引归这一个入口。
 "默认"尺寸 = runtime 的 1100×740。`flush` 是 SDK 宿主给不留白（应用自己铺满整窗）。
 
 ## 8. 包协议与文档加载
@@ -365,7 +356,6 @@ CSP 由 SDK 产包时注入（产包一条、开发一条，不再按清单分�
   data/<id>/                   应用私有数据（扁平：文件直接放这一层）
   data/<id>/cache/             可随时整体删除重建（所以 cache 是保留名）
   data/<id>/backend/           随包后端的影子 backend.cjs
-  shared/library/              共享书库（Reader 的那一份）
   icons/<id>.ico               交给外壳的那张任务栏图标
   logs/                        按日期的日志
   profile/                     Electron 自己的浏览器档（userData 开局就钉到这里）
@@ -470,8 +460,8 @@ Electron 与 electron-builder 的二进制走 npmmirror（`.npmrc` 与 `build-ru
 界面观感不进册子，那是 `just shot` 截图走查的事。写不出可执行判据的期望别进册子，记到本文档对应小节。
 
 册子共 **23 本**：runtime 7 本（bridge / grants / logging / runtime / storage / theme / tray）
-+ 应用区 2 本（app-model / package）+ 共享 2 本（library / textdecode）+ 应用 12 本
-（ffmpeg / reader / dago / life-game / svg-editor / s3 / icon 各一，wsld 五本）。索引见 [specs/index.md](specs/index.md)。
++ 应用区 2 本（app-model / package）+ 共享 1 本（textdecode）+ 应用 13 本
+（ffmpeg / dago / life-game / svg-editor / s3 / icon 各一，reader 两本〈书架与阅读器 + 书库〉，wsld 五本）。索引见 [specs/index.md](specs/index.md)。
 
 **替身住 SDK**（`@airship/sdk/testing` 的 `FakeAirship` 与 `mountUi`），不住 runtime 的测试目录：
 应用不许引 runtime，用例也不能——否则"包自持"在测试里是假的，外部作者复制范本出去后拿不到同一个替身。
@@ -520,7 +510,6 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
 
 - **runtime**：那个共享的 Electron 运行时（`@airship/runtime`），装一次大家共用，自己没有界面。
 - **包 / airship 包**：一个应用的归档 `<id>.airship`（zip 换了扩展名），自持文档与清单。
-- **边界名单 / sharedNamespaces**：清单里那份共享区真名单，越界一律拒并念出该改清单的哪一处。
 - **桥 / bridge**：`window.airship` 那一面，应用碰系统的唯一入口。
 - **宿主 / host**：SDK 给应用窗口的那份 DOM（标题栏 / 主题 / 留白 / 占位）。
 - **册子 / spec**：用户可见契约的四档结构文档，用例是它的影子。

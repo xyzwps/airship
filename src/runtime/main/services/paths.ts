@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { SHARED_NAMESPACES, pathEscape, type AppId, type SharedNamespace } from '@airship/contract'
+import { pathEscape, type AppId } from '@airship/contract'
 
 /**
  * 目录布局（全在用户主目录下的 `~/.airship`，安装落点见 PK-032/PK-035）：
@@ -13,7 +13,6 @@ import { SHARED_NAMESPACES, pathEscape, type AppId, type SharedNamespace } from 
  *       settings.json                应用私有设置（含它自己的主题档）
  *       cache/                       可随时整体删除重建（应用往数据目录写同名 `cache` 会被连累）
  *       backend/backend.cjs          后端影子（backendHost）
- *     shared/library/                runtime 级共享区：Reader 用的书库
  *     logs/airship-YYYY-MM-DD.log
  *     icons/<id>.ico                 交给 Windows 外壳的任务栏图标（包内那份 icon.ico 的落盘）
  *     profile/                       Electron 自己的浏览器档（userData）：Chromium 缓存与渲染侧存储
@@ -36,7 +35,7 @@ interface AppDirs {
   settings: string
 }
 
-let cached: { root: string; logs: string; shared: Record<string, string> } | null = null
+let cached: { root: string; logs: string } | null = null
 
 /** 这台机器上 airship 的家：`AIRSHIP_HOME` 指哪就是哪，否则 `~/.airship`（截图模式是 `~/.airship-shot`） */
 export function airshipHome(): string {
@@ -55,15 +54,7 @@ function build() {
   const root = airshipHome()
   const logs = join(root, 'logs')
   mkdirSync(logs, { recursive: true })
-
-  const shared: Record<string, string> = {}
-  for (const ns of SHARED_NAMESPACES) {
-    const dir = join(root, 'shared', ns)
-    mkdirSync(dir, { recursive: true })
-    shared[ns] = dir
-  }
-
-  return { root, logs, shared }
+  return { root, logs }
 }
 
 export function paths() {
@@ -104,17 +95,6 @@ export function appSettingsFile(id: AppId): string {
   return dirsFor(id).settings
 }
 
-export function sharedDir(ns: SharedNamespace): string {
-  return paths().shared[ns]!
-}
-
-/** 本应用有权访问的共享命名空间目录表 */
-export function sharedDirsFor(namespaces: readonly SharedNamespace[]): Partial<Record<SharedNamespace, string>> {
-  const out: Partial<Record<SharedNamespace, string>> = {}
-  for (const ns of namespaces) out[ns] = sharedDir(ns)
-  return out
-}
-
 export function logDir(): string {
   return paths().logs
 }
@@ -135,11 +115,6 @@ export function taskbarIconFile(id: AppId): string {
 /** 把若干段拼到应用数据目录下，并挡住 ../ 越界 */
 export function resolveInData(id: AppId, segments: string[]): string {
   return resolveUnder(appDataDir(id), segments, `${id} 的数据目录`)
-}
-
-/** 把若干段拼到共享命名空间目录下，同样挡住越界 */
-export function resolveInShared(ns: SharedNamespace, segments: string[]): string {
-  return resolveUnder(sharedDir(ns), segments, `共享命名空间 ${ns}`)
 }
 
 function resolveUnder(base: string, segments: string[], label: string): string {

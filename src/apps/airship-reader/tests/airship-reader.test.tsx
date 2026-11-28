@@ -4,7 +4,7 @@ import { act } from 'react'
 import { FakeAirship } from '@airship/sdk/testing'
 import { mountUi, type Mount } from '@airship/sdk/testing'
 import BooksApp from '../BooksApp'
-import { loadBooks } from '@airship/library'
+import { loadBooks } from '../library'
 
 /**
  * BK 册子（src/apps/airship-reader/specs/airship-reader.md）。
@@ -118,12 +118,11 @@ vi.mock('foliate-js/view.js', () => {
   }
 })
 
-const SHARED = '/fake/.airship/shared/library'
+const LIB = '/fake/.airship/data/airship-reader/library'
 
 function shelf(picks?: Array<string[] | string | null>, files?: Record<string, string>): FakeAirship {
   return new FakeAirship({
     id: 'airship-reader',
-    sharedNamespaces: ['library'],
     picks,
     files
   })
@@ -148,15 +147,15 @@ function record(over: Record<string, unknown> = {}): Record<string, unknown> {
 const BOOK_BODY = '第一章 起风了\n风从河面上过来。\n\n第二章 河上的船\n船是半夜来的。'
 
 function seed(fake: FakeAirship, books: unknown[], files: Record<string, string> = {}): void {
-  fake.seed(`${SHARED}/library.json`, `${JSON.stringify({ version: 2, books }, null, 2)}\n`)
-  for (const [name, body] of Object.entries(files)) fake.seed(`${SHARED}/${name}`, body)
+  fake.seed(`${LIB}/library.json`, `${JSON.stringify({ version: 2, books }, null, 2)}\n`)
+  for (const [name, body] of Object.entries(files)) fake.seed(`${LIB}/${name}`, body)
 }
 
 async function mount(fake: FakeAirship, confirm?: boolean): Promise<Mount> {
   return mountUi(<BooksApp api={fake.api} />, { fake, confirm })
 }
 
-/** 共享区里就一本 EPUB 的状态 */
+/** 书库里就一本 EPUB 的状态 */
 function bookShelf(progress: unknown = null): FakeAirship {
   const fake = shelf()
   seed(fake, [record({ progress })], { 'files/b1.epub': BOOK_BODY })
@@ -232,7 +231,7 @@ describe('书架列的就是那份共用索引', () => {
     await m.press('移除')
     expect(asked).toBe('从书架移除《起风了》？本地副本和封面会一起删掉。')
     expect(m.has('起风了')).toBe(true)
-    expect(fake.vol.has(`${SHARED}/files/b1.epub`)).toBe(true)
+    expect(fake.vol.has(`${LIB}/files/b1.epub`)).toBe(true)
     expect((await loadBooks(fake.api)).length).toBe(1)
     m.unmount()
   })
@@ -247,22 +246,22 @@ describe('书架列的就是那份共用索引', () => {
     await m.press('移除')
 
     expect((await loadBooks(fake.api)).length).toBe(0)
-    expect(fake.vol.has(`${SHARED}/files/b1.epub`)).toBe(false)
-    expect(fake.vol.has(`${SHARED}/covers/b1.jpg`)).toBe(false)
+    expect(fake.vol.has(`${LIB}/files/b1.epub`)).toBe(false)
+    expect(fake.vol.has(`${LIB}/covers/b1.jpg`)).toBe(false)
     expect(m.text()).toContain('书架是空的。点右上角导入一本试试。')
     m.unmount()
   })
 })
 
 describe('导入把元数据交给书库，读不出来就退化成文件名', () => {
-  it('BK-007 导入 MOBI：格式记 mobi，本体落进共享区的 files/ 下', async () => {
+  it('BK-007 导入 MOBI：格式记 mobi，本体落进书库的 files/ 下', async () => {
     const fake = shelf([['/fake/media/起风了.mobi']], { '/fake/media/起风了.mobi': BOOK_BODY })
     const m = await mount(fake)
     await m.press('导入书籍')
 
     const [book] = await loadBooks(fake.api)
     expect(book!.format).toBe('mobi')
-    expect(fake.vol.has(`${SHARED}/files/${book!.id}.mobi`)).toBe(true)
+    expect(fake.vol.has(`${LIB}/files/${book!.id}.mobi`)).toBe(true)
     expect(book!.title).toBe('书里的标题')
     expect(m.text()).toContain('书里的标题')
     m.unmount()
@@ -277,9 +276,9 @@ describe('导入把元数据交给书库，读不出来就退化成文件名', (
     expect(book!.title).toBe('书里的标题')
     expect(book!.author).toBe('书里的作者')
     expect(book!.cover).toBe(`covers/${book!.id}.png`)
-    expect(fake.text(`${SHARED}/covers/${book!.id}.png`)).toBe('封面字节')
+    expect(fake.text(`${LIB}/covers/${book!.id}.png`)).toBe('封面字节')
     // 卡片上真画出了一张封面图：地址必须是应用窗口 CSP 放行图片来源（blob:），
-    // 内容就是上面断言过的那个共享区文件
+    // 内容就是上面断言过的那个书库文件
     const img = m.container.querySelector('.book-card__cover img') as HTMLImageElement
     expect(img.src.startsWith('blob:'), `封面地址用的是别的来源：${img.src}`).toBe(true)
     m.unmount()
@@ -326,8 +325,8 @@ describe('导入把元数据交给书库，读不出来就退化成文件名', (
 describe('阅读界面那一栏与字号', () => {
   function reader(progress: unknown = null): Promise<Mount> {
     const fake = shelf()
-    fake.seed(`${SHARED}/library.json`, `${JSON.stringify({ version: 2, books: [record({ progress })] }, null, 2)}\n`)
-    fake.seed(`${SHARED}/files/b1.epub`, BOOK_BODY)
+    fake.seed(`${LIB}/library.json`, `${JSON.stringify({ version: 2, books: [record({ progress })] }, null, 2)}\n`)
+    fake.seed(`${LIB}/files/b1.epub`, BOOK_BODY)
     return mountUi(<BooksApp api={fake.api} />, { fake })
   }
 
@@ -358,9 +357,9 @@ describe('阅读界面那一栏与字号', () => {
 
   it('BK-017 书名交给标题栏中段，底栏念得出读到哪一节与全书进度', async () => {
     const fake = shelf()
-    fake.seed(`${SHARED}/library.json`, `${JSON.stringify({ version: 2, books: [record({ progress: null })] }, null, 2)}
+    fake.seed(`${LIB}/library.json`, `${JSON.stringify({ version: 2, books: [record({ progress: null })] }, null, 2)}
 `)
-    fake.seed(`${SHARED}/files/b1.epub`, BOOK_BODY)
+    fake.seed(`${LIB}/files/b1.epub`, BOOK_BODY)
     const m = await mountUi(<BooksApp api={fake.api} />, { fake })
     await m.press('起风了')
     await m.settle()
@@ -399,8 +398,8 @@ describe('阅读界面那一栏与字号', () => {
 
   it('BK-019 字号改动立刻进设置，重开还是那个值', async () => {
     const fake = shelf()
-    fake.seed(`${SHARED}/library.json`, `${JSON.stringify({ version: 2, books: [record()] }, null, 2)}\n`)
-    fake.seed(`${SHARED}/files/b1.epub`, BOOK_BODY)
+    fake.seed(`${LIB}/library.json`, `${JSON.stringify({ version: 2, books: [record()] }, null, 2)}\n`)
+    fake.seed(`${LIB}/files/b1.epub`, BOOK_BODY)
     const m = await mountUi(<BooksApp api={fake.api} />, { fake })
     await m.press('起风了')
     await m.press('A＋')
@@ -433,10 +432,10 @@ describe('阅读界面那一栏与字号', () => {
     foliate.toc = []
     const fake = shelf()
     fake.seed(
-      `${SHARED}/library.json`,
+      `${LIB}/library.json`,
       `${JSON.stringify({ version: 2, books: [record({ id: 'e1', title: '一本EPUB', format: 'epub', file: 'files/e1.epub' })] }, null, 2)}\n`
     )
-    fake.seed(`${SHARED}/files/e1.epub`, 'PK 一份电子书')
+    fake.seed(`${LIB}/files/e1.epub`, 'PK 一份电子书')
     const m = await mount(fake)
     await m.press('一本EPUB')
     expect(m.byText('目录').disabled).toBe(true)
@@ -450,10 +449,10 @@ describe('交出去的是按范围取字节的文件', () => {
     const fake = shelf()
     const bytes = 'PK' + 'x'.repeat(118)
     fake.seed(
-      `${SHARED}/library.json`,
+      `${LIB}/library.json`,
       `${JSON.stringify({ version: 2, books: [record({ id: 'e1', title: '一本EPUB', format: 'epub', file: 'files/e1.epub', size: bytes.length })] }, null, 2)}\n`
     )
-    fake.seed(`${SHARED}/files/e1.epub`, bytes)
+    fake.seed(`${LIB}/files/e1.epub`, bytes)
     const m = await mount(fake)
     await m.press('一本EPUB')
     await m.settle()

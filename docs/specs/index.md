@@ -33,10 +33,10 @@ src/<区>/<名>/tests/fixtures/   真样本跟着用它的用例走（wslc 的�
 ### Requirement: 这一条锁的是哪个不变量
 依据：为什么这么定（一段，指向 architecture.md 的节）。
 
-#### Scenario: BR-007 共享命名空间没声明就用不了
-- **WHEN** 应用把路径解析到没在自己清单 `sharedNamespaces` 里写过的命名空间
-- **THEN** 原因读得到「<id> 没有声明共享命名空间 <ns>（在 apps/<id>/app.ts 的 sharedNamespaces 里声明）」
-- **AND** 不出现 "Error invoking remote method" 这类 Electron 内部措辞
+#### Scenario: BR-003 以别的应用名义调用被拒
+- **WHEN** airship-ffmpeg 的窗口拿 airship-s3 的名义调一条应用接口
+- **THEN** 拒，原因读得到「身份不匹配：这个窗口属于 airship-ffmpeg，不能以 airship-s3 的名义调用」
+- **AND** 这一笔被记进日志（身份不匹配，已拒绝）
 ```
 
 ## 编号规则
@@ -103,7 +103,6 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 
 | 前缀 | 管什么 | 册子 | 谁该动它 | 验证档 |
 |---|---|---|---|---|
-| LB | 书库（索引版本、导入判重、封面、进度） | `library.md` | 碰 Reader 那份书库数据的人 | 自动化 |
 | TD | 中文文本解码（BOM → UTF-8 严格 → GBK） | `textdecode.md` | Reader 正文与 FFmpeg 字幕的解码 | 自动化 |
 
 ### 应用（`src/apps/<id>/`）
@@ -112,6 +111,7 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 |---|---|---|---|
 | VC | airship-ffmpeg（FFmpeg）：选流、处理链、命令、队列 | `airship-ffmpeg.md` | 自动化 + 门控（`VCP_E2E=1` 真编码） |
 | BK | airship-reader（Reader，即墨读）：书架与阅读器 | `airship-reader.md` | 自动化 + 门控（真书） |
+| LB | airship-reader 自己的书库（索引版本、导入判重、封面、进度；册子随书库住在包内） | `library.md` | 自动化 |
 | DG | airship-dago（Dago，即打勾勾）：每日清单与托盘徽标 | `airship-dago.md` | 自动化 |
 | LF | airship-life-game（Life Game）：100 / 200 / 300 三档网格与缩放、世代推演、经典图形与自画 | `airship-life-game.md` | 自动化 |
 | AL | airship-svg-editor（SVG Editor，即 Albedo）：SVG 编辑工作台（形状与路径命令栈、布尔、对齐吸附、桌布、双语、导入导出） | `airship-svg-editor.md` | 自动化 + 截图走查 |

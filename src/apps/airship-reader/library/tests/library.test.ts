@@ -10,18 +10,18 @@ import {
   saveBooks,
   setProgress,
   type BookRecord
-} from '@airship/library'
+} from '../index'
 import { FakeAirship } from '@airship/sdk/testing'
 
 /**
- * LB 册子（src/shared/library/specs/library.md）。
+ * LB 册子（src/apps/airship-reader/library/specs/library.md）。
  *
- * 拿 FakeAirship 当 runtime：书库落在共享命名空间 `library` 里，
+ * 拿 FakeAirship 当 runtime：书库落在应用数据目录的 `library/` 下，
  * 所有断言读的都是那份内存卷与索引文件的原文，不看内部实现。
  */
 
-const SHARED = '/fake/.airship/shared/library'
-const INDEX = `${SHARED}/library.json`
+const LIB = '/fake/.airship/data/airship-reader/library'
+const INDEX = `${LIB}/library.json`
 
 /**
  * 应用窗口那条 CSP 里 `img-src` 明确允许的图片来源。
@@ -32,7 +32,7 @@ const INDEX = `${SHARED}/library.json`
  * `exec` 取到的第一条正是收紧的产线版）。
  */
 function appImgSchemes(): string[] {
-  const html = readFileSync(join(__dirname, '..', '..', '..', 'sdk', 'csp.ts'), 'utf8').replace(/\s+/g, ' ')
+  const html = readFileSync(join(__dirname, '..', '..', '..', '..', 'sdk', 'csp.ts'), 'utf8').replace(/\s+/g, ' ')
   const m = /img-src\s+([^;]+);/.exec(html)
   if (!m) throw new Error('src/sdk/csp.ts 里找不到 img-src，这条判据没依据了')
   return m[1]!
@@ -42,18 +42,15 @@ function appImgSchemes(): string[] {
 }
 
 function shelf(id: string): FakeAirship {
-  return new FakeAirship({
-    id,
-    sharedNamespaces: ['library']
-  })
+  return new FakeAirship({ id })
 }
 
-/** 源文件放在共享区之外：先用对话框"选中"它，才有读的权利 */
+/** 源文件在应用数据目录之外：先用对话框"选中"它，才有读的权利 */
 function grant(fake: FakeAirship, path: string): void {
   fake.readGrants.add(path)
 }
 
-/** 另一个应用读同一个目录：卷与授权各一份，数据是同一份 */
+/** 索引读的是内存卷里那份落盘原文 */
 function indexed(fake: FakeAirship): { version: number; books: BookRecord[] } {
   return JSON.parse(fake.text(INDEX)) as { version: number; books: BookRecord[] }
 }
@@ -90,7 +87,7 @@ describe('索引文件自己带版本', () => {
     fake.seed(INDEX, '{"version":1,"books":[]}')
     await expect(loadBooks(fake.api)).rejects.toThrow('书库索引是 v1，本包只认 v2。')
     const message = await loadBooks(fake.api).catch((e: unknown) => String(e))
-    expect(message).toContain('删掉 ~/.airship/shared/library/library.json')
+    expect(message).toContain('删掉 ~/.airship/data/airship-reader/library/library.json')
     expect(message).toContain('书本体和封面不用动')
 
     // 没写版本的同样被拒，念出来的是 v?
@@ -113,7 +110,7 @@ describe('判重在拷贝之前', () => {
     fake.seed(first, 'A'.repeat(64))
     grant(fake, first)
     const before = await addBook(fake.api, { sourcePath: first, format: 'epub', title: '同一本', author: '' })
-    const filesBefore = [...fake.vol.keys()].filter((p) => p.startsWith(`${SHARED}/files/`)).length
+    const filesBefore = [...fake.vol.keys()].filter((p) => p.startsWith(`${LIB}/files/`)).length
 
     // 换个路径再导一次：大小与标题都一样 → 就是同一本
     const again = '/fake/other/同名副本.epub'
@@ -123,7 +120,7 @@ describe('判重在拷贝之前', () => {
 
     expect(after.id).toBe(before.id)
     expect(await loadBooks(fake.api)).toHaveLength(1)
-    const filesAfter = [...fake.vol.keys()].filter((p) => p.startsWith(`${SHARED}/files/`)).length
+    const filesAfter = [...fake.vol.keys()].filter((p) => p.startsWith(`${LIB}/files/`)).length
     expect(filesAfter).toBe(filesBefore)
   })
 
@@ -140,7 +137,7 @@ describe('判重在拷贝之前', () => {
 
     expect(two.id).not.toBe(one.id)
     expect((await loadBooks(fake.api)).length).toBe(2)
-    expect(fake.vol.has(`${SHARED}/files/${two.id}.epub`)).toBe(true)
+    expect(fake.vol.has(`${LIB}/files/${two.id}.epub`)).toBe(true)
   })
 
   it('LB-007 新书排在最前，本体落在 files/<书号>.<扩展名>', async () => {
@@ -152,7 +149,7 @@ describe('判重在拷贝之前', () => {
 
     expect(book.file).toBe(`files/${book.id}.mobi`)
     const dest = await bookPath(fake.api, book)
-    expect(dest).toBe(`${SHARED}/files/${book.id}.mobi`)
+    expect(dest).toBe(`${LIB}/files/${book.id}.mobi`)
     expect(fake.text(dest)).toBe('mobi-bytes')
 
     // 源文件删掉后，读的还是书库里那一份副本
@@ -184,7 +181,7 @@ describe('封面由导入方交进来', () => {
     const b = await addBook(fake.api, { sourcePath: noCover, format: 'epub', title: '没封面', author: '' })
 
     expect(a.cover).toBe(`covers/${a.id}.png`)
-    expect(fake.text(`${SHARED}/covers/${a.id}.png`)).toBe('PNGDATA')
+    expect(fake.text(`${LIB}/covers/${a.id}.png`)).toBe('PNGDATA')
     expect(b.cover).toBeNull()
     expect((await loadBooks(fake.api)).length).toBe(2)
   })
@@ -239,9 +236,9 @@ describe('删除连索引带文件一起清', () => {
 
     const left = await loadBooks(fake.api)
     expect(left.map((b) => b.id)).toEqual([kept.id])
-    expect(fake.vol.has(`${SHARED}/files/${doomed.id}.epub`)).toBe(false)
-    expect(fake.vol.has(`${SHARED}/covers/${doomed.id}.jpg`)).toBe(false)
-    expect(fake.vol.has(`${SHARED}/files/${kept.id}.epub`)).toBe(true)
+    expect(fake.vol.has(`${LIB}/files/${doomed.id}.epub`)).toBe(false)
+    expect(fake.vol.has(`${LIB}/covers/${doomed.id}.jpg`)).toBe(false)
+    expect(fake.vol.has(`${LIB}/files/${kept.id}.epub`)).toBe(true)
   })
 
   it('LB-011 删一个没登记过的书号什么都不动', async () => {

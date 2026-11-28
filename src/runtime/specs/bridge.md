@@ -28,12 +28,8 @@
 - **WHEN** 一个不是 runtime 开出来的窗口（或已销毁的窗口）来调
 - **THEN** 拒，原因读得到「调用来源不是 runtime 注册的窗口，拒绝」
 
-### Requirement: 没声明过的共享区一律拒绝
-静默降级会让边界形同虚设，所以拒了要说清该改哪份清单。共享区看 `sharedNamespaces` 那一份名单。
-
-#### Scenario: BR-007 共享命名空间没声明就用不了
-- **WHEN** 应用把路径解析到没在自己清单 `sharedNamespaces` 里写过的命名空间
-- **THEN** 原因读得到「<id> 没有声明共享命名空间 <ns>（在 apps/<id>/app.ts 的 sharedNamespaces 里声明）」
+### Requirement: 参数不合法要把收到的值念出来
+契约方法的入参先验形状，拒的时候把收到的值原样念出来，不让人对着 "undefined" 猜。
 
 #### Scenario: BR-008 参数不合法要把收到的值念出来
 - **WHEN** 应用传的 path 或 key 是空串、非字符串
@@ -72,4 +68,7 @@ preload 用 Electron 的 `webUtils.getPathForFile` 读浏览器已经交出来�
   闸的强度不及它的承诺——应用随包自带的后端进程本就是无限制的 Node，能跑什么在那里没有边界可言，
   runtime 侧再摆一张工具表只是让老实人多写一行声明；发现逻辑（哪台机器上 ffmpeg 落在哪）也从来是
   这台机器的知识，不该由发布出去的契约代管。外部命令改由应用自己的后端进程负责（backend.md）。
+  BR-007 于 2026-11-28 显式删除：共享命名空间整族退场——书库唯一的消费者是 Reader，
+  "共享"早已没有第二个对象；数据落点改到 Reader 自己的数据目录（data/airship-reader/library/），
+  runtime 不再托管任何共享区。边界只剩 grants 路径表与身份闸。编号不复用。
 -->

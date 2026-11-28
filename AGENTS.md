@@ -53,7 +53,6 @@ src/cli                @airship/cli          作者命令行：产包流水、de
 src/scaffold           create-airship-app    npm 手脚架（npx create-airship-app）：minimal 与 todo 两套模板，
                                              模板里 `__APP_ID__` 与 `__APP_NAME__` 是渲染位；不参与 casecov
 src/shared/contract    @airship/contract     契约、清单类型、拒绝措辞、注册与包形状的规矩
-src/shared/library     @airship/library      共享书库（Reader 管的那一份（PDF 应用已于 2026-11-26 退场））
 src/shared/textdecode  @airship/textdecode   中文解码
 ```
 
@@ -87,11 +86,11 @@ runtime 给应用窗口的 DOM 只有 SDK 那一份——`src/runtime` 里没有
 不扫磁盘、没有"包根"那回事。这条有用例守着（AP-010：runtime 产品代码里不许出现具体应用 id 的字面量）。
 
 清单只写"这个应用自己的事实"：`name / description / platforms /
-sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `id`——它的唯一真源是项目 `package.json`
+flush / defaultWidth / defaultHeight`。**不写** `id`——它的唯一真源是项目 `package.json`
 的 `name`（本仓就是 `src/apps/<id>` 的目录名），产包期注入 `manifest.json`；清单里再写一遍就有写岔的机会（AP-003）。
 **不写** `iconPath`、`order` 这类表现或关系字段
 （都被驳回过）——图标是文件约定，排序不存在（没有启动器格子要排）。
-剩下的边界只有一份真名单——`sharedNamespaces`（共享区）——加上 grants 的文件路径表与身份闸；
+剩下的边界只有一张真表——grants 的文件路径表——加上身份闸；
 要跑这台机器上的外部程序，走应用随包自带的后端（`backend.ts`），runtime 不认识任何具体工具。
 
 包格式（**归档文件名** `<id>.airship`——里面是一个 zip，条目名就是包内路径；`manifest.json` 的字段、id 的形状、引用不许越出包）
@@ -114,7 +113,7 @@ Node 脚本走软链读的就是那份 JS；这两区**源码里**的相对 impo
 
 ## Reader 支持的格式
 
-**只有 EPUB 与 MOBI。** 唯一真源是 `src/shared/library/index.ts` 的 `BookFormat`
+**只有 EPUB 与 MOBI。** 唯一真源是 `src/apps/airship-reader/library/index.ts` 的 `BookFormat`
 （`'epub' | 'mobi'`；PDF 应用连同 `pdf` 格式位已于 2026-11-26 退场）。TXT 与 azw3 都在 2026-11-06 被退回，
 别把文件选择框里的扩展名别名当契约——要加格式是一次契约变更：改类型 + 开册子场景 + 造样本。
 
@@ -215,7 +214,7 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
   只能一幅：未发布时仓内经 workspace 软链读的也是那份 dist，`npm publish --dry-run` 打进 tarball 的还是它，三面同一份产物。
   代价是"改了源码没编译"会静默用旧 dist——所有读它们的配方（build-apps / compile / typecheck / test / casecov /
   app-installer / e2e / wsld-real）都已挂 build-libs 依赖，走 just 就不存在忘编。
-  vitest 的 `server.deps.inline: [/^@airship\//]` 仍要留着（`@airship/library` 与 SDK 的 CSS 还是源码消费）。
+  vitest 的 `server.deps.inline: [/^@airship\//]` 仍要留着（SDK 的 CSS 还是源码消费）。
 - 这台机器 npm 默认 registry 是 **npmmirror（只读镜像）**：`npm publish` 会撞"requires you to be logged in to
   https://registry.npmmirror.com"——真要发布得 `--registry https://registry.npmjs.org` 且先 `npm login` 到官方源。
 - 落点由主进程开头那两句钉死：`app.setName('airship')`（Electron 的默认名会取包名 `@airship/runtime`，

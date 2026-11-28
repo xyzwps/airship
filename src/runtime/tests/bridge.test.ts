@@ -138,16 +138,9 @@ describe('身份由 runtime 注入，冒充不了别人', () => {
   it('BR-004 没登记过的来源一律拒', async () => {
     expect(reason(await call('fs:read', 4242, 'airship-ffmpeg', '/x'))).toBe('调用来源不是 runtime 注册的窗口，拒绝')
   })
-})
 
-describe('没声明过的名单一律拒绝', () => {
-  it('BR-007 共享命名空间没声明就用不了', async () => {
-    const why = reason(await call('fs:resolveInShared', VCP, 'airship-ffmpeg', 'library', ['library.json']))
-    expect(why).toBe('airship-ffmpeg 没有声明共享命名空间 library（在 apps/airship-ffmpeg/app.ts 的 sharedNamespaces 里声明）')
-
-    // 声明了的应用走同一条路就给的出路径
-    const ok = await call<string>('fs:resolveInShared', BOOKS, 'airship-reader', 'library', ['library.json'])
-    expect(ok.ok ? ok.value.replace(/\\/g, '/') : ok).toMatch(/shared\/library\/library\.json$/)
+  it('共享区那条频道不再存在（防回流）', () => {
+    expect(ipc.has('fs:resolveInShared')).toBe(false)
   })
 })
 

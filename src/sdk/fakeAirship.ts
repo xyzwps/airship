@@ -1,7 +1,6 @@
 import {
   backendAbsent,
   needString,
-  nsDenied,
   pathEscape,
   readDenied,
   writeDenied
@@ -16,7 +15,6 @@ import type {
   NotifyOptions,
   OpenFilesOptions,
   SaveFileOptions,
-  SharedNamespace,
   ShellEvent,
   ShellEventListener,
   ThemeSnapshot,
@@ -28,9 +26,9 @@ import type {
  *
  * 它按契约把 `window.airship` 装成一个内存里的小 runtime：
  *   - 拒绝措辞**直接从 shared/errors 取**（那里是唯一的措辞真源），
- *     所以越界、未声明名单这类场景里用户看到的那句中文，在测试里就是真实界面里的那句；
+ *     所以越界这类场景里用户看到的那句中文，在测试里就是真实界面里的那句；
  *   - 文件走一个内存卷，授权规则与 runtime 一致：自己的 data/cache 自由读写，
- *     声明过的共享命名空间可读写，别的路径必须先用对话框"选中"；
+ *     别的路径必须先用对话框"选中"；
  *   - 后端程序由 `backend` 那条替身应答，命令行与 payload 全记下来供断言，
  *     它主动推的事件经 `ctl.event` 走真实订阅通道。
  *
@@ -47,7 +45,6 @@ type Content = string | Uint8Array
 
 export interface FakeOptions {
   id: string
-  sharedNamespaces?: SharedNamespace[]
   /** 预置文件：假路径 → 内容 */
   files?: Record<string, Content>
   /** 预置目录 */
@@ -76,7 +73,6 @@ export interface BackendCtl {
 
 export class FakeAirship implements AirshipBridge {
   readonly id: string
-  readonly sharedNamespaces: SharedNamespace[]
 
   /** 内存卷 */
   readonly vol = new Map<string, Content>()
@@ -104,12 +100,11 @@ export class FakeAirship implements AirshipBridge {
 
   constructor(private readonly opts: FakeOptions) {
     this.id = opts.id
-    this.sharedNamespaces = opts.sharedNamespaces ?? []
     this.picks = [...(opts.picks ?? [])]
     for (const [p, c] of Object.entries(opts.files ?? {})) this.vol.set(p, c)
     for (const d of opts.dirs ?? []) this.dirSet.add(d)
-    // 应用自己的目录与声明过的共享区天然存在（真 runtime 在启动时就建好了）
-    for (const d of [this.dataDir, this.cacheDir, ...this.sharedRoots()]) this.dirSet.add(d)
+    // 应用自己的目录天然存在（真 runtime 在启动时就建好了）
+    for (const d of [this.dataDir, this.cacheDir]) this.dirSet.add(d)
   }
 
   /* ---------------- 测试侧的手脚 ---------------- */
@@ -120,10 +115,6 @@ export class FakeAirship implements AirshipBridge {
 
   get cacheDir(): string {
     return `${ROOT}/data/${this.id}/cache`
-  }
-
-  sharedDir(ns: SharedNamespace): string {
-    return `${ROOT}/shared/${ns}`
   }
 
   /** 直接往卷里写，不经任何闸门（造场景用） */
@@ -165,15 +156,7 @@ export class FakeAirship implements AirshipBridge {
   }
 
   private ownSpace(p: string): boolean {
-    return (
-      FakeAirship.inside(this.dataDir, p) ||
-      FakeAirship.inside(this.cacheDir, p) ||
-      this.sharedRoots().some((root) => FakeAirship.inside(root, p))
-    )
-  }
-
-  private sharedRoots(): string[] {
-    return this.sharedNamespaces.map((ns) => this.sharedDir(ns))
+    return FakeAirship.inside(this.dataDir, p) || FakeAirship.inside(this.cacheDir, p)
   }
 
   private granted(set: Set<string>, p: string): boolean {
@@ -196,18 +179,13 @@ export class FakeAirship implements AirshipBridge {
    * `get api()` 是 `{ ...this }`——原型方法不会被展开带走，
    * 应用从 `api.on(...)` 订事件时丢的就是这条通道。
    */
-  readonly paths = async (): Promise<AppPaths> => {
-    const shared: Partial<Record<SharedNamespace, string>> = {}
-    for (const ns of this.sharedNamespaces) shared[ns] = this.sharedDir(ns)
-    return {
-      data: this.dataDir,
-      cache: this.cacheDir,
-      root: ROOT,
-      shared,
-      platform: 'win32',
-      runtimeVersion: '0.0.0-test'
-    }
-  }
+  readonly paths = async (): Promise<AppPaths> => ({
+    data: this.dataDir,
+    cache: this.cacheDir,
+    root: ROOT,
+    platform: 'win32',
+    runtimeVersion: '0.0.0-test'
+  })
 
   readonly theme = async (): Promise<ThemeSnapshot> => this.themeSnapshot()
 
@@ -363,17 +341,6 @@ export class FakeAirship implements AirshipBridge {
       const clean = segments.map((s) => this.needString(s, 'segment'))
       const target = [this.dataDir, ...clean].join('/')
       if (!FakeAirship.inside(this.dataDir, target)) throw new Error(pathEscape(clean, `${this.id} 的数据目录`))
-      return target
-    },
-    resolveInShared: async (ns: SharedNamespace, ...segments: string[]): Promise<string> => {
-      const namespace = this.needString(ns, 'ns') as SharedNamespace
-      if (!this.sharedNamespaces.includes(namespace)) {
-        throw new Error(nsDenied(this.id, namespace))
-      }
-      const clean = segments.map((s) => this.needString(s, 'segment'))
-      const base = this.sharedDir(namespace)
-      const target = [base, ...clean].join('/')
-      if (!FakeAirship.inside(base, target)) throw new Error(pathEscape(clean, `共享命名空间 ${namespace}`))
       return target
     },
     pathForFile: (file: DroppedFile): string => this.opts.dropPaths?.[file.name] ?? ''

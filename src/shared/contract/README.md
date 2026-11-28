@@ -25,8 +25,8 @@ The manifest does NOT declare `id`: its only source is the project `package.json
 
 Key exports:
 
-- `AppMeta` — the manifest shape; the remaining gates are the shared-area name list
-  (`sharedNamespaces`) plus the grants path table;
+- `AppMeta` — the manifest shape; the remaining gates are the grants path table
+  and the identity check;
 - `APP_ID_PATTERN` — id rules (1–32 chars, lowercase letter first, then lowercase
   letters, digits, hyphens);
 - `packageRules` — rules for the package (zip archive `<id>.airship`);

@@ -14,7 +14,7 @@ import {
   type BookFormat,
   type BookProgress,
   type BookRecord
-} from '@airship/library'
+} from './library'
 import { remoteFile } from './remoteFile'
 import { ReaderView, type ReaderHandle, type TocItem } from './ReaderView'
 import './airship-reader.css'
@@ -22,8 +22,7 @@ import './airship-reader.css'
 /**
  * Reader（墨读）—— EPUB / MOBI。
  *
- * 书架与阅读器两个视图。书库在 runtime 级共享区，整份索引都归这一个入口
- * （PDF 应用连同 `pdf` 格式位已于 2026-11-26 退场）。
+ * 书架与阅读器两个视图。书目、封面与进度都存在这个应用自己数据目录的书库里。
  *
  * 导入时元数据和封面用 foliate 的 makeBook 读（EPUB 与 MOBI 都支持 getCover），
  * 读不出来就退化成"文件名当标题、无封面"，不让导入失败。

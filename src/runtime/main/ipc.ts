@@ -22,30 +22,24 @@ import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import {
   type AppId,
-  type SharedNamespace,
   type ThemeSnapshot
 } from '@airship/contract'
 import {
   identityMismatch,
   needScopeString,
   needString,
-  nsDenied,
   unknownApp,
   unknownSender
 } from '@airship/contract'
 import {
   metaOf,
-  canAccessShared,
-  isKnownApp,
-  sharedNamespacesOf
+  isKnownApp
 } from './services/appRegistry'
 import {
   appCacheDir,
   appDataDir,
   paths,
-  resolveInData,
-  resolveInShared,
-  sharedDirsFor
+  resolveInData
 } from './services/paths'
 import { settings } from './services/settings'
 import { grants } from './services/grants'
@@ -70,7 +64,7 @@ import type {
  *   2. `assertApp`    —— 调用方传来的 app 必须等于归属。**身份由 preload 注入，
  *      应用改不了；就算改了，这里也对不上。**
  *
- * 边界各自成立：grants 的路径表（文件）、sharedNamespaces 名单（共享区）。
+ * 边界只有一张表：grants 的路径表（文件），加上身份与归属那两道闸。
  * 外部程序不归这层管——要跑外部命令的应用自带后台进程（Node 侧），runtime 只负责起停它。
  *
  * 顺序是刻意的：先确认"你是谁"，再判"这份路径你授权过没有"。
@@ -141,12 +135,10 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
   handle('runtime:paths', (event, appArg: unknown) => {
     const id = assertApp(event, appArg)
     const p = paths()
-    const namespaces = sharedNamespacesOf(id)
     return {
       data: appDataDir(id),
       cache: appCacheDir(id),
       root: p.root,
-      shared: sharedDirsFor(namespaces),
       platform: process.platform,
       runtimeVersion: app.getVersion()
     }
@@ -364,20 +356,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
     if (!Array.isArray(segments)) throw new Error('segments 必须是数组')
     return resolveInData(
       id,
-      segments.map((s) => assertNonEmptyString(s, 'segment'))
-    )
-  })
-
-  handle('fs:resolveInShared', (event, appArg: unknown, ns: unknown, segments: unknown) => {
-    const id = assertApp(event, appArg)
-    const namespace = assertNonEmptyString(ns, 'ns')
-    if (!canAccessShared(id, namespace)) {
-      log.warn(id, '拒绝访问未声明的共享命名空间', { ns: namespace })
-      throw new Error(nsDenied(id, namespace))
-    }
-    if (!Array.isArray(segments)) throw new Error('segments 必须是数组')
-    return resolveInShared(
-      namespace as SharedNamespace,
       segments.map((s) => assertNonEmptyString(s, 'segment'))
     )
   })

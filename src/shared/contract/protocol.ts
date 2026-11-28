@@ -31,20 +31,6 @@ export type AppId = string
 export type SettingsScope = AppId
 
 /**
- * runtime 托管的共享命名空间登记表。
- *
- * 与应用 id 不同，这份名单**属于 runtime**：目录由 runtime 创建、由 runtime 托管，
- * 新增一个共享数据区是 runtime 的功能变更，不是应用变更。
- * 应用只能在清单里声明自己要访问哪个，声明了不存在的直接拒。
- *
- * 为什么需要它：从前墨读与 PDF 是两个独立应用入口，
- * 书架、导入记录、封面、阅读进度必须是同一套数据——各自存一份就会出现
- * "同一本书在两个入口里各有一本"的重复（PDF 已于 2026-11-26 退场，机制留着）。
- */
-export const SHARED_NAMESPACES = ['library'] as const
-export type SharedNamespace = (typeof SHARED_NAMESPACES)[number]
-
-/**
  * 运行平台。用界面语言里的名字，不把 `win32` 这种 Node 的实现细节写进清单。
  * 对应关系由 `platformIdOf` 一处给出，主进程与测试替身都问它。
  */
@@ -76,10 +62,8 @@ export interface AppPaths {
   data: string
   /** 本应用缓存目录，可随时整体删除重建 */
   cache: string
-  /** airship 的家目录（`~/.airship`）：这一族的数据、共享区、日志都在它下面 */
+  /** airship 的家目录（`~/.airship`）：这一族的数据、日志都在它下面 */
   root: string
-  /** 本应用有权访问的共享命名空间根目录 */
-  shared: Partial<Record<SharedNamespace, string>>
   /** 平台标识，值同 process.platform */
   platform: string
   /** runtime 版本 */
@@ -217,11 +201,6 @@ export interface AirshipBridge {
     copy(src: string, dest: string): Promise<void>
     /** 把路径解析到应用数据目录下，返回绝对路径；越界直接抛错 */
     resolveInData(...segments: string[]): Promise<string>
-    /**
-     * 把路径解析到 runtime 级共享命名空间下。
-     * 应用必须在自己的清单 `sharedNamespaces` 里声明了该命名空间，否则主进程拒绝。
-     */
-    resolveInShared(ns: SharedNamespace, ...segments: string[]): Promise<string>
     /**
      * 拖放/选择事件里那个 File 对象对应的本机路径；换不出路径（JS 自造、没盘上真身）就是空字符串。
      *

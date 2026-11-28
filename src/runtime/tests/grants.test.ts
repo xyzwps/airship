@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * GR-001 ~ GR-004、GR-006、GR-009：路径授权表本身。
+ * GR-001 ~ GR-003、GR-006 ~ GR-009：路径授权表本身。
  *
  * 跑的是真 grants.ts（真 paths.ts 的目录布局），对话框那一步给出去的许可在 `bridge.test.ts` 里验，
  * 因为"选中即授权"是 ipc.ts 那条流程的事。
@@ -20,7 +20,7 @@ vi.mock('electron', async () => {
 })
 
 const { join } = await import('node:path')
-const { appCacheDir, appDataDir, isInside, resolveInData, resolveInShared, sharedDir } = await import(
+const { appCacheDir, appDataDir, isInside, resolveInData } = await import(
   '../main/services/paths'
 )
 const { grants } = await import('../main/services/grants')
@@ -59,24 +59,11 @@ describe('应用自己的地盘', () => {
       }
     })()
     expect(why).toContain('不在airship-ffmpeg 的数据目录内')
-
-    // 想借共享区跳出去也一样
-    expect(() => resolveInShared('library', ['..', '..', 'etc'])).toThrowError(/不在共享命名空间 library内/)
   })
 })
 
-describe('共享命名空间与显式授权', () => {
+describe('显式授权', () => {
   const root = join(__dirname, '.tmp', 'grants-userData')
-
-  it('GR-004 声明过的共享区可读写，没声明的应用碰不到', () => {
-    const book = join(sharedDir('library'), 'files', 'a.epub')
-    // airship-reader 在清单里声明了 library
-    expect(grants.canRead('airship-reader', book)).toBe(true)
-    expect(grants.canWrite('airship-reader', book)).toBe(true)
-    // airship-ffmpeg 没声明，同一条路径就不给
-    expect(grants.canRead('airship-ffmpeg', book)).toBe(false)
-    expect(slash(sharedDir('library'))).toMatch(/shared\/library$/)
-  })
 
   it('GR-006 选中一个目录，它下面任意深度都可读', () => {
     const picked = join(root, '..', 'media')

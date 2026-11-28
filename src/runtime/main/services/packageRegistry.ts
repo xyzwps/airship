@@ -11,7 +11,7 @@ import {
   type PackageManifest
 } from '@airship/contract'
 import type { AppMeta } from '@airship/contract'
-import type { PlatformId, SharedNamespace } from '@airship/contract'
+import type { PlatformId } from '@airship/contract'
 import { platformIssue } from '@airship/contract'
 import { archiveEntryNames, readArchiveText } from './packageArchive'
 
@@ -167,7 +167,7 @@ export function packageFor(id: string): InstalledPackage | null {
   return byId.get(id) ?? null
 }
 
-/* ---------------- 读法：共享区名单（sharedNamespaces）只问这张表 ---------------- */
+/* ---------------- 读法：只问这张表 ---------------- */
 
 export function appIds(): string[] {
   return [...byId.keys()]
@@ -180,16 +180,6 @@ export function appsInOrder(): RegisteredMeta[] {
 
 export function isKnownApp(value: unknown): value is string {
   return typeof value === 'string' && byId.has(value)
-}
-
-/** 应用能不能碰某个共享命名空间：只问清单声明的那份名单 */
-export function canAccessShared(app: string, ns: string): ns is SharedNamespace {
-  const meta = byId.get(app)?.meta
-  return (meta?.sharedNamespaces ?? []).includes(ns as SharedNamespace)
-}
-
-export function sharedNamespacesOf(app: string): SharedNamespace[] {
-  return byId.get(app)?.meta.sharedNamespaces ?? []
 }
 
 export function unavailableReason(app: string, platform: PlatformId | 'unknown'): string | null {

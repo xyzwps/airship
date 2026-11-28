@@ -123,7 +123,7 @@ function appTarget(file: string, spec: string): string | null {
 function areaTarget(file: string, spec: string): string | null {
   if (spec.startsWith('@airship/runtime')) return 'runtime'
   if (spec.startsWith('@airship/sdk')) return 'sdk'
-  if (spec.startsWith('@airship/contract') || spec.startsWith('@airship/library') || spec.startsWith('@airship/textdecode'))
+  if (spec.startsWith('@airship/contract') || spec.startsWith('@airship/textdecode'))
     return 'shared'
   const resolved = resolveSpec(file, spec)
   if (!resolved) return null
@@ -202,7 +202,6 @@ describe('应用只引 SDK 与契约层（§4 / I-6）', () => {
       join(SRC, 'sdk', 'package.json'),
       join(SRC, 'cli', 'package.json'),
       join(SRC, 'shared', 'contract', 'package.json'),
-      join(SRC, 'shared', 'library', 'package.json'),
       join(SRC, 'shared', 'textdecode', 'package.json'),
       ...discoveredAppIds().map((id) => join(APPS_DIR, id, 'package.json'))
     ]
@@ -292,7 +291,7 @@ describe('依赖方向（§4 / I-1）', () => {
         const resolved = resolveSpec(file, spec)
         const ownPkgDir = `${SHARED_P}/${ownPkg}`
         const relativeEscape = resolved !== null && !resolved.startsWith(ownPkgDir + '/') && !resolved.startsWith(SHARED_P + '/contract')
-        const namedIntoSharedDeep = /^@airship\/(contract|library|textdecode)\//.test(spec)
+        const namedIntoSharedDeep = /^@airship\/(contract|textdecode)\//.test(spec)
         if (intoApp || intoRuntime || relativeEscape || namedIntoSharedDeep) violations.push(`${srcPosix(file)} → ${spec}`)
       }
     }
@@ -323,7 +322,7 @@ describe('包入口（§8.1 规则 1）', () => {
     for (const file of scanned) {
       for (const spec of importSpecifiers(file)) {
         if (ALLOWED_SUBPATHS.includes(spec)) continue
-        // '@airship/library/x' 这种更深一层就是绕过入口
+        // '@airship/contract/x' 这种更深一层就是绕过入口
         if (/^@airship\/[a-z-]+\//.test(spec)) violations.push(`${srcPosix(file)} → ${spec}`)
       }
     }

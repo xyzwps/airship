@@ -9,7 +9,7 @@ import {
 import 'foliate-js/view.js'
 import { makeBook } from 'foliate-js/view.js'
 import type { AppApi } from '@airship/contract'
-import { bookPath, type BookProgress, type BookRecord } from '@airship/library'
+import { bookPath, type BookProgress, type BookRecord } from './library'
 import { remoteFile } from './remoteFile'
 
 /**

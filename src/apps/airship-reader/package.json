@@ -6,7 +6,6 @@
   "type": "module",
   "devDependencies": {
     "@airship/contract": "*",
-    "@airship/library": "*",
     "@airship/sdk": "*",
     "@airship/textdecode": "*",
     "@vitejs/plugin-react": "^6.2.1",
