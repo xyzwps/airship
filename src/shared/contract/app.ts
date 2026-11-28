@@ -1,9 +1,9 @@
-import type { PlatformId, SharedNamespace, ToolName } from './protocol.ts'
+import type { PlatformId, SharedNamespace } from './protocol.ts'
 
 /**
  * The pure-data half of an app manifest: `AppMeta` and `APP_ID_PATTERN`.
  * Kept in its own component-free file because the main process reads it for
- * package layout and the two name lists (sharedNamespaces / tools).
+ * package layout and the shared-area name list (sharedNamespaces).
  * Conventions for other files (entry document, icons) live in docs/apps/files.md.
  */
 
@@ -45,6 +45,4 @@ export interface AppMeta {
    * in src/shared/contract/errors.ts).
    */
   platforms?: PlatformId[]
-  /** External tools from the runtime's tool table; declared names get their paths and the proc whitelist */
-  tools?: ToolName[]
 }

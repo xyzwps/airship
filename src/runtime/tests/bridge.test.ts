@@ -148,12 +148,6 @@ describe('没声明过的名单一律拒绝', () => {
     // 声明了的应用走同一条路就给的出路径
     const ok = await call<string>('fs:resolveInShared', BOOKS, 'airship-reader', 'library', ['library.json'])
     expect(ok.ok ? ok.value.replace(/\\/g, '/') : ok).toMatch(/shared\/library\/library\.json$/)
-
-    // 同一份"名单闸"在 tools 那一条上的两句原话（真 ipc.ts 的措辞）
-    expect(reason(await call('tools:path', VCP, 'airship-ffmpeg', 'wslc'))).toBe(
-      'airship-ffmpeg 没有声明 wslc 工具（要用它就在 apps/airship-ffmpeg/app.ts 的 tools 里声明）'
-    )
-    expect(reason(await call('tools:path', VCP, 'airship-ffmpeg', 'nope'))).toContain('runtime 不认识的工具：nope')
   })
 })
 

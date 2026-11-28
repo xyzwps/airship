@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import { IconButton } from '@airship/sdk'
 import type { AppApi } from '@airship/contract'
-import { WSLC_MISSING, loadImages, nextJobId, type WslcRunner } from './cli'
+import { WSLC_MISSING, jobEvent, loadImages, nextJobId, type WslcChunk, type WslcExit, type WslcRunner } from './cli'
 import { cleanWslcError, errorMessage } from './parse'
 import { imageIsTagged, imageReference } from './model'
 import { useShellEvents } from './hooks'
@@ -217,9 +217,9 @@ export function RunView({ api, runner }: Props): JSX.Element {
 
   const kill = (): void => {
     const current = job.current
-    if (!current) return
+    if (!runner || !current) return
     stoppedByUser.current = true
-    void api.proc.kill(current.jobId).catch(() => undefined)
+    void runner.kill(current.jobId).catch(() => undefined)
   }
 
   const clearAll = (): void => {
@@ -267,19 +267,21 @@ export function RunView({ api, runner }: Props): JSX.Element {
     const current = job.current
     if (!current) return
 
-    if (event.kind === 'proc:chunk') {
-      if (event.jobId !== current.jobId) return
-      if (event.stream === 'stdout') {
-        stdoutRaw.current += event.text
-        ingest(event.text, (line) => appendLines([line]))
+    const chunk = jobEvent<WslcChunk>(event, 'job:chunk')
+    if (chunk) {
+      if (chunk.jobId !== current.jobId) return
+      if (chunk.stream === 'stdout') {
+        stdoutRaw.current += chunk.text
+        ingest(chunk.text, (line) => appendLines([line]))
       } else {
         // stderr 不进输出框：那句话清洗后由错误条说，别让样板话留在屏上（RB-024）
-        stderrRaw.current += event.text
+        stderrRaw.current += chunk.text
       }
       return
     }
 
-    if (event.kind !== 'proc:exit' || event.jobId !== current.jobId) return
+    const exit = jobEvent<WslcExit>(event, 'job:exit')
+    if (!exit || exit.jobId !== current.jobId) return
 
     const rest = partial.current.replace(/\r$/, '')
     partial.current = ''
@@ -294,7 +296,7 @@ export function RunView({ api, runner }: Props): JSX.Element {
       setNotice(KILLED)
       return
     }
-    if (event.result.code !== 0) {
+    if (exit.code !== 0) {
       setError(cleanWslcError(stderrRaw.current))
       return
     }

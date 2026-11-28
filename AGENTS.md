@@ -86,12 +86,13 @@ runtime 给应用窗口的 DOM 只有 SDK 那一份——`src/runtime` 里没有
 **runtime 侧任何文件都不用改**——runtime 运行期注册命令行指来的包（`airship.exe <id>.airship`），
 不扫磁盘、没有"包根"那回事。这条有用例守着（AP-010：runtime 产品代码里不许出现具体应用 id 的字面量）。
 
-清单只写"这个应用自己的事实"：`name / description / platforms / tools /
+清单只写"这个应用自己的事实"：`name / description / platforms /
 sharedNamespaces / flush / defaultWidth / defaultHeight`。**不写** `id`——它的唯一真源是项目 `package.json`
 的 `name`（本仓就是 `src/apps/<id>` 的目录名），产包期注入 `manifest.json`；清单里再写一遍就有写岔的机会（AP-003）。
 **不写** `iconPath`、`order` 这类表现或关系字段
 （都被驳回过）——图标是文件约定，排序不存在（没有启动器格子要排）。
-剩下的边界只有两份真名单——`sharedNamespaces`（共享区）与 `tools`（外部工具）——加上 grants 的文件路径表。
+剩下的边界只有一份真名单——`sharedNamespaces`（共享区）——加上 grants 的文件路径表与身份闸；
+要跑这台机器上的外部程序，走应用随包自带的后端（`backend.ts`），runtime 不认识任何具体工具。
 
 包格式（**归档文件名** `<id>.airship`——里面是一个 zip，条目名就是包内路径；`manifest.json` 的字段、id 的形状、引用不许越出包）
 的唯一叙述是 `src/apps/specs/package.md`；**判据只有 `@airship/contract` 那一份**（`packageRules.ts`），

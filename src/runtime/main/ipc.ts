@@ -23,24 +23,19 @@ import { dirname, join } from 'node:path'
 import {
   type AppId,
   type SharedNamespace,
-  type ThemeSnapshot,
-  type ToolName,
-  TOOL_NAMES
+  type ThemeSnapshot
 } from '@airship/contract'
 import {
-  badToolName,
   identityMismatch,
   needScopeString,
   needString,
   nsDenied,
-  toolDenied,
   unknownApp,
   unknownSender
 } from '@airship/contract'
 import {
   metaOf,
   canAccessShared,
-  canUseTool,
   isKnownApp,
   sharedNamespacesOf
 } from './services/appRegistry'
@@ -55,17 +50,14 @@ import {
 import { settings } from './services/settings'
 import { grants } from './services/grants'
 import { log } from './services/logging'
-import { proc } from './services/proc'
 import { backendHost } from './services/backendHost'
 import { trayService } from './services/tray'
-import { toolPath } from './services/tools'
 import { bringAppToFront, ownerOfContents } from './windows'
 import type {
   DirEntry,
   FileStat,
   NotifyOptions,
   OpenFilesOptions,
-  ProcRequest,
   SaveFileOptions,
   TrayState
 } from '@airship/contract'
@@ -78,10 +70,10 @@ import type {
  *   2. `assertApp`    —— 调用方传来的 app 必须等于归属。**身份由 preload 注入，
  *      应用改不了；就算改了，这里也对不上。**
  *
- * 边界各自成立：grants 的路径表（文件）、sharedNamespaces 名单（共享区）、
- * tools 名单 + proc.ts 的 exe 白名单（外部程序）。
+ * 边界各自成立：grants 的路径表（文件）、sharedNamespaces 名单（共享区）。
+ * 外部程序不归这层管——要跑外部命令的应用自带后台进程（Node 侧），runtime 只负责起停它。
  *
- * 顺序是刻意的：先确认"你是谁"，再判"这份路径/这个工具你声明过没有"。
+ * 顺序是刻意的：先确认"你是谁"，再判"这份路径你授权过没有"。
  */
 
 function senderOwner(event: IpcMainInvokeEvent): string {
@@ -99,18 +91,6 @@ function assertApp(event: IpcMainInvokeEvent, appArg: unknown): AppId {
   }
   if (!isKnownApp(appArg)) throw new Error(unknownApp(appArg))
   return appArg
-}
-
-/** 工具路径只给"清单里声明了这个工具"的应用 */
-function assertTool(app: AppId, tool: ToolName): void {
-  if (!(TOOL_NAMES as readonly string[]).includes(tool)) {
-    log.warn(app, '问了 runtime 不认识的工具', { tool })
-    throw new Error(badToolName(tool))
-  }
-  if (!canUseTool(app, tool)) {
-    log.warn(app, '工具未声明，已拒绝', { tool })
-    throw new Error(toolDenied(app, tool))
-  }
 }
 
 function assertNonEmptyString(value: unknown, label: string): string {
@@ -400,38 +380,6 @@ export function registerIpc(options: { shotMode?: boolean } = {}): void {
       namespace as SharedNamespace,
       segments.map((s) => assertNonEmptyString(s, 'segment'))
     )
-  })
-
-  /* ---------- 子进程：事件只回归属窗口 ---------- */
-
-  handle('proc:run', async (event, appArg: unknown, request: unknown) => {
-    const id = assertApp(event, appArg)
-    const req = request as Omit<ProcRequest, 'jobId'>
-    if (!req || !Array.isArray(req.args)) throw new Error('request.args 必须是数组')
-    assertNonEmptyString(req.exe, 'request.exe')
-    return proc.run(id, req)
-  })
-
-  handle('proc:start', (event, appArg: unknown, request: unknown) => {
-    const id = assertApp(event, appArg)
-    const req = request as ProcRequest
-    if (!req || !Array.isArray(req.args)) throw new Error('request.args 必须是数组')
-    assertNonEmptyString(req.exe, 'request.exe')
-    assertNonEmptyString(req.jobId, 'request.jobId')
-    proc.start(id, req)
-  })
-
-  handle('proc:kill', (event, appArg: unknown, jobId: unknown) =>
-    proc.kill(assertNonEmptyString(jobId, 'jobId'), assertApp(event, appArg))
-  )
-
-  handle('proc:list', (event, appArg: unknown) => proc.list(assertApp(event, appArg)))
-
-  handle('tools:path', (event, appArg: unknown, toolArg: unknown) => {
-    const id = assertApp(event, appArg)
-    const tool = assertNonEmptyString(toolArg, 'tool') as ToolName
-    assertTool(id, tool)
-    return toolPath(tool)
   })
 
   /* ---------- 后端程序：进程随窗口走，事件只回归属窗口 ---------- */

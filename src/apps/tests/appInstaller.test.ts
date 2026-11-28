@@ -24,7 +24,7 @@ function scriptOf(meta: (typeof REAL_APPS)[number]): string {
 describe('安装器找 runtime', () => {
   it('PK-031 找 runtime 按顺序，找不到念原话不装', () => {
     const script = scriptOf(game)
-    // AIRSHIP_PATH 在前，固定目录在后（与 tools.ts 同一套顺序）
+    // AIRSHIP_PATH 在前，固定目录在后（与 runtime 的落点同一个目录约定）
     const envAt = script.indexOf('ReadEnvStr $0 "AIRSHIP_PATH"')
     const fixedAt = script.indexOf('$PROFILE\\.airship\\runtime')
     expect(envAt).toBeGreaterThan(-1)

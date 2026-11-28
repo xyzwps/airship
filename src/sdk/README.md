@@ -15,7 +15,7 @@ import App from './App.tsx'
 createAirshipApp({ meta: app, component: App, icon: './icon.png' })
 ```
 
-组件里拿到的 `api` 就是 runtime 的全部通道，随取随用。真正的边界只有三份名单：共享区看清单的 `sharedNamespaces`，外部工具看清单的 `tools`，文件路径看 grants 的授权表；越界时拒绝你收到的是一句人话。
+组件里拿到的 `api` 就是 runtime 的全部通道，随取随用。runtime 侧的边界只有两份：共享区看清单的 `sharedNamespaces`，文件路径看 grants 的授权表；越界时拒绝你收到的是一句人话。要跑这台机器上的外部程序，走 `api.backend`——进程由应用随包自带的后端去发现和拉起，runtime 不认识任何具体工具。
 
 常用导出：`createAirshipApp`、`useTheme`、`Titlebar` / `IconButton` / `Glyph`、`AIRSHIP_CSP`。
 
@@ -28,6 +28,6 @@ createAirshipApp({ meta: app, component: App, icon: './icon.png' })
 ```tsx
 import { FakeAirship, mountUi } from '@airship/sdk/testing'
 
-const fake = new FakeAirship({ id: 'hello', sharedNamespaces: [], tools: [] })
+const fake = new FakeAirship({ id: 'hello', sharedNamespaces: [] })
 const m = await mountUi(<MyApp api={fake.api} />, { fake })
 ```

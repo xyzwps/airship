@@ -11,7 +11,7 @@ import {
   type PackageManifest
 } from '@airship/contract'
 import type { AppMeta } from '@airship/contract'
-import type { PlatformId, SharedNamespace, ToolName } from '@airship/contract'
+import type { PlatformId, SharedNamespace } from '@airship/contract'
 import { platformIssue } from '@airship/contract'
 import { archiveEntryNames, readArchiveText } from './packageArchive'
 
@@ -167,7 +167,7 @@ export function packageFor(id: string): InstalledPackage | null {
   return byId.get(id) ?? null
 }
 
-/* ---------------- 读法：两份名单（sharedNamespaces / tools）只问这张表 ---------------- */
+/* ---------------- 读法：共享区名单（sharedNamespaces）只问这张表 ---------------- */
 
 export function appIds(): string[] {
   return [...byId.keys()]
@@ -190,14 +190,6 @@ export function canAccessShared(app: string, ns: string): ns is SharedNamespace 
 
 export function sharedNamespacesOf(app: string): SharedNamespace[] {
   return byId.get(app)?.meta.sharedNamespaces ?? []
-}
-
-export function toolsOf(app: string): ToolName[] {
-  return byId.get(app)?.meta.tools ?? []
-}
-
-export function canUseTool(app: string, tool: ToolName): boolean {
-  return toolsOf(app).includes(tool)
 }
 
 export function unavailableReason(app: string, platform: PlatformId | 'unknown'): string | null {

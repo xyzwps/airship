@@ -4,13 +4,11 @@ import type {
   AppId,
   NotifyOptions,
   OpenFilesOptions,
-  ProcRequest,
   SaveFileOptions,
   SharedNamespace,
   ShellEvent,
   ShellEventListener,
-  TrayState,
-  ToolName
+  TrayState
 } from '@airship/contract'
 
 /**
@@ -107,22 +105,6 @@ const bridge: AirshipBridge = {
       call<string>('fs:resolveInShared', needApp(), ns, segments),
     // 就地算，不过桥：webUtils 是 Electron 给 sandbox 渲染侧的 API（contextBridge 函数收 File 原对象，见官方用法）
     pathForFile: (file: File) => webUtils.getPathForFile(file)
-  },
-
-  proc: {
-    run: (request: Omit<ProcRequest, 'jobId'>) =>
-      call<{ code: number | null; signal: string | null; stdout: string; stderr: string }>(
-        'proc:run',
-        needApp(),
-        request
-      ),
-    start: (request: ProcRequest) => call<void>('proc:start', needApp(), request),
-    kill: (jobId: string) => call<boolean>('proc:kill', needApp(), jobId),
-    list: () => call<string[]>('proc:list', needApp())
-  },
-
-  tools: {
-    path: (name: ToolName) => call<string | null>('tools:path', needApp(), name)
   },
 
   backend: {

@@ -36,17 +36,18 @@ See [icons.md](icons.md).
 
 ## `backend.ts`: the optional background process
 
-A window can neither reach the network nor touch disk (CSP `connect-src 'self' ipc:`), so anything external — services, large streams, long tasks — goes through a Node process packaged with the app. It exists only if the archive root has `backend.js`; in the source directory, `backend.ts` or `backend.js` must appear in exactly one place, bundled by packing into that single file.
+A window can neither reach the network nor touch disk (CSP `connect-src 'self' ipc:`), so anything external — network services, this machine's CLI programs, large streams, long tasks — goes through a Node process packaged with the app. It exists only if the archive root has `backend.js`; in the source directory, `backend.ts` or `backend.js` must appear in exactly one place, bundled by packing into that single file. Locating a tool on this machine (env var, `PATH`, known install dirs) is the app's own knowledge, not the runtime's: the runtime knows no tool by name.
 
 What an author must honor:
 
-- Reply `{ ready: true }` as the first act after start; then answer `{ seq, method, payload }` requests with `{ seq, ok, value | error }`, and push events as `{ event: true, method, payload }`. Timeouts: 10s readiness, 30s per reply.
+- Reply `{ ready: true }` as the first act after start; then answer `{ seq, method, payload }` requests with `{ seq, ok, value | error }`, and push events as `{ event: true, method, payload }`. Timeouts: 10s readiness, 30s per reply — so a long task replies at once and streams back through events instead of holding the reply open.
 - Receive config only via `AIRSHIP_APP_ID` / `AIRSHIP_DATA_DIR` / `AIRSHIP_CACHE_DIR`; write data only inside those two directories.
+- Reap what you spawn. Closing the window terminates the backend process, and on Windows that does not carry the backend's own children with it — a spawned CLI keeps running unless the backend stops it (`SIGTERM`/`SIGKILL` handler plus an exit hook).
 
 Lifecycle (spawn on window open, teardown on close, crash-isolated) and where the bundle lands at runtime are the runtime's business, not the author's contract.
 
 ## The bridge: runtime main process (shared by all apps)
 
-Not a file in the app directory, but the bridge itself is the whole outward face: the renderer reaches the system only through `window.airship`, injected by preload. settings, log, tray and notify are base functions, open to every app — the renderer has no sandbox, so a declared permission bitmap could never stop anyone determined to bypass it. What still gates: the two manifest name lists — `sharedNamespaces` and `tools` — plus the identity check (the main process re-derives your app from `event.sender`). Refusals come back in plain Chinese wording, not Electron internals; events are delivered only to their owning window — dropped if the app isn't open, never broadcast.
+Not a file in the app directory, but the bridge itself is the whole outward face: the renderer reaches the system only through `window.airship`, injected by preload. settings, log, tray and notify are base functions, open to every app — the renderer has no sandbox, so a declared permission bitmap could never stop anyone determined to bypass it. What still gates: the shared-area name list in the manifest (`sharedNamespaces`) plus the identity check (the main process re-derives your app from `event.sender`). Refusals come back in plain Chinese wording, not Electron internals; events are delivered only to their owning window — dropped if the app isn't open, never broadcast.
 
-On top of the name lists, `fs` must also pass a path table: anything inside the app's own data directory is read/write by nature; outside it, only paths the user explicitly picked via a system dialog during this session.
+On top of that gate, `fs` must also pass a path table: anything inside the app's own data directory is read/write by nature; outside it, only paths the user explicitly picked via a system dialog during this session.

@@ -5,10 +5,8 @@ import { registerIpc } from './ipc'
 import { profileDir } from './services/paths'
 import { registerAirshipScheme, serveAirshipPackages } from './services/packageProtocol'
 import { log } from './services/logging'
-import { proc, setProcEmitter } from './services/proc'
 import { backendHost, setBackendEmitter } from './services/backendHost'
 import { trayService } from './services/tray'
-import { toolStatus } from './services/tools'
 import { appsAvailableOn, registerPackage, type InstalledPackage } from './services/appRegistry'
 import { archivesFromArgv } from './services/runArgs'
 import { usageLine } from '@airship/contract'
@@ -251,9 +249,7 @@ app.whenReady().then(() => {
 
   registerIpc({ shotMode: SHOT_MODE })
 
-  // 子进程事件只投给归属应用的那个窗口
-  setProcEmitter((owner, event) => sendTo(owner, event))
-  // 后端程序主动推的事件同一条路：只回归属窗口，没有全局广播
+  // 后端程序主动推的事件只回归属窗口，没有全局广播
   setBackendEmitter((owner, event) => sendTo(owner, event))
 
   // 没带包路径：念用法，不开任何界面
@@ -286,9 +282,6 @@ app.whenReady().then(() => {
     跑着的包: packages.map((p) => p.meta.id)
   })
 
-  // 提前发现外部工具，第一份日志里就能读到"可用/不可用"
-  log.info('runtime', '工具发现结果', toolStatus())
-
   if (SHOT_MODE) {
     // 截图工装自己失败就必须响亮退出：挂在这儿比报错难查十倍
     void runShotMode().catch((err: unknown) => {
@@ -313,14 +306,12 @@ app.on('window-all-closed', () => {
   // 这里若跟着 quit，截完第一个窗口就退出，后面几个永远截不到——启动器退场后抓到的一次回归：
   // 从前启动器那扇窗一直开着，window-all-closed 不会在截图途中触发。
   if (SHOT_MODE) return
-  proc.killAll()
   backendHost.killAll()
   trayService.clearForShutdown()
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('before-quit', () => {
-  proc.killAll()
   backendHost.killAll()
   trayService.clearForShutdown()
 })

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { act } from 'react'
-import { FakeAirship, type StartCall, type StreamCtl } from '@airship/sdk/testing'
+import { FakeAirship, type BackendCtl } from '@airship/sdk/testing'
 import { mountUi, type Mount } from '@airship/sdk/testing'
 import VcpApp from '../VcpApp'
 import { placeCard } from '../HelpTip'
@@ -10,7 +10,7 @@ import type { AppApi, ShellEventListener } from '@airship/contract'
 
 /**
  * VC 册子（src/apps/airship-ffmpeg/specs/airship-ffmpeg.md）里"界面看得见什么"那几条：真挂载、真点、真喂输出流。
- * ffmpeg 由 FakeAirship 的 proc 替身顶上：命令行记在 procCalls，流式输出由用例往里推。
+ * ffmpeg 由 FakeAirship 的后端替身顶上：命令行记在 backendCalls，流式输出由用例经 ctl.event 往里推。
  *
  * FakeAirship.api 是展开装配的，展开只带自有属性；paths / theme / on 这三个原型方法
  * 要补回去，应用拿到的才是完整的一张面。
@@ -46,24 +46,48 @@ interface Options {
   files?: Record<string, string>
 }
 
-function rig(opts: Options = {}): { fake: FakeAirship; api: AppApi; calls: string[][]; jobs: Map<string, StreamCtl> } {
-  const jobs = new Map<string, StreamCtl>()
+/** 用例手里的流式任务：往本窗口推一段输出 / 报一次结束（不给结果就是干净退出） */
+interface JobCtl {
+  chunk(stream: 'stdout' | 'stderr', text: string): void
+  exit(result?: { code?: number | null; signal?: string | null }): void
+}
+
+function rig(opts: Options = {}): { fake: FakeAirship; api: AppApi; calls: string[][]; jobs: Map<string, JobCtl> } {
+  const jobs = new Map<string, JobCtl>()
   const calls: string[][] = []
+  const exe = 'ffmpeg' in opts ? (opts.ffmpeg ?? null) : FFMPEG
   const fake = new FakeAirship({
     id: 'airship-ffmpeg',
-    tools: ['ffmpeg'],
-    toolPaths: { ffmpeg: 'ffmpeg' in opts ? (opts.ffmpeg ?? null) : FFMPEG },
     picks: opts.picks ?? [[SOURCE]],
     files: { [SOURCE]: 'k'.repeat(2 * 1048576), ...(opts.files ?? {}) },
-    run: (_exe, args) => {
-      calls.push(args)
+    backend: (method, payload, ctl: BackendCtl) => {
+      const args = ((payload ?? {}) as { args?: unknown }).args
+      const list = Array.isArray(args) ? (args as string[]) : []
+      if (method === 'locate') return exe
+      if (method === 'start') {
+        const jobId = String((payload as { jobId?: string }).jobId)
+        jobs.set(jobId, {
+          chunk: (stream, text) => ctl.event('job:chunk', { jobId, stream, text }),
+          exit: (result = {}) => {
+            jobs.delete(jobId)
+            const done = { code: 0, signal: null, ...result }
+            ctl.event('job:exit', { jobId, code: done.code, signal: done.signal })
+          }
+        })
+        return { jobId }
+      }
+      if (method === 'kill') {
+        const ctl2 = jobs.get(String((payload as { jobId?: string }).jobId))
+        if (!ctl2) return false
+        ctl2.exit({ code: null, signal: 'SIGKILL' })
+        return true
+      }
+      if (method === 'killAll') return 0
+      calls.push(list)
       // 探测以外的调用（抽字幕、写文件）都是干净退出
-      if (args.includes('-f') || args.includes('-y')) return { code: 0, stdout: '', stderr: '' }
-      const byPath = opts.stderrFor?.[args[args.length - 1] ?? '']
-      return { stderr: byPath ?? opts.stderr ?? PROBE_STDERR }
-    },
-    start: (call, ctl) => {
-      jobs.set(call.jobId, ctl)
+      if (list.includes('-f') || list.includes('-y')) return { code: 0, signal: null, stdout: '', stderr: '' }
+      const byPath = opts.stderrFor?.[list[list.length - 1] ?? '']
+      return { code: 0, signal: null, stdout: '', stderr: byPath ?? opts.stderr ?? PROBE_STDERR }
     }
   })
   return { fake, api: appApi(fake), calls, jobs }
@@ -179,7 +203,11 @@ describe('打开一个文件，界面念得出 ffmpeg 说的话', () => {
     await openVideo(m)
 
     expect(calls[0]).toEqual(['-hide_banner', '-i', SOURCE])
-    expect(fake.procCalls[0]!.exe).toBe(FFMPEG)
+    // 开局先问后端"ffmpeg 在哪"（顶栏那枚就绪/不可用靠它），探测本身走的是同一条 invoke
+    expect(fake.backendCalls[0]!.method).toBe('locate')
+    expect(
+      fake.backendCalls.filter((c) => c.method === 'run').map((c) => (c.payload as { args: string[] }).args)[0]
+    ).toEqual(['-hide_banner', '-i', SOURCE])
     m.unmount()
   })
 
@@ -343,23 +371,24 @@ describe('命令、检查与修正都在同一屏上', () => {
 })
 
 describe('提交任务与右栏队列', () => {
-  it('VC-065 提交后右栏出现 #1，runtime 收到的命令行带着进度管道', async () => {
+  it('VC-065 提交后右栏出现 #1，后端收到的命令行带着进度管道', async () => {
     const { fake, api, jobs } = rig()
     const m = await mount(api, fake)
     await openVideo(m)
     await m.press('提交任务')
 
-    const call = fake.procCalls.find((c) => c.jobId)
-    expect(call?.args.slice(0, 4)).toEqual(['-hide_banner', '-nostats', '-progress', 'pipe:1'])
-    expect(call?.args).toContain('-i')
-    expect(call!.args[call!.args.length - 1]).toBe(OUT)
+    const call = fake.backendCalls.find((c) => c.method === 'start')
+    const args = (call?.payload as { args: string[] })?.args ?? []
+    expect(args.slice(0, 4)).toEqual(['-hide_banner', '-nostats', '-progress', 'pipe:1'])
+    expect(args).toContain('-i')
+    expect(args[args.length - 1]).toBe(OUT)
     expect(m.text()).toContain('#1')
     expect(m.text()).toContain('4k_demo.mkv')
     expect(jobs.size).toBe(1)
     m.unmount()
   })
 
-  it('VC-066 进行中：状态与速度念得出 runtime 推来的那一截', async () => {
+  it('VC-066 进行中：状态与速度念得出后端推来的那一截', async () => {
     const { fake, api, jobs } = rig()
     const m = await mount(api, fake)
     await openVideo(m)

@@ -5,7 +5,7 @@ import ChangeMeApp from '../CHANGE_MEApp.tsx'
 import { app } from '../app.ts'
 
 /**
- * 用例的地基是 `@airship/sdk/testing` 那个假 runtime：内存卷、命令行记录、两份名单的闸都在它身上，
+ * 用例的地基是 `@airship/sdk/testing` 那个假 runtime：内存卷、后端调用记录、那份名单的闸都在它身上，
  * 措辞直接取 `@airship/contract` 的真源，所以越界时用户看见的那句中文
  * 在这里与在真 runtime 里是同一句。
  *

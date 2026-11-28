@@ -2,16 +2,18 @@ import { useEffect, useRef, useState, type JSX } from 'react'
 import {
   DEFAULT_TAIL_LINES,
   TAIL_CHOICES,
+  jobEvent,
   logsArgs,
   nextJobId,
   nowEpochSeconds,
   tailLabel,
+  type WslcChunk,
+  type WslcExit,
   type WslcRunner
 } from './cli'
 import { cleanWslcError, errorMessage, prettyLine, prepareLogLines } from './parse'
 import { clockOfDay } from './model'
 import { useShellEvents } from './hooks'
-import type { ProcResult } from '@airship/contract'
 
 /**
  * 容器详情的「日志」页签：两种读法各发各的命令，各有一份文本。
@@ -164,14 +166,14 @@ export function LogsView({ runner, containerRef, running, active }: Props): JSX.
     const jobId = job.current
     if (!jobId) return
     stoppedByUser.current = true
-    const killed = await api.proc.kill(jobId).catch(() => false)
+    const killed = await runner.kill(jobId).catch(() => false)
     // 进程刚好自己结束了：那句话由收尾那一路说，这里不抢
     if (!killed) stoppedByUser.current = false
   }
 
   /* ---------------- 事件回流 ---------------- */
 
-  const onExit = (result: ProcResult): void => {
+  const onExit = (result: WslcExit): void => {
     job.current = null
     busyRef.current = false
     setBusy(false)
@@ -198,9 +200,10 @@ export function LogsView({ runner, containerRef, running, active }: Props): JSX.
   }
 
   useShellEvents(api, (event) => {
-    if (event.kind === 'proc:chunk') {
-      if (event.jobId !== job.current || event.stream !== 'stdout') return
-      partial.current += event.text
+    const chunk = jobEvent<WslcChunk>(event, 'job:chunk')
+    if (chunk) {
+      if (chunk.jobId !== job.current || chunk.stream !== 'stdout') return
+      partial.current += chunk.text
       const pieces = partial.current.split('\n')
       partial.current = pieces.pop() ?? ''
       const complete = pieces.map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line))
@@ -210,7 +213,8 @@ export function LogsView({ runner, containerRef, running, active }: Props): JSX.
       }
       return
     }
-    if (event.kind === 'proc:exit' && event.jobId === job.current) onExit(event.result)
+    const exit = jobEvent<WslcExit>(event, 'job:exit')
+    if (exit && exit.jobId === job.current) onExit(exit)
   })
 
   /* ---------------- 会话收尾 ---------------- */
@@ -219,7 +223,7 @@ export function LogsView({ runner, containerRef, running, active }: Props): JSX.
   useEffect(() => {
     if (job.current) {
       stoppedByUser.current = true
-      void api.proc.kill(job.current).catch(() => undefined)
+      void runner.kill(job.current).catch(() => undefined)
       job.current = null
     }
     busyRef.current = false

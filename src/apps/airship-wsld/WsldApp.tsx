@@ -13,8 +13,8 @@ import './airship-wsld.css'
  *
  * 三页：容器（列表 + 详情 + 生命周期动作 + 日志）、镜像（列表 + 拉取 + 删除）、
  * 命令编排（`wslc run` 表单 + 就地执行 + 历史）。
- * 容器与镜像两页的数据与动作全靠 `wslc.exe`，路径由 runtime 定位：应用只声明"我要用 wslc"，
- * runtime 给不出路径就按"这台机器上没有 wslc"说话；编排页不依赖定位结果照常可用，
+ * 容器与镜像两页的数据与动作全靠 `wslc.exe`，路径由应用自带的后端定位：找不到就按
+ * "这台机器上没有 wslc"说话；编排页不依赖定位结果照常可用，
  * 只有「就地执行」按下时会说到那句缺 wslc 的话（RB-039）。
  */
 
@@ -37,11 +37,11 @@ export default function WsldApp({ api }: { api: AppApi }): JSX.Element {
         setChecking(false)
         if (exe) {
           markPerf('wslc 已定位')
-          setRunner(makeRunner(api, exe))
+          setRunner(makeRunner(api))
         }
       })
       .catch(() => {
-        // 问路径这一步本身就失败（没声明 proc / 没声明工具）：同样按"用不了"说，不炸界面
+        // 问路径这一步本身就失败（这台机器上没有这个应用自带的后端）：同样按"用不了"说，不炸界面
         if (alive) setChecking(false)
       })
     return () => {

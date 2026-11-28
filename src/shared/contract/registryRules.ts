@@ -1,15 +1,15 @@
 import type { AppMeta } from './app.ts'
 import { APP_ID_PATTERN } from './app.ts'
-import { badAppId, unknownTool } from './errors.ts'
+import { badAppId } from './errors.ts'
 import { ICON_NAME, RETIRED_ICON_PATTERN } from './packageRules.ts'
-import { PLATFORM_IDS, TOOL_NAMES } from './protocol.ts'
+import { PLATFORM_IDS } from './protocol.ts'
 
 /**
  * 应用注册表的规矩（产包器与 runtime 注册共用一份）。
  *
  * 产包器与运行期注册各自校验同一份清单，如果各写一套校验，就会出现
  * "一侧收下了、另一侧炸了"的分裂。规矩只有这些条，写在一处，测在一处。
- * 返回值是**人读的原因列表**——注册期直接炸，比运行到一半"工具查不到"好解释得多。
+ * 返回值是**人读的原因列表**——注册期直接炸，比运行到一半才报"工具查不到"好解释得多。
  */
 
 /** 清单本身的规矩：id 合形状、id 不重复、字段合法。id 由产包注入，这里不再与目录名对账 */
@@ -21,9 +21,6 @@ export function manifestProblems(
   const out: string[] = []
   if (!APP_ID_PATTERN.test(meta.id)) out.push(`${file}: ${badAppId(meta.id)}`)
   if (seen.includes(meta.id)) out.push(`${file}: id 重复 "${meta.id}"`)
-  for (const tool of meta.tools ?? []) {
-    if (!(TOOL_NAMES as readonly string[]).includes(tool)) out.push(`${file}: ${unknownTool(meta.id, tool)}`)
-  }
   for (const p of meta.platforms ?? []) {
     if (!(PLATFORM_IDS as readonly string[]).includes(p)) {
       out.push(`${file}: 不认识的平台 "${p}"（清单 platforms 只认 ${PLATFORM_IDS.join(' / ')}）`)

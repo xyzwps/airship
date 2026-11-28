@@ -1,4 +1,3 @@
-import { TOOL_NAMES } from './protocol.ts'
 import type { PlatformId } from './protocol.ts'
 import type { AppMeta } from './app.ts'
 
@@ -80,14 +79,6 @@ export const runtimeNotFound = (): string =>
 export const packageRejected = (name: string, reasons: readonly string[]): string =>
   `这个包跑不起来：${name}\n${reasons.map((r) => '  · ' + r).join('\n')}`
 
-/** 子进程白名单外的可执行文件 */
-export const exeDenied = (exe: string): string =>
-  `不允许执行 ${exe}：可执行文件必须先由 runtime 发现（见 tools.ts 的白名单规则）`
-
-/** 同一应用内任务标识重复 */
-export const dupJob = (jobId: string): string =>
-  `任务标识重复：${jobId}（同一个应用内要唯一）`
-
 /** 参数必须是非空字符串 */
 export const needString = (label: string, got: unknown): string =>
   `${label} 必须是非空字符串，收到 ${JSON.stringify(got)}`
@@ -99,10 +90,6 @@ export const noResult = (channel: string): string => `${channel} 调用失败（
 export const noBridge = (): string =>
   'window.airship 不存在：preload 没有加载成功。' +
   '检查 electron.vite.config.ts 的 preload 入口和窗口的 webPreferences.preload 路径。'
-
-/** 想用的工具没在自己清单里声明 */
-export const toolDenied = (app: string, tool: string): string =>
-  `${app} 没有声明 ${tool} 工具（要用它就在 apps/${app}/app.ts 的 tools 里声明）`
 
 /* ---------------- 后台程序的措辞（包根 backend.js 约定 ↔ api.backend） ---------------- */
 
@@ -125,14 +112,6 @@ export const backendNotReady = (app: string, seconds: number): string =>
 /** 一次调用超时（进程活着，这条不回） */
 export const backendNoAnswer = (method: string, seconds: number): string =>
   `后端程序没在 ${seconds} 秒内回话：${method}（调用取消了，后端进程还留着——它要是之后回了话会被丢弃）`
-
-/** 清单里写了 runtime 不认识的运行期工具 */
-export const unknownTool = (app: string, tool: string): string =>
-  `${app} 的清单声明了 runtime 不认识的工具 ${tool}（runtime 只认 ${TOOL_NAMES.join(' / ')}）`
-
-/** 调用时传了 runtime 不认识的工具名 */
-export const badToolName = (tool: string): string =>
-  `runtime 不认识的工具：${tool}（runtime 的工具表只有 ${TOOL_NAMES.join(' / ')}）`
 
 /** 外部链接协议 */
 export const linkDenied = (url: string): string => `只允许打开 http/https 链接：${url}`

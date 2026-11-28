@@ -288,3 +288,14 @@ export function clockOfDay(at: number): string {
   const d = new Date(at)
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
+
+/**
+ * 拉取卡片上的时长说法。
+ * 引擎在这台机器上不中途吐输出（管道、文件、伪终端三条路实测都是结束时整份到），
+ * 所以进行中唯一真的在走的就是这个数。
+ */
+export function elapsedText(seconds: number): string {
+  const whole = Math.max(0, Math.floor(seconds))
+  if (whole < 60) return `${whole} 秒`
+  return `${Math.floor(whole / 60)} 分 ${pad(whole % 60)} 秒`
+}

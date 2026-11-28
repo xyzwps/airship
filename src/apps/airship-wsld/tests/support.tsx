@@ -2,38 +2,84 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { act } from 'react'
 import WsldApp from '../WsldApp'
-import { FakeAirship, type FakeOptions } from '@airship/sdk/testing'
+import { FakeAirship, type BackendCtl } from '@airship/sdk/testing'
 import { mountUi, type Mount } from '@airship/sdk/testing'
 import type { AppApi } from '@airship/contract'
-import type { ProcResult } from '@airship/contract'
+import type { WslcResult } from '../cli'
 
 /**
  * wsld 用例的公共工装。
  *
- * 一切外部事实都从 FakeAirship 编排：`toolPaths.wslc` 决定"这台机器上有没有 wslc"，
+ * 一切外部事实都由 FakeAirship 的后端替身编排：`locate` 决定"这台机器上有没有 wslc"，
  * `run` 决定一次性调用的应答，`start` + `ctl` 决定流式任务什么时候结束、吐出什么。
- * 断言只落在可观察结果上：界面文字、`fake.procCalls` 里真实发出的命令行、事件流。
+ * 断言只落在可观察结果上：界面文字、`commands(fake)` 里真实发出的命令行、事件流。
  */
 
 export const WSLC_EXE = 'C:/fake/wslc.exe'
 
+/** 流式任务的一次提交（后端收到的那一份） */
+export interface JobCall {
+  jobId: string
+  args: string[]
+}
+
+/** 用例手里的流式任务：往本窗口推一段输出 / 报一次结束（不给结果就是干净退出） */
+export interface JobCtl {
+  chunk(stream: 'stdout' | 'stderr', text: string): void
+  exit(result?: { code?: number | null; signal?: string | null; stdout?: string; stderr?: string }): void
+}
+
 export interface FakeSetup {
   /** 一次性调用的应答；不给就是干净退出 */
-  run?: (exe: string, args: string[]) => Partial<ProcResult>
-  /** 流式任务：用例自己用 ctl.chunk / ctl.exit 喂 */
-  start?: FakeOptions['start']
+  run?: (args: string[]) => Partial<WslcResult>
+  /** 流式任务：用例自己拿 ctl 喂 chunk 与 exit */
+  start?: (call: JobCall, ctl: JobCtl) => void
   /** 这台机器上没有 wslc 时传 null；默认有 */
   wslc?: string | null
   confirm?: boolean
 }
 
 export function makeFake(setup: FakeSetup = {}): FakeAirship {
+  const exe = setup.wslc === undefined ? WSLC_EXE : setup.wslc
+  /** 还在跑的流式任务：kill 要像真后端那样把它结算掉，界面那句"已取消/已停止"才说得出 */
+  const live = new Map<string, JobCtl>()
   return new FakeAirship({
     id: 'airship-wsld',
-    tools: ['wslc'],
-    toolPaths: { wslc: setup.wslc === undefined ? WSLC_EXE : setup.wslc },
-    run: setup.run,
-    start: setup.start
+    backend: (method, payload, ctl: BackendCtl) => {
+      const call = (payload ?? {}) as { jobId?: unknown; args?: unknown }
+      const args = Array.isArray(call.args) ? (call.args as string[]) : []
+      const jobId = String(call.jobId ?? '')
+      if (method === 'locate') return exe
+      if (method === 'status') {
+        return { found: exe !== null, exe, version: exe === null ? null : 'UnifiedContainer 0.1.0' }
+      }
+      if (method === 'run') return { code: 0, signal: null, stdout: '', stderr: '', ...(setup.run?.(args) ?? {}) }
+      if (method === 'start') {
+        const job: JobCtl = {
+          chunk: (stream, text) => ctl.event('job:chunk', { jobId, stream, text }),
+          exit: (result = {}) => {
+            live.delete(jobId)
+            const done = { code: 0, signal: null, stdout: '', stderr: '', ...result }
+            ctl.event('job:exit', { jobId, ...done })
+          }
+        }
+        live.set(jobId, job)
+        setup.start?.({ jobId, args }, job)
+        return { jobId }
+      }
+      if (method === 'kill') {
+        const job = live.get(jobId)
+        if (!job) return false
+        job.exit({ code: null, signal: 'SIGKILL' })
+        return true
+      }
+      if (method === 'killAll') {
+        const n = live.size
+        for (const job of live.values()) job.exit({ code: null, signal: 'SIGKILL' })
+        return n
+      }
+      throw new Error(`工装不认的后端方法：${method}`)
+    }
   })
 }
 
@@ -54,7 +100,7 @@ export function unmountAll(): void {
  * 装配成应用真正拿到的 AppApi。
  *
  * 替身的 `.api` 是把实例摊开成一个对象，原型上的方法（on / paths / theme）跟着丢了，
- * 而 wsld 要订阅子进程事件——所以这里把这三颗补回来，语义仍然由替身自己判。
+ * 而 wsld 要订阅后端推来的事件——所以这里把这三颗补回来，语义仍然由替身自己判。
  */
 export function appApiOf(fake: FakeAirship): AppApi {
   return {
@@ -91,7 +137,9 @@ export function askConfirm(answer: boolean): string[] {
 
 /** 真发出的命令行，形如 `wslc list -a --format json`；册子里允许出现命令行，那是系统边界 */
 export function commands(fake: FakeAirship): string[] {
-  return fake.procCalls.map((call) => `wslc ${call.args.join(' ')}`)
+  return fake.backendCalls
+    .filter((call) => call.method === 'run' || call.method === 'start')
+    .map((call) => `wslc ${((call.payload as { args?: string[] })?.args ?? []).join(' ')}`)
 }
 
 export function countOf(fake: FakeAirship, needle: string): number {

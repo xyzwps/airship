@@ -2,9 +2,11 @@ import { IconButton } from '@airship/sdk'
 import { Fragment, useCallback, useEffect, useRef, useState, type JSX } from 'react'
 import {
   containerActionArgs,
+  jobEvent,
   loadContainers,
   nextJobId,
   type ContainerActionName,
+  type WslcExit,
   type WslcRunner
 } from './cli'
 import { cleanWslcError, errorMessage, parseLabels, type RawContainer } from './parse'
@@ -111,21 +113,22 @@ export function ContainersView({ runner }: { runner: WslcRunner }): JSX.Element 
   }
 
   useShellEvents(api, (event) => {
-    if (event.kind !== 'proc:exit') return
+    const exit = jobEvent<WslcExit>(event, 'job:exit')
+    if (!exit) return
     const current = job.current
-    if (!current || event.jobId !== current.jobId) return
+    if (!current || exit.jobId !== current.jobId) return
 
     job.current = null
     busy.current = false
     setPending(null)
 
-    if (event.result.code === 0) {
+    if (exit.code === 0) {
       // 成功就补刷一次；删除成功的这个容器已经不在了，详情收回引导语
       if (current.action === 'remove' && selectedId === current.id) setSelectedId(null)
       void refresh()
     } else {
       // 失败就原地站着：不补刷，旧数据留着
-      setError(cleanWslcError(event.result.stderr))
+      setError(cleanWslcError(exit.stderr))
     }
   })
 

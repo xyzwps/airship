@@ -150,18 +150,18 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
           <p>这几条是"不照做就会做错"的硬约束，多数有册子编号或用例守着。</p>
           <ul class="invariants">
             <li><span class="no">I-1</span><p><strong>一个应用一个窗口一个渲染进程。</strong>隔离是窗口化真正买到的东西：一个应用崩了不带崩别人，改一个应用不用管其余七个。</p></li>
-            <li><span class="no">I-2</span><p><strong>应用只能通过 <code>window.airship</code> 碰系统。</strong>看不到 <code>ipcRenderer</code>，也拿不到绝对路径以外的系统面；能碰什么由两份清单名单（<code>sharedNamespaces</code> / <code>tools</code>）、路径表与身份判定守着，越界一律拒绝并给出读得懂的原因（措辞在 <code>@airship/contract</code>）。</p></li>
+            <li><span class="no">I-2</span><p><strong>应用只能通过 <code>window.airship</code> 碰系统。</strong>看不到 <code>ipcRenderer</code>，也拿不到绝对路径以外的系统面；能碰什么由共享区名单（<code>sharedNamespaces</code>）、路径表与身份判定守着，越界一律拒绝并给出读得懂的原因（措辞在 <code>@airship/contract</code>）。</p></li>
             <li><span class="no">I-3</span><p><strong>身份由 runtime 绑定注入，应用冒充不了别人。</strong>preload 从启动参数注入 id，主进程再用 <code>event.sender</code> 反查归属二次确认。应用代码从不传自己的 id。</p></li>
             <li><span class="no">I-4</span><p><strong>数据由 runtime 统一托管。</strong>各应用的数据落在 <code>~\.airship\data\&lt;id&gt;\</code> 下它自己那一族，应用不自己挑落盘位置。共享数据区（书库）由 runtime 创建与托管。</p></li>
             <li><span class="no">I-5</span><p><strong>加一个应用不改 runtime 侧任何文件。</strong>名单来自命令行指来的包，不是写死的 id 表。契约层刻意不维护 id 名单（<code>AppId = string</code>，运行期校验）。AP-010 守着：runtime 产品代码里不许出现具体应用 id 的字面量。</p></li>
             <li><span class="no">I-6</span><p><strong>应用与 SDK 不许 import runtime。</strong>边界由 node 的解析器守（说明符一律写包名），不靠注释。AP-013 守着这条。</p></li>
-            <li><span class="no">I-7</span><p><strong>子进程只跑 runtime 发现的东西。</strong>proc 白名单的来历只有一个：runtime 按工具登记表发现的（含环境变量显式指的那一档）。应用既不能自己找一个来跑，也不能借 runtime 发现的名义跑没声明的工具。</p></li>
+            <li><span class="no">I-7</span><p><strong>外部程序由应用随包自带的后端去起。</strong>"这台机器上有没有 ffmpeg / wslc、它在哪"是应用的知识，不是契约的知识：runtime 不认识任何具体工具名，也没有工具登记表。runtime 只管后端进程本身的生死，后端名下的子进程归后端自己收。</p></li>
           </ul>
 
           <h2 class="sub" id="boundary">分层与边界图</h2>
           <p>
             上面七条不变量画在一张图上：从上到下就是<strong>依赖方向</strong>，珊瑚色那四条是<strong>边界</strong>——每一道都写着"不照做就会做错"的那件事，以及守着它的用例编号。
-            放行与否只由<strong>两份名单 + 路径表 + 身份</strong>决定，全画在中间那层。
+            放行与否只由<strong>一份名单 + 路径表 + 身份</strong>决定，全画在中间那层。
           </p>
 
           <figure class="diagram">
@@ -174,14 +174,14 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
               <p class="dg-sub">各自一个 <code>@airship/&lt;id&gt;</code> 包、各自一本册子；改一个不用管其余七个，一个崩了不带崩别人。</p>
               <div class="dg-row win">
                 <div class="dg-cell app"><b>Reader airship-reader</b>600×800 · 用 runtime 托管的共享书库</div>
-                <div class="dg-cell app"><b>FFmpeg airship-ffmpeg</b>要外部工具 <code>ffmpeg</code></div>
-                <div class="dg-cell app"><b>WSLD airship-wsld</b><code>platforms: ['windows']</code> · 要 <code>wslc</code></div>
-                <div class="dg-cell app"><b>Life Game airship-life-game</b>两份名单都空着——没有要记住的上次那张图</div>
+                <div class="dg-cell app"><b>FFmpeg airship-ffmpeg</b>自带后端找 <code>ffmpeg</code> 并起它</div>
+                <div class="dg-cell app"><b>WSLD airship-wsld</b><code>platforms: ['windows']</code> · 自带后端找 <code>wslc</code> 并起它</div>
+                <div class="dg-cell app"><b>Life Game airship-life-game</b>名单空着——没有要记住的上次那张图</div>
                 <div class="dg-cell app"><b>你的应用 hello</b><code>just new-app</code> 从范本造</div>
               </div>
               <div class="dg-row" style="margin-top: 10px">
                 <div class="dg-cell pkg"><b>包自持</b><span class="mono">airship://&lt;id&gt;/index.html</span> · 归档 <code>&lt;id&gt;.airship</code>（一个 zip 换了扩展名）· 入口里的引用不许越出包（PK-006）</div>
-                <div class="dg-cell pkg"><b>清单 app.ts</b><span class="mono">name · description · platforms · tools · sharedNamespaces · flush · default*（id 由产包注入）</span> 只写这个应用自己的事实</div>
+                <div class="dg-cell pkg"><b>清单 app.ts</b><span class="mono">name · description · platforms · sharedNamespaces · flush · default*（id 由产包注入）</span> 只写这个应用自己的事实</div>
               </div>
             </div>
 
@@ -212,7 +212,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
             </div>
 
             <div class="dg-layer">
-              <p class="dg-title"><span class="no">边界</span>两份名单 + 路径表 + 身份</p>
+              <p class="dg-title"><span class="no">边界</span>一份名单 + 路径表 + 身份</p>
               <p class="dg-sub">
                 渲染进程没有沙箱，位图式的声明拦不住想绕的人，settings / log / tray / notify 又是个个要用的基础功能——放行只由名单与路径表决定。
                 越界一律拒绝，界面上读得到的是契约层那句中文，不是 "Error invoking remote method"。
@@ -243,10 +243,10 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
               </div>
 
               <div class="dg-group">
-                <div class="dg-g">进程</div>
+                <div class="dg-g">外部程序</div>
                 <div>
-                  <div class="dg-chips"><span class="dg-chip">proc</span><span class="dg-chip">tools</span></div>
-                  <p class="dg-why"><b>I-7</b>：proc 白名单的来历只有一个——runtime 按工具登记表发现的（<code>AIRSHIP_&lt;NAME&gt;_PATH</code> &gt; PATH &gt; 已知位置，现认识 <code>ffmpeg</code> / <code>wslc</code>）。清单 <code>tools</code> 里声明了才拿得到路径，也不能借名义跑没声明的工具。</p>
+                  <div class="dg-chips"><span class="dg-chip">backend.invoke</span><span class="dg-chip bypass">runtime 不登记工具</span></div>
+                  <p class="dg-why"><b>I-7</b>：要跑这台机器上的命令行程序（<code>ffmpeg</code> / <code>wslc</code> 之类），应用随包带一份 <code>backend.ts</code>，发现（<code>AIRSHIP_&lt;NAME&gt;_PATH</code> &gt; PATH &gt; 已知落点）与拉起都写在那一份里。runtime 不认识任何具体工具名，清单里也没有那一栏；后端名下的子进程归后端自己收。</p>
                 </div>
               </div>
 
@@ -254,7 +254,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
                 <div class="dg-g">系统</div>
                 <div>
                   <div class="dg-chips"><span class="dg-chip">tray</span><span class="dg-chip">notify</span><span class="dg-chip">clipboard</span><span class="dg-chip">log</span></div>
-                  <p class="dg-why">托盘、通知、日志是个个要用的基础功能，剪贴板保持原生态不另立闸门。子进程进度与托盘点击这类事件只投归属那个窗口，没有全局广播；日志按应用分命名空间、按天分文件。</p>
+                  <p class="dg-why">托盘、通知、日志是个个要用的基础功能，剪贴板保持原生态不另立闸门。后端推的任务进度与托盘点击这类事件只投归属那个窗口，没有全局广播；日志按应用分命名空间、按天分文件。</p>
                 </div>
               </div>
 
@@ -294,10 +294,10 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
               <p class="dg-title"><span class="no">I-5</span>runtime 主进程 ⇄ 外部世界</p>
               <p class="dg-sub">runtime 自己不画界面：没有启动器，也没有 renderer 目标。</p>
               <div class="dg-row">
-                <div class="dg-cell rt"><b>主进程</b>从 argv 注册包 → <strong>活动包表</strong>（只装这次指来的那几份，不扫磁盘）· 按契约表实现每个方法 · 包协议 <code>airship://</code> · 单实例转发 · 关窗收子进程与托盘</div>
+                <div class="dg-cell rt"><b>主进程</b>从 argv 注册包 → <strong>活动包表</strong>（只装这次指来的那几份，不扫磁盘）· 按契约表实现每个方法 · 包协议 <code>airship://</code> · 单实例转发 · 关窗收后端进程与托盘</div>
                 <div class="dg-cell rt"><b>不认识具体应用</b>名单来自命令行指来的包，不是写死的 id 表；契约层 <code>AppId = string</code>，运行期校验（AP-010 扫产品代码里的应用 id 字面量）</div>
                 <div class="dg-cell world"><b>磁盘</b><code>~\.airship\data\&lt;id&gt;\</code> 各家数据 · <code>shared\library\</code> 共享书库 · 包落 <code>~\.airship\apps\&lt;id&gt;\</code></div>
-                <div class="dg-cell world"><b>外部</b>子进程 <code>ffmpeg</code> / <code>wslc</code> · 系统托盘 · 通知 · 剪贴板 · 外部服务（由随包自带的后台进程连，窗口不发请求）</div>
+                <div class="dg-cell world"><b>外部</b>这台机器上的程序 <code>ffmpeg</code> / <code>wslc</code>（由随包自带的后端起） · 系统托盘 · 通知 · 剪贴板 · 外部服务（由随包自带的后台进程连，窗口不发请求）</div>
               </div>
             </div>
 
@@ -327,7 +327,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
           <ol class="steps">
             <li><h4>落点由主进程开头两句钉死</h4><p><code>app.setName('airship')</code> 让日志与外壳身份念得对（Electron 的默认名会取包名 <code>@airship/runtime</code>）；<code>app.setPath('userData', profileDir())</code> 把浏览器档单独收到 <code>~\.airship\profile</code>。<strong>数据布局不跟 userData 走</strong>——paths.ts 从 <code>airshipHome()</code> 派生，改任何一边都要想到另一边。</p></li>
             <li><h4>抢单实例锁，在 <code>whenReady</code> 之前</h4><p>抢不到不是错误——argv 会由 Electron 自动交给第一实例的 <code>second-instance</code>，这次直接 <code>app.quit()</code>。<code>whenReady</code> 首行 <code>if (!GOT_LOCK) return</code>：不然第二实例也会把启动跑完、开出一扇重复的窗再退出（真机抓到过：两扇 airship-dago 各开一次）。</p></li>
-            <li><h4>挂协议、注册 IPC、接事件路由</h4><p>包协议处理器、IPC 方法、把子进程事件接到"只投归属窗口"的路由上。</p></li>
+            <li><h4>挂协议、注册 IPC、接事件路由</h4><p>包协议处理器、IPC 方法、把后端推来的事件接到"只投归属窗口"的路由上。</p></li>
             <li><h4>从 argv 挑包路径</h4><p>挑出以 <code>.airship</code> 结尾的路径（相对路径按 cwd 解）。一份都没有 → 念用法 + <code>app.exit(1)</code>，不开任何界面。</p></li>
             <li><h4>逐份注册</h4><p>读归档里的清单、校验形状与引用边界、装进<strong>活动包表</strong>。不合格响亮退出（弹错误框 + exit 1），不静默少一个窗口。</p></li>
             <li><h4>逐份开窗口</h4><p>运行期没有任何确认闸门，直跑就是开窗口。一个窗口都没开出来（全都开失败）→ <code>app.quit()</code>，没有理由继续占着进程。</p></li>
@@ -343,9 +343,9 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
           <h3>窗口、事件与收尾</h3>
           <ul>
             <li><strong>窗口</strong>：无边框（<code>frame: false</code>，标题栏由 SDK 画），尺寸只认清单（没写就跟 runtime 默认 1100×740），位置不记、每次由系统摆。台账判"开新的还是聚焦旧的"。清单 <code>platforms</code> 不含本机的应用根本不开窗口，响亮念出原因。</li>
-            <li><strong>事件只投归属窗口</strong>：子进程进度、托盘点击这类事件只回到归属那个窗口，没有全局广播；窗口没了事件就丢弃。这条抽成纯函数是为了能被测试——隔离的最后一环就是它。</li>
+            <li><strong>事件只投归属窗口</strong>：后端推的任务进度、托盘点击这类事件只回到归属那个窗口，没有全局广播；窗口没了事件就丢弃。这条抽成纯函数是为了能被测试——隔离的最后一环就是它。</li>
             <li><strong>崩溃隔离</strong>：一个渲染进程崩了不带崩主进程与别的窗口。主进程的未捕获异常 / 未处理拒绝写日志不致命。</li>
-            <li><strong>关窗收尾</strong>：<code>window-all-closed</code> → 收掉所有子进程、清托盘、退出。截图模式例外——它逐个开窗、关窗再下一个，<code>window-all-closed</code> 在该模式下直接 return，否则截完第一个就退出。</li>
+            <li><strong>关窗收尾</strong>：<code>window-all-closed</code> → 收掉每扇窗名下的后端进程、清托盘、退出。后端自己起的程序由那份后端在退出钩子里收。截图模式例外——它逐个开窗、关窗再下一个，<code>window-all-closed</code> 在该模式下直接 return，否则截完第一个就退出。</li>
             <li><strong>任务栏身份今天是假绿</strong>（TD-001）：<code>window.setAppUserModelId?.(...)</code> 是空操作（那方法只挂在 <code>app</code> 上，BrowserWindow 没有），八个应用的任务栏按钮仍共用一个 runtime 身份。</li>
           </ul>
           <div class="note">
@@ -355,16 +355,16 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
           <h2 class="sub" id="bridge">契约桥与 API 面</h2>
           <p>
             <code>AirshipBridge</code> 声明应用能碰的全部面：<code>paths</code> / <code>theme</code> / <code>setTheme</code> / <code>settings</code> /
-            <code>dialog</code> / <code>fs</code> / <code>proc</code> / <code>tools</code> / <code>tray</code> / <code>notify</code> /
+            <code>dialog</code> / <code>fs</code> / <code>backend</code> / <code>tray</code> / <code>notify</code> /
             <code>clipboard</code> / <code>log</code> / <code>window</code> / <code>on</code>。
             <strong>没有 app 参数</strong>：身份由该窗口的 preload 从启动参数注入，主进程再用 <code>event.sender</code> 反查归属二次确认。应用既看不到"传 id"这个动作，也就没法冒充别的应用。线格式（preload ↔ 主进程）仍然带 id，那是实现细节，不进契约。
           </p>
           <ul>
             <li><code>AppApi = AirshipBridge &amp; { id }</code>：id 只用于显示与日志，不参与任何权限判定。</li>
             <li>preload 只暴露 <code>window.airship</code> 这一面。渲染侧拿不到 <code>ipcRenderer</code>，也拿不到绝对路径——路径只能由 preload 的 <code>webUtils.getPathForFile(file)</code> 换出来（拖文件进窗口时用）。</li>
-            <li>主进程按契约表实现每个方法，按 <code>event.sender</code> 反查归属，再过各自那道闸——清单名单、路径表。拒绝的措辞由 <code>@airship/contract</code> 的 <code>errors.ts</code> 供（中文句子原文，不出现 "Error invoking remote method" 这类 Electron 内部措辞）。</li>
+            <li>主进程按契约表实现每个方法，按 <code>event.sender</code> 反查归属，再过各自那道闸——共享区名单、路径表。拒绝的措辞由 <code>@airship/contract</code> 的 <code>errors.ts</code> 供（中文句子原文，不出现 "Error invoking remote method" 这类 Electron 内部措辞）。</li>
             <li>安装页要念的话都在契约层——找到 runtime 那句 <code>runtimeNotFound</code>、带后台应用的多念一句的 <code>BACKEND_PHRASE</code>——<strong>界面上与 NSI 里不许再抄一遍</strong>。</li>
-            <li>事件频道 <code>ShellEvent</code>：<code>proc:chunk</code> / <code>proc:exit</code> / <code>tray:click</code> / <code>window:maximized</code>。<strong>没有 <code>theme:changed</code> 全局广播</strong>——主题按应用各记各的，不需要广播。</li>
+            <li>事件频道 <code>ShellEvent</code>：<code>tray:click</code> / <code>window:maximized</code> / <code>backend:event</code> / <code>backend:exited</code>。后端主动推的东西装在 <code>backend:event</code> 里，里面的 method 名由应用与它的后端约好，runtime 只搬运不解释。<strong>没有 <code>theme:changed</code> 全局广播</strong>——主题按应用各记各的，不需要广播。</li>
           </ul>
 
           <h2 class="sub" id="gates">边界与授权</h2>
@@ -376,7 +376,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
             <thead><tr><th>边界</th><th>管什么</th><th>判据在哪</th></tr></thead>
             <tbody>
               <tr><td><code>sharedNamespaces</code></td><td>要访问哪个共享数据区——没点名的命名空间用不了，原因念得出来</td><td>BR 册（措辞在 <code>@airship/contract</code>）</td></tr>
-              <tr><td><code>tools</code> + 发现表</td><td>proc 只跑 runtime 按工具登记表发现的东西（<code>AIRSHIP_&lt;NAME&gt;_PATH</code> &gt; PATH &gt; 已知位置），清单里声明了才拿得到路径</td><td>PT 册 · I-7</td></tr>
+              <tr><td>随包自带的后端</td><td>要跑这台机器上的命令行程序（<code>ffmpeg</code> / <code>wslc</code> 之类），发现与拉起写在应用自己的 <code>backend.ts</code> 里；runtime 不登记任何工具名，清单里也没有那一栏</td><td>BE 册 · I-7</td></tr>
               <tr><td>grants 路径表</td><td>数据目录内随便读写；目录外只认本次会话中用户经对话框显式选中的路径</td><td>GR 册五条规则</td></tr>
               <tr><td>身份</td><td>每一道闸判定之前，主进程先按 <code>event.sender</code> 反查这扇窗归属哪个应用——冒充不了别人</td><td>BR 册</td></tr>
             </tbody>
@@ -392,18 +392,21 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
             五条规则，会话内有效：应用数据目录内随便读写；数据目录外只读用户本次会话通过对话框显式选中的路径；<code>dialog</code> 选中的文件自动进入可读集合（<code>grantParentDir</code>
             可连父目录一起授，给"输出落在源文件同目录"那种应用用）；共享命名空间要清单声明；越界直接拒。授权是会话级的，进程退出就没了。
           </p>
-          <h3>共享命名空间与工具发现</h3>
+          <h3>共享命名空间</h3>
           <p>
             <code>SHARED_NAMESPACES = ['library']</code>，这份名单<strong>属于 runtime</strong>：目录由 runtime 创建与托管，新增一个共享数据区是 runtime 的功能变更，不是应用变更。书库开成共享命名空间，是因为它曾由墨读与
             PDF 两个入口共用（PDF 已于 2026-11-26 退场）——各自存一份就会"同一本书在两个入口里各有一本"。
           </p>
+          <h3>外部程序在哪里跑</h3>
           <p>
-            <code>TOOL_NAMES = ['ffmpeg', 'wslc']</code>，同样<strong>属于 runtime</strong>。发现顺序三档：<strong>环境变量 <code>AIRSHIP_&lt;NAME&gt;_PATH</code>（如
-            <code>AIRSHIP_FFMPEG_PATH</code>）&gt; PATH &gt; 已知位置</strong>。<strong>没有"用户指定"那一档</strong>（整档随启动器删了），要显式指就走环境变量。工具可用与否在启动第一份日志里就能读到。
+            窗口不能起进程，也没有一条"跑个命令"的通道：要跑这台机器上的命令行程序，应用随包带一份 <code>backend.ts</code>，
+            <strong>发现（环境变量 <code>AIRSHIP_&lt;NAME&gt;_PATH</code> &gt; PATH &gt; 已知落点）与拉起都写在那一份里</strong>。
+            名单不进契约——做一个 docker 或 kubectl 的外壳，不该先回头给 runtime 登记工具；要加一档发现规则也不必动 runtime。
           </p>
           <p>
-            子进程接口：<code>proc.run</code> 一次性跑完拿结果（探测类短命令），<code>proc.start</code> 后台跑、进度通过事件回流到本窗口，<code>proc.kill</code> /
-            <code>proc.list</code> 管生命周期；关窗与退出时收掉所有子进程。
+            一次调用有 30 秒时限，所以长任务在应用侧走"提交即应答"：<code>backend.invoke('start', …)</code> 立刻回一个 jobId，
+            进度与结束由后端推 <code>backend:event</code> 回本窗口（渲染侧 <code>api.on</code> 订阅），要中断就发 <code>kill</code>。
+            关窗收掉的是后端进程本身，它名下的子进程归后端自己收。
           </p>
 
           <h2 class="sub" id="package">包格式与文档加载</h2>
@@ -448,7 +451,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
   logs/                        按日期的日志
   profile/                     Electron 自己的浏览器档（userData 钉在这里）</code></pre>
           <p>
-            <strong>没有 runtime 级的 settings.json</strong>：从前那份全局设置（全局主题、工具手动路径）随启动器退场——主题按应用各记各的，工具"用户指定"那一档整档删了。目录布局只依赖 airship
+            <strong>没有 runtime 级的 settings.json</strong>：从前那份全局设置随启动器退场——主题按应用各记各的，要显式指某个程序的路径就走环境变量（读它的是应用自己的后端）。目录布局只依赖 airship
             家的根与 id，<strong>不需要知道"现在有哪些应用"</strong>（这条是踩过来的：<code>build()</code> 曾遍历当时的注册表建一张表并缓存，一开机就读失败）。
           </p>
           <p>落盘原子写（写暂存名再改名），坏文件挪成 <code>.bad</code> 不致命。应用安装器卸载不动这份数据；runtime 卸载也不动。</p>
@@ -600,7 +603,6 @@ just app-installer hello   <span class="c"># 产 release/apps/hello-Setup-&lt;�
   name: '你好',                    <span class="c">// 界面显示名，不限字符</span>
   description: '一句话说清它是干什么的',
   sharedNamespaces: ['library'],  <span class="c">// 可选：要访问哪个共享数据区——不点名就用不了</span>
-  tools: ['ffmpeg'],              <span class="c">// 可选：声明了才拿得到路径，也只有这些进 proc 白名单</span>
   flush: true,                    <span class="c">// 可选：内容区去掉 runtime 给的默认内边距</span>
   defaultWidth: 1000,             <span class="c">// 可选：不写就用 1100×740，两维各自独立</span>
   defaultHeight: 720,
@@ -625,7 +627,7 @@ just app-installer hello   <span class="c"># 产 release/apps/hello-Setup-&lt;�
               <strong>拿 API 用 <code>useAppApi()</code></strong>（<code>src/sdk/api.ts</code>）。它不存在时响亮念出"这个包不是由 airship runtime 打开的，或 preload 没加载成功"，而不是静默空操作。
             </li>
             <li>
-              <strong>名单是真闸</strong>：要跑的外部工具写进 <code>tools</code>，要碰的共享数据区写进 <code>sharedNamespaces</code>——没声明的调用被拒时，界面上读得到的是契约层那句中文，不是 Electron 内部措辞。
+              <strong>名单是真闸</strong>：要碰的共享数据区写进 <code>sharedNamespaces</code>——没声明的调用被拒时，界面上读得到的是契约层那句中文，不是 Electron 内部措辞。要跑这台机器上的外部程序不写进清单，写在随包自带的 <code>backend.ts</code> 里。
             </li>
             <li>
               <strong>观感用宿主给的 CSS 变量与 <code>useTheme()</code></strong>，别另调一套配色。<code>IconButton</code> / <code>Titlebar</code> /
@@ -659,7 +661,7 @@ just app-installer hello   <span class="c"># 产 release/apps/hello-Setup-&lt;�
             <li><strong>bug fix 必须先补 Scenario</strong>（描述现象），再补可执行用例，再改代码。</li>
           </ul>
           <p>
-            现有 24 本：runtime 8 本（bridge / grants / logging / proc-tools / runtime / storage / theme / tray）+ 应用区 2 本（app-model / package）+ 共享 2 本（library /
+            现有 23 本：runtime 7 本（bridge / grants / logging / runtime / storage / theme / tray）+ 应用区 2 本（app-model / package）+ 共享 2 本（library /
             textdecode）+ 应用 12 本（Reader、Dago、Life Game、FFmpeg、SVG Editor、S3、Icon Helper各一本，airship-wsld 五本）。索引与前缀表见 <code>docs/specs/index.md</code>——新册子的两字母前缀要取没被占用的，索引表里查。
           </p>
 
@@ -667,9 +669,9 @@ just app-installer hello   <span class="c"># 产 release/apps/hello-Setup-&lt;�
           <p>
             用例标题以同一个编号开头，<code>just casecov</code> 做双向差集：册里有号没用例 = 未实现，用例挂了号册里没有 = 私测（禁止）。差集只看"有没有"，不看次数；同一条契约要多条用例钉住时，编号重复出现即可。
           </p>
-          <pre><code><span class="c">// src/runtime/specs/runtime.md 里那条叫「SH-006 关掉应用窗口，它名下的子进程跟着收掉」，</span>
-<span class="c">// 钉它的用例在 src/runtime/tests/windows.test.ts：</span>
-it('SH-006 只杀这个应用的任务，别人的任务一条都不碰', async () =&gt; { … })</code></pre>
+          <pre><code><span class="c">// src/runtime/specs/backend.md 里那条叫「BE-011 关掉应用窗口，它名下的后端跟着收掉」，</span>
+<span class="c">// 钉它的用例在 src/runtime/tests/backend.test.ts：</span>
+it('BE-011 收掉一个应用的后端，别的应用的一条不碰', async () =&gt; { … })</code></pre>
           <ul>
             <li>
               <strong>替身住 SDK，不住 runtime 的测试目录</strong>：<code>@airship/sdk/testing</code> 的 <code>FakeAirship</code> 与
@@ -756,7 +758,7 @@ just build                 <span class="c"># 两条一起跑</span></code></pre>
             <li>新改动有没有对应的册子场景？bug fix 先补 Scenario，再补用例，再改代码。</li>
             <li><code>just check</code> 全绿（类型 + 单测 + 差集双向零缺漏）。</li>
             <li>动了界面观感？跑 <code>just shot</code> 走查截图，确认临时补丁已还原并重建，<code>git status</code> 干净。</li>
-            <li>加了新工具或新共享命名空间？那是 runtime 的变更，不是应用侧改一条字符串就算——工具名单与共享命名空间名单都<strong>属于 runtime</strong>。</li>
+            <li>加了新共享命名空间？那是 runtime 的变更，不是应用侧改一条字符串就算——共享命名空间名单<strong>属于 runtime</strong>。要跑外部程序则相反：写进应用自己的 <code>backend.ts</code>，runtime 一行都不用改。</li>
             <li>改了 SDK 导出？等于改公开面，同步 <code>docs/architecture.md</code> 对应小节。</li>
             <li>"还没做 / 做不了 / 这期不做"记进 <code>docs/todo.md</code>（只在有人做了决定时）；架构文档里只留状态标记，不另开一章。</li>
             <li>停在"未提交"，把改动、验证口径（哪一半用例、哪一半像素、哪一半没验到）和实测数字讲清楚，由使用者决定提交。</li>

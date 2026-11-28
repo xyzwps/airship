@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act } from 'react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   askConfirm,
   commands,
@@ -15,17 +15,19 @@ import {
   rows,
   tap,
   twoTags,
-  unmountAll
+  unmountAll,
+  type JobCall,
+  type JobCtl,
 } from './support'
-import type { FakeAirship, StartCall, StreamCtl } from '@airship/sdk/testing'
+import type { FakeAirship } from '@airship/sdk/testing'
 import type { Mount } from '@airship/sdk/testing'
-import type { ProcResult } from '@airship/contract'
+import type { WslcResult } from '../cli'
 
 /**
- * IM-001 ~ IM-039：镜像页那一列，与拉取 / 删除 / 强制删除。
+ * IM-001 ~ IM-048：镜像页那一列，与拉取 / 删除 / 强制删除。
  *
  * 删除与拉取走流式任务，"正在进行"这一段由用例扣住；
- * 命令行一律看 `fake.procCalls` 里真实发出去的那几条。
+ * 命令行一律看 `commands(fake)` 里真实发出去的那几条。
  */
 
 const BUSY = 'docker.1ms.run/library/busybox:latest'
@@ -46,14 +48,14 @@ const NOT_FOUND = [
 ].join('\n')
 
 interface Held {
-  call: StartCall
-  ctl: StreamCtl
+  call: JobCall
+  ctl: JobCtl
 }
 
-function stage(setup: { images?: () => Partial<ProcResult>; list?: string } = {}) {
+function stage(setup: { images?: () => Partial<WslcResult>; list?: string } = {}) {
   const held: Held[] = []
   const fake = makeFake({
-    run: (_exe, args) => {
+    run: (args) => {
       if (args[0] === 'images') return setup.images?.() ?? { stdout: imagesNdjson() }
       return { stdout: setup.list ?? listEmpty() }
     },
@@ -98,6 +100,7 @@ const imagesCalls = (fake: FakeAirship): string[] =>
 
 // 每条用例都从干净的界面开始：失败的用例不会把带重复标识的残骸留给下一条
 afterEach(() => {
+  vi.useRealTimers()
   unmountAll()
 })
 
@@ -236,7 +239,7 @@ describe('摆出来的就是本机有的镜像', () => {
   })
 
   it('IM-033 读失败不冲掉已经看见的列表', async () => {
-    let reply: Partial<ProcResult> = { stdout: imagesNdjson() }
+    let reply: Partial<WslcResult> = { stdout: imagesNdjson() }
     const { fake } = stage({
       images: () => reply
     })
@@ -410,6 +413,193 @@ describe('拉取', () => {
     expect(errorBar(m)).toBe('')
     expect(imagesCalls(fake)).toHaveLength(before)
     expect(m.container.querySelector('.wsld__bar--ok')?.textContent).toContain('已取消')
+    m.unmount()
+  })
+})
+
+describe('拉取进行时看得见一张卡片，时间真的在走', () => {
+  /** 真拉取输出按行拆开：本机是跑完才整份吐，用例按块喂它 */
+  const pullLines = (): string[] => pullNew().split(/\r?\n/).map((line) => line.replace(/\r$/, '')).filter((line) => line.length > 0)
+  const NO_OUTPUT_NOTE = '这台机器上的 wslc 要跑完才报详细输出。'
+
+  const cardStatus = (m: Mount): string => m.field('镜像-卡片-状态')?.textContent ?? ''
+  const cardLines = (m: Mount): string[] =>
+    Array.from(m.container.querySelectorAll('[data-test="镜像-卡片-输出"] p')).map((p) => p.textContent ?? '')
+
+  /** 停在"拉取正在进行"那一拍：引用已填、进程已起、卡片已开 */
+  async function pulling(): Promise<{ fake: FakeAirship; m: Mount; ctl: JobCtl }> {
+    const { fake, held } = stage()
+    const m = await openImages(fake)
+    await m.type('镜像引用，例如 docker.1ms.run/library/redis:7', BUSY)
+    await tap(m, '镜像-拉取')
+    return { fake, m, ctl: held[0]!.ctl }
+  }
+
+  /**
+   * 同上，但秒表要在伪时钟之下创建——定时器一旦按真时钟挂上，
+   * 之后再切伪时钟就推不动它，所以切表赶在点「拉取」之前，点完只用微任务收尾。
+   */
+  async function pullingOnFakeClock(): Promise<{ fake: FakeAirship; m: Mount; ctl: JobCtl }> {
+    const { fake, held } = stage()
+    const m = await openImages(fake)
+    await m.type('镜像引用，例如 docker.1ms.run/library/redis:7', BUSY)
+    vi.useFakeTimers()
+    const pullBtn = m.field('镜像-拉取')
+    await act(async () => {
+      pullBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+      await Promise.resolve()
+    })
+    return { fake, m, ctl: held[0]!.ctl }
+  }
+
+  /** 已等时长走的是秒表，所以只有这一族用伪时钟；settle() 在伪时钟下等不到头 */
+  const tick = async (ms: number): Promise<void> => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms)
+    })
+  }
+
+  it('IM-040 点下拉取就出现卡片，念出命令与已等时长', async () => {
+    const { m } = await pulling()
+
+    expect(m.field('镜像-卡片-命令行')?.textContent).toBe(`wslc pull ${BUSY}`)
+    expect(cardStatus(m)).toBe('进行中 · 已等 0 秒')
+    expect(cardLines(m)).toEqual([NO_OUTPUT_NOTE])
+    expect(m.text()).not.toMatch(/\d%|层完成/)
+    m.unmount()
+  })
+
+  it('IM-041 已等时长一秒一秒往前走，页上只剩最新那个数', async () => {
+    const { m } = await pullingOnFakeClock()
+    try {
+      expect(cardStatus(m)).toBe('进行中 · 已等 0 秒')
+      await tick(3000)
+      expect(cardStatus(m)).toBe('进行中 · 已等 3 秒')
+      await tick(2000)
+      expect(cardStatus(m)).toBe('进行中 · 已等 5 秒')
+    } finally {
+      vi.useRealTimers()
+    }
+    m.unmount()
+  })
+
+  it('IM-042 等过一分钟改说几分几秒', async () => {
+    const { m } = await pullingOnFakeClock()
+    try {
+      await tick(65_000)
+      expect(cardStatus(m)).toBe('进行中 · 已等 1 分 05 秒')
+    } finally {
+      vi.useRealTimers()
+    }
+    m.unmount()
+  })
+
+  it('IM-043 输出的行到了就原样逐行摆出来', async () => {
+    const { m, ctl } = await pulling()
+    const lines = pullLines()
+
+    await act(async () => {
+      ctl.chunk('stderr', `${lines.slice(0, 3).join('\r\n')}\r\n`)
+    })
+    expect(cardLines(m)).toEqual(lines.slice(0, 3))
+
+    await act(async () => {
+      ctl.chunk('stderr', `${lines.slice(3, 5).join('\r\n')}\r\n`)
+    })
+    expect(cardLines(m)).toEqual(lines.slice(0, 5))
+    expect(cardLines(m)).not.toContain(NO_OUTPUT_NOTE)
+    m.unmount()
+  })
+
+  it('IM-044 拆成两块推来的行拼成一屏一条', async () => {
+    const { m, ctl } = await pulling()
+    const [first] = pullLines()
+
+    await act(async () => {
+      ctl.chunk('stderr', first.slice(0, 8))
+    })
+    expect(cardLines(m)).toEqual([NO_OUTPUT_NOTE])
+
+    await act(async () => {
+      ctl.chunk('stderr', `${first.slice(8)}\r\n`)
+    })
+    expect(cardLines(m)).toEqual([first])
+    m.unmount()
+  })
+
+  it('IM-045 卡片里那颗取消只在进行中看得见，点了就是取消这一轮', async () => {
+    const { fake, m } = await pulling()
+    expect(m.field('镜像-卡片-取消')).not.toBeNull()
+
+    await tap(m, '镜像-卡片-取消')
+    expect(m.field('镜像-卡片-取消')).toBeNull()
+    expect(cardStatus(m)).toContain('已取消')
+    expect(okBar(m)).toBe(`已取消拉取 ${BUSY}`)
+    expect(fake.backendCalls.some((call) => call.method === 'kill')).toBe(true)
+    expect(imagesCalls(fake)).toHaveLength(1)
+    m.unmount()
+  })
+
+  it('IM-046 收尾后卡片不自己关，时间停在这一拍', async () => {
+    const { m, ctl } = await pullingOnFakeClock()
+    try {
+      await tick(2000)
+      await act(async () => {
+        ctl.exit({ code: 0, stdout: 'Status: Downloaded newer image for ' + BUSY })
+      })
+      expect(cardStatus(m)).toBe('已结束 · 已用 2 秒')
+      await tick(5000)
+      expect(cardStatus(m)).toBe('已结束 · 已用 2 秒')
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(okBar(m)).toBe(`已拉取 ${BUSY}`)
+    m.unmount()
+  })
+
+  it('IM-047 失败的卡片留着说清哪一步，关掉之后错误条仍在', async () => {
+    const { m, ctl } = await pulling()
+    await act(async () => {
+      ctl.chunk('stderr', 'latest: Pulling from library/busybox\r\n')
+      ctl.exit({ code: 1, stderr: '错误：拉不下来\n错误代码： WSLC_E_PULL_FAILED\n' })
+    })
+
+    expect(cardStatus(m)).toContain('失败')
+    expect(m.text()).toContain('拉不下来')
+    expect(errorBar(m)).toContain('拉不下来')
+    expect(m.field('镜像-卡片-关闭')).not.toBeNull()
+
+    await tap(m, '镜像-卡片-关闭')
+    expect(m.field('镜像-卡片-状态')).toBeNull()
+    expect(errorBar(m)).toContain('拉不下来')
+    m.unmount()
+  })
+
+  it('IM-048 关掉卡片后下一轮从零起算，已报出的结果不受影响', async () => {
+    const { fake, held } = stage()
+    const m = await openImages(fake)
+    await m.type('镜像引用，例如 docker.1ms.run/library/redis:7', BUSY)
+
+    await tap(m, '镜像-拉取')
+    await act(async () => {
+      held[0]!.ctl.chunk('stderr', 'Everything up to date\r\n')
+      held[0]!.ctl.exit({ code: 0, stdout: `Status: Image is up to date for ${BUSY}` })
+    })
+    const refreshed = imagesCalls(fake).length
+    expect(okBar(m)).toBe(`${BUSY} 已是最新`)
+
+    const panel = m.container.querySelector('.wsld__modal-panel')
+    await act(async () => {
+      panel?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(m.field('镜像-卡片-状态')).toBeNull()
+    expect(imagesCalls(fake)).toHaveLength(refreshed)
+    expect(okBar(m)).toBe(`${BUSY} 已是最新`)
+
+    await tap(m, '镜像-拉取')
+    expect(cardStatus(m)).toBe('进行中 · 已等 0 秒')
+    expect(cardLines(m)).toEqual([NO_OUTPUT_NOTE])
+    expect(commands(fake).filter((line) => line.includes('pull'))).toHaveLength(2)
     m.unmount()
   })
 })

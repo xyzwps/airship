@@ -9,5 +9,5 @@
  * 替身只实现真 API 面上存在的方法：缺什么要喊出来，不许用可选链吞成空操作。
  */
 
-export { FakeAirship } from './fakeAirship.ts'
+export { FakeAirship, type BackendCtl } from './fakeAirship.ts'
 export { mountUi, type Mount, type MountOptions } from './mount.tsx'

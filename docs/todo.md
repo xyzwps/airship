@@ -13,11 +13,11 @@
 ---
 
 ## 项目问题
-- [ ] 我看到 APP_ID_PATTERN 没有删除，怎么回事
+
 
 ## 工程问题
 - [ ] 我看到注释里有很多过时的东西，越堆积越多
-- [ ] AI 似乎倾向于在各处记录各种历史，我希望把一个东西删除干净，结果留的到处是痕迹，影响后续的上下文
+- [ ] AI 似乎倾向于在各处记录各种历史，我希望把一个东西删除干净，结果留的到处是痕迹，影响后续的上下文。比如我让删除 capabilities，结果到处留的都是xx时候删除了capabilities 痕迹……
 
 
 ## runtime 与发布
@@ -93,11 +93,25 @@
 
 镜像源路径改写与 pull 后改名。来源：`docs/specs/index.md`「先不开的册子」。
 
-### TD-009 拉取实时进度（`pull-progress`）—— 这条是能力缺口，不是省事
+### TD-009 拉取的字节级实时进度（`pull-progress`）—— 这条是能力缺口，不是省事
 
-原版逐层进度靠 ConPTY 伪终端把 `wslc` 当全屏应用来读（`VtScreenTracker` 那套屏幕模型），
-而本项目 `proc` 只有管道分块——没有 TTY 就没有那一层。要么以后给 `proc` 加伪终端能力，
-要么按普通管道输出重做进度呈现。来源：`docs/architecture.md` §14。
+镜像页的拉取卡片（IM-040~048）报的是已等时长加收到的输出原文，没有百分比。为什么给不出：
+本机 `wslc 3.0.5.0` 在拉取结束前一个字都不吐——三条通道都实测过：接管道 120 秒后整份到（1635 字节）、
+重定向到文件 80 秒时 0 字节、自己开 ConPTY 伪终端把 `wslc` 当全屏应用读，485 秒仍是一次整份到（744 字节）。
+按层聚合也报不出：真输出里 `Already exists` 的那些层根本不写 `Pull complete`，分母会一直卡着。
+磁盘侧估不出来：镜像落进固定分配好的 `storage.vhdx`（本机 1006632960 字节），看不见增长量。
+
+真百分比有两条路，都没走：
+
+1. **官方容器 API**。Microsoft Learn《WSL container》给的 C# 面是 `Session.PullImageAsync(new PullImageOptions(...))`，
+   `options.Progress` 回调直接带 `CurrentBytes / TotalBytes`；`wsl.dev/api-reference` 的 C 面对应是
+   `WslcPullSessionImage` + `WslcImageProgressMessage{ id, status, detail.currentBytes/totalBytes }`（头文件 `wslcsdk.h`，
+   NuGet 包 `Microsoft.WSL.Containers`）。本机 `C:\Program Files\WSL\` 里没有那份 dll/lib/winmd（只有 CLI 与 `wslcsession.exe`），
+   所以 Electron 侧要落地就得写一个桥接进程按行吐进度——这比应用自己的 `backend.ts` 大一档。
+2. **自己按 registry manifest 下 blob**（`skopeo` / `crane` 那一类），再 `wslc load` 进引擎。进度天然是自己的。
+
+动它要碰哪里：`src/apps/airship-wsld/backend.ts`（起 `wslc` 的那一侧）与 `ImagesView.tsx` 的拉取卡片。
+来源：`docs/architecture.md` §14；2026-11-28 三条通道 + 伪终端实测。
 
 ### TD-010 airship-wsld 自己的设置页（`settings`）
 

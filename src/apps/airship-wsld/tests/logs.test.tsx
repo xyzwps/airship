@@ -15,11 +15,13 @@ import {
   tap,
   twoContainers,
   unmountAll,
-  askConfirm
+  askConfirm,
+  type JobCall,
+  type JobCtl,
 } from './support'
-import type { FakeAirship, StartCall, StreamCtl } from '@airship/sdk/testing'
+import type { FakeAirship } from '@airship/sdk/testing'
 import type { Mount } from '@airship/sdk/testing'
-import type { ProcResult } from '@airship/contract'
+import type { WslcResult } from '../cli'
 
 /**
  * WL-001 ~ WL-028：容器详情的「日志」那一档。
@@ -32,14 +34,14 @@ const RUNNING_ID = 'bbbb22222222' // zeta，在跑
 const STOPPED_ID = 'aaaa11111111' // alpha，已停
 
 interface Held {
-  call: StartCall
-  ctl: StreamCtl
+  call: JobCall
+  ctl: JobCtl
 }
 
-function stage(setup: { list?: () => string; logs?: () => Partial<ProcResult> } = {}) {
+function stage(setup: { list?: () => string; logs?: () => Partial<WslcResult> } = {}) {
   const held: Held[] = []
   const fake = makeFake({
-    run: (_exe, args) => {
+    run: (args) => {
       if (args[0] === 'logs') return setup.logs?.() ?? { stdout: logsPlain() }
       return { stdout: setup.list?.() ?? twoContainers() }
     },
@@ -231,7 +233,7 @@ describe('日志文本进界面', () => {
   })
 
   it('WL-016 读失败给的是人话，日志文本区不被污染', async () => {
-    let reply: () => Partial<ProcResult> = () => ({ stdout: '先读到的两行\n第二行\n' })
+    let reply: () => Partial<WslcResult> = () => ({ stdout: '先读到的两行\n第二行\n' })
     const { fake } = stage({ logs: () => reply() })
     const m = await openLogs(fake)
     await tap(m, '日志-查看')
@@ -405,7 +407,7 @@ describe('只有运行中的容器可以实时，会话各归各', () => {
     const running = rows(twoContainers())
     const held: Held[] = []
     const fake = makeFake({
-      run: (_exe, args) => (args[0] === 'logs' ? { stdout: '' } : { stdout: list }),
+      run: (args) => (args[0] === 'logs' ? { stdout: '' } : { stdout: list }),
       start: (call, ctl) => {
         held.push({ call, ctl })
       }

@@ -64,7 +64,6 @@ export const ALLOWED_KEYS = [
   'defaultWidth',
   'defaultHeight',
   'platforms',
-  'tools',
   'schemaVersion',
   'sdkVersion',
   'entry'
@@ -122,7 +121,7 @@ export function idShapeProblem(id: unknown): string | null {
 /**
  * 包清单的形状判定。返回**人读的原因列表**，空数组就是通过。
  *
- * 不判工具名——那条住在 `manifestProblems()`（app.ts 与包清单共用的那份），
+ * 清单字段的通用规矩住在 `manifestProblems()`（app.ts 与包清单共用的那份），
  * 注册期两边都调；这里判的是包格式独有的那一圈。
  */
 export function packageManifestProblems(manifest: unknown, at = ''): string[] {

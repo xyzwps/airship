@@ -51,8 +51,8 @@ runtime 装一次，钉死在 `~\.airship\runtime`（每用户，不要管理员
 - **I-1 一个应用一个窗口一个渲染进程。** 隔离是窗口化真正买到的东西：一个应用崩了不带崩别人，
   改一个应用不用管其余七个。
 - **I-2 应用只能通过 `window.airship` 碰系统。** 看不到 `ipcRenderer`，也拿不到绝对路径以外的系统面；
-  越界的调用一律拒绝并给出读得懂的原因（措辞在 `@airship/contract`）。边界是两份真名单
-  （`sharedNamespaces` / `tools`）加 grants 的路径表。
+  越界的调用一律拒绝并给出读得懂的原因（措辞在 `@airship/contract`）。边界是一份真名单
+  （`sharedNamespaces`）加 grants 的路径表，再由身份闸守着归属。
 - **I-3 身份由 runtime 绑定注入，应用冒充不了别人。** preload 从启动参数注入 id，
   主进程再用 `event.sender` 反查归属二次确认。应用代码从不传自己的 id。
 - **I-4 数据由 runtime 统一托管。** 各应用的数据落在 `~\.airship\data\<id>\` 下它自己那一族，
@@ -62,8 +62,9 @@ runtime 装一次，钉死在 `~\.airship\runtime`（每用户，不要管理员
   runtime 产品代码里不许出现具体应用 id 的字面量。
 - **I-6 应用与 SDK 不许 import runtime。** 边界由 node 的解析器守（说明符一律写包名 `@airship/...`），
   不靠注释。AP-013 守着这条。壳给应用窗口的 DOM 只有 SDK 那一份。
-- **I-7 子进程只跑 runtime 发现的东西。** proc 白名单的来历只有一个：runtime 按工具登记表发现的
-  （含环境变量显式指的那一档）。应用既不能自己找一个来跑，也不能借 runtime 发现的名义跑没声明的工具。
+- **I-7 外部程序由应用随包自带的后端去起。** "这台机器上有没有 ffmpeg / wslc、它在哪"是应用的知识，
+  不是契约的知识——runtime 不认识任何具体工具名，也没有工具登记表。runtime 只管后端进程本身的生死，
+  后端名下的子进程归后端自己收。
 
 ## 3. 进程与窗口模型
 
@@ -79,7 +80,7 @@ runtime 装一次，钉死在 `~\.airship\runtime`（每用户，不要管理员
    抢不到不是错误——argv 会由 Electron 自动交给第一实例的 `second-instance`，这次直接 `app.quit()`。
    `whenReady` 首行 `if (!GOT_LOCK) return`：不然第二实例也会把启动跑完、开出一扇重复的窗再退出
    （真机抓到过：两扇 airship-dago 各开一次）。
-3. `whenReady` 里：挂包协议处理器、注册 IPC、把子进程事件接到"只投归属窗口"的路由上。
+3. `whenReady` 里：挂包协议处理器、注册 IPC、把后端推来的事件接到"只投归属窗口"的路由上。
 4. 从 argv 挑出 `.airship` 结尾的包路径（`archivesFromArgv`，相对路径按 cwd 解）。
    一份都没有 → 念用法（`usageLine()`）+ `app.exit(1)`，不开任何界面。
 5. 逐份 `registerPackage(archive)`：读归档里的清单、校验形状与引用边界、装进**活动包表**。
@@ -103,7 +104,7 @@ runtime 装一次，钉死在 `~\.airship\runtime`（每用户，不要管理员
 台账（`windowLedger`）判"开新的还是聚焦旧的"：同 id 已开着就聚焦，不重开。
 平台不支持的应用（清单 `platforms` 不含本机）根本不开窗口，响亮念出原因。
 
-**事件只投归属窗口**（`routing.ts` 的 `targetsFor`）：子进程进度、托盘点击这类事件只回到归属那个窗口，
+**事件只投归属窗口**（`routing.ts` 的 `targetsFor`）：后端推的任务进度、托盘点击这类事件只回到归属那个窗口，
 没有全局广播。窗口没了事件就丢弃。这条抽成纯函数是为了能被测试——隔离的最后一环就是它。
 
 **任务栏身份逐窗口给。** `windows.ts` 在建窗之后调 `setAppDetails({ appId, appIconPath, relaunchCommand,
@@ -117,7 +118,7 @@ relaunchDisplayName })`（win32 专有；后两条必须成对，否则外壳两
 
 **崩溃隔离**：一个渲染进程崩了不带崩主进程与别的窗口。主进程的未捕获异常 / 未处理拒绝写日志不致命。
 
-**关窗收尾**：`window-all-closed` → 收掉所有子进程、清托盘、退出（非 macOS）。
+**关窗收尾**：`window-all-closed` → 收掉每扇窗名下的后端进程、清托盘、退出（非 macOS）。后端自己起的程序归后端自己的退出钩子收。
 截图模式例外——它逐个开窗、关窗再下一个，生命周期由 `runShotMode` 自管（末尾 `app.quit()`），
 `window-all-closed` 在截图模式下直接 return，否则截完第一个就退出（启动器退场后抓到的一次回归）。
 
@@ -178,7 +179,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 ### 5.1 契约（`src/shared/contract/protocol.ts`）
 
 `AirshipBridge` 声明应用能碰的全部面：`paths` / `theme` / `setTheme` / `settings` / `dialog` /
-`fs` / `proc` / `tools` / `backend` / `tray` / `notify` / `clipboard` / `log` / `window` / `on`。
+`fs` / `backend` / `tray` / `notify` / `clipboard` / `log` / `window` / `on`。
 **没有 app 参数**：身份由该窗口的 preload 从启动参数注入，主进程再用 `event.sender` 反查归属二次确认。
 应用既看不到"传 id"这个动作，也就没法冒充别的应用。线格式（preload ↔ 主进程）仍然带 id，
 那是实现细节，不进契约。
@@ -187,7 +188,9 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 `AppPaths.runtimeVersion` 是 runtime 版本。`SettingsScope = AppId`——runtime 自己不持有设置屏，
 主题这类窗口观感也落在应用自己那份设置文件里（由 `theme:set` 这条窗口面通道写，不走应用的设置面）。
 
-事件频道 `ShellEvent`：`proc:chunk` / `proc:exit` / `tray:click` / `window:maximized` / `backend:event` / `backend:exited`。
+事件频道 `ShellEvent`：`tray:click` / `window:maximized` / `backend:event` / `backend:exited`。
+后端自己推的东西（如任务分块与结束）装在 `backend:event` 里，里面的 `method` 名由应用与它的后端约好，
+runtime 只搬运不解释。
 **没有 `theme:changed` 全局广播**——主题按应用各记各的（见 §10），不需要广播。
 
 ### 5.2 preload（`src/runtime/preload/`）
@@ -198,10 +201,10 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 
 ### 5.3 主进程 IPC（`src/runtime/main/ipc.ts`）
 
-按契约表实现每个方法，按 `event.sender` 反查归属，再过两份名单（`sharedNamespaces` / `tools`）与 grants 的路径表。
+按契约表实现每个方法，按 `event.sender` 反查归属，再过共享区名单（`sharedNamespaces`）与 grants 的路径表。
 越界的调用一律拒绝，
 错误措辞由 `@airship/contract` 的 `errors.ts` 供（中文句子原文，不出现 "Error invoking remote method"
-这类 Electron 内部措辞）。问了 runtime 不认识的工具，日志喊"问了 runtime 不认识的工具"。
+这类 Electron 内部措辞）。
 
 ### 5.4 拒绝措辞单一真源
 
@@ -217,12 +220,11 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 
 渲染进程没有沙箱，任何位图式的声明都拦不住真想绕的人，所以授权面立不起来；settings / log / tray / notify
 是个个要用的基础功能，clipboard 不加治理——窗口本来就是浏览器，读写剪贴板走浏览器原生面。
-真正的边界是两份真名单加一张路径表：
+真正的边界是一份真名单加一张路径表：
 
 | 边界 | 管什么 | 在哪判 |
 |---|---|---|
 | `sharedNamespaces` 名单 | 共享数据区具体哪几个可用（目录由 runtime 创建与托管） | 注册表 + grants，措辞见 `errors.ts` |
-| `tools` 名单 | 外部工具（ffmpeg / wslc）具体哪几个可用 | 清单声明 + proc.ts 的 exe 白名单 |
 | grants 路径表 | 本应用数据目录内随便读写；目录外只认本次会话对话框显式选中的路径 | `grants.ts`（GR 册） |
 | 身份 | 调用只认 preload 注入、主进程按 `event.sender` 反查的归属 | I-3，`ipc.ts` 的 `assertApp` |
 
@@ -249,24 +251,21 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 （PDF 已于 2026-11-26 退场，机制留着）——各自存一份就会"同一本书在两个入口里各有一本"。
 应用只能在清单里声明自己要访问哪个，声明了不存在的直接拒。
 
-### 6.3 工具发现（`tools.ts`，PT 册）
+### 6.3 外部程序（归应用随包自带的后端）
 
-`TOOL_NAMES = ['ffmpeg', 'wslc']`，这份名单同样**属于 runtime**：怎么发现、拿什么标志校验它是真的，
-是 runtime 自己的事，不是应用的说法。发现顺序三档：
+**runtime 不认识任何具体工具**：没有工具登记表，清单里也没有那一栏。要跑这台机器上的命令行程序
+（ffmpeg、wslc 之类），应用随包带一份 `backend.ts`，发现与拉起都写在那一份里——先看环境变量显式指的路径
+（如 `AIRSHIP_WSLC_PATH`），再看 PATH，最后试已知落点（如 `C:\Program Files\WSL\wslc.exe`）。
+这三档是应用自己的判断，要加第四档不必动 runtime。
 
-1. **环境变量显式指**：`AIRSHIP_<NAME>_PATH`（如 `AIRSHIP_FFMPEG_PATH`）。
-2. **PATH**：在 PATH 里找。
-3. **已知位置**：内置表里那几个常见落点（如 `C:\Program Files\WSL\wslc.exe`）。
+理由有两条：渲染进程虽然没有 Node 能力，随包后端却是一个不受限的 Node 进程，位图式的声明拦不住真想绕的人；
+而"这台机器上装没装、装在哪"是本机知识，写进发布出去的契约等于替全世界的机器代管名单——
+作者要做一个 docker 或 kubectl 的外壳，不该先回头给 runtime 登记工具。
 
-**没有"用户指定"那一档**（整档删了）：从前启动器设置屏里那颗"手动指一个路径"的键随启动器退场，
-要显式指就走环境变量。应用既不能自己找一个来跑，也不能借 runtime 发现的名义跑没声明的工具。
-工具发现结果在启动第一份日志里就能读到"可用/不可用"。
-
-### 6.4 子进程（`proc.ts`）
-
-白名单的来历只有一个：runtime 按 §6.3 发现的。`proc.run` 一次性跑完拿结果（探测类短命令），
-`proc.start` 后台跑、进度通过 `proc:chunk` / `proc:exit` 事件回流到本窗口，`proc.kill` / `proc.list` 管生命周期。
-关窗与退出时 `proc.killAll()` 收掉所有子进程。
+一次调用有 30 秒时限（`backend.md` BE-012），所以长任务在应用侧走"提交即应答"：`start` 立刻回一个 jobId，
+进度与结束由后端主动推 `job:chunk` / `job:exit` 事件回本窗口（渲染侧 `api.on` 订阅），要中断就发 `kill`。
+关窗收掉的是后端进程本身（BE-011），它名下的子进程归后端自己收——ffmpeg 与 wsld 那两份 `backend.ts`
+都在退出钩子里把还在跑的任务杀掉。
 
 ## 7. 应用模型
 
@@ -277,7 +276,7 @@ runtime（src/runtime）──依赖──▶ 契约 + SDK（宿主那一份 DOM
 `icon.png`（**只认这一张源图**，不套底板，颜色烘进图里；svg / jpg / jpeg / webp 于 2026-11-26 退场）。
 外加 `icon.ico`（任务栏那颗外壳图标，作者自备的多尺寸 16~256，产包只搬不转）。缺哪件产包期炸哪件，标准见 [docs/apps/icons.md](apps/icons.md)。
 
-清单只写"这个应用自己的事实"：`name / description / platforms / tools /
+清单只写"这个应用自己的事实"：`name / description / platforms /
 sharedNamespaces / flush / defaultWidth / defaultHeight`（`id` 由产包期注入，清单里写它就是 PK-005 的拒绝对象）。
 **不写** `iconPath`、`order` 这类表现或关系字段
 （都被驳回过）——图标是文件约定（包根那张图），排序不存在（没有启动器格子要排）。
@@ -317,25 +316,25 @@ runtime 侧不再有扫包、拖装、启动器卸载的代码。
 
 ### 7.4 生命周期
 
-装（应用安装器，欢迎页念落点）→ 双击快捷方式 → runtime 注册 + 开窗口 → 用 → 关窗（收子进程、清托盘）→
+装（应用安装器，欢迎页念落点）→ 双击快捷方式 → runtime 注册 + 开窗口 → 用 → 关窗（收后端、清托盘）→
 最后一个窗口关掉则 runtime 退出。卸（应用安装器的卸载段）只删安装目录 / 快捷方式 / 卸载项，数据留着。
 更新一个应用 = 重跑它的安装器（同 id 覆盖那份归档），不动 runtime。
 
 ### 7.5 八个应用
 
-| id | 名称 | tools | shared | 平台 | flush | 默认尺寸 |
+| id | 名称 | backend | shared | 平台 | flush | 默认尺寸 |
 |---|---|---|---|---|---|---|
 | `airship-reader` | Reader | — | library | 全 | 是 | 600×800 |
-| `airship-dago` | Dago | — | — | 全 | 是 | 600×800 |
+| `airship-dago` | Dago | 有 | — | 全 | 是 | 600×800 |
 | `airship-life-game` | Life Game | — | — | 全 | 是 | 1000×720 |
-| `airship-ffmpeg` | FFmpeg | ffmpeg | — | 全 | 是 | 默认 |
-| `airship-wsld` | WSLD | wslc | — | windows | 是 | 默认 |
+| `airship-ffmpeg` | FFmpeg | 有 | — | 全 | 是 | 默认 |
+| `airship-wsld` | WSLD | 有 | — | windows | 是 | 默认 |
 | `airship-svg-editor` | SVG Editor | — | — | 全 | 是 | 1440×900 |
-| `airship-s3` | S3 | — | — | 全 | 是 | 1180×760 |
+| `airship-s3` | S3 | 有 | — | 全 | 是 | 1180×760 |
 | `airship-icon` | Icon Helper | — | — | 全 | 否 | 720×780 |
 
-`airship-dago` 与 `airship-s3` 各自带一份 `backend.ts`，产包后进包根 `backend.js`：盘的活与网络活都在自带的后端进程里做，
-窗口的清单不再为它们要 fs 或外连的口子（§6 末尾与 `backend.md`）。
+`airship-dago` 与 `airship-s3` 各带一份 `backend.ts` 干盘的活与网络活，`airship-ffmpeg` 与 `airship-wsld`
+那两份负责发现并拉起这台机器上的命令行程序（§6.3）——窗口的清单不再为它们要 fs 或外连的口子（§6 末尾与 `backend.md`）。
 
 从前 books 与 pdf 都声明 `sharedNamespaces: ['library']` 共用同一份书库；PDF 退场后只剩 airship-reader 这一个消费者。
 "默认"尺寸 = runtime 的 1100×740。`flush` 是 SDK 宿主给不留白（应用自己铺满整窗）。
@@ -372,8 +371,8 @@ CSP 由 SDK 产包时注入（产包一条、开发一条，不再按清单分�
   profile/                     Electron 自己的浏览器档（userData 开局就钉到这里）
 ```
 
-**没有 runtime 级的 settings.json 了**：从前壳级那份（全局主题、工具手动路径）随启动器退场——
-主题按应用各记各的（落在 `data/<id>/settings.json`），工具手动路径那一档整档删了（要显式指走环境变量）。
+**没有 runtime 级的 settings.json 了**：从前壳级那份随启动器退场——主题按应用各记各的（落在 `data/<id>/settings.json`），
+要显式指某个程序的路径就走环境变量（读它的是应用自己的后端）。
 
 目录布局只依赖 airship 家的根与 id，**不需要知道"现在有哪些应用"**。这条是踩过来的：
 原来 `build()` 会遍历当时的注册表建一张 `apps` 表并缓存，一开机就读失败。
@@ -398,9 +397,8 @@ runtime 自己没有界面。应用窗口的 DOM 只有 SDK 那一份宿主：�
 ## 11. 可观测性
 
 日志按天分文件、按应用分命名空间（LG 册），行形状固定，写失败不致命。
-启动第一份日志里念：版本、平台、userData、跑着的包、工具发现结果。
-没有启动器设置屏那个诊断入口了（随启动器退场）；工具可用与否在日志里读，
-`grants.stats` 供诊断与用例用。主进程未捕获异常 / 未处理拒绝写日志。
+启动第一份日志里念：版本、是否截图模式、平台、userData、跑着的包。
+没有启动器设置屏那个诊断入口了（随启动器退场）；`grants.stats` 供诊断与用例用。主进程未捕获异常 / 未处理拒绝写日志。
 
 ## 12. 构建与出包
 
@@ -471,7 +469,7 @@ Electron 与 electron-builder 的二进制走 npmmirror（`.npmrc` 与 `build-ru
 用例标题以编号开头，`just casecov` 做双向差集：册里有号没用例 = 未实现，用例挂了号册里没有 = 私测（禁止）。
 界面观感不进册子，那是 `just shot` 截图走查的事。写不出可执行判据的期望别进册子，记到本文档对应小节。
 
-册子共 **24 本**：runtime 8 本（bridge / grants / logging / proc-tools / runtime / storage / theme / tray）
+册子共 **23 本**：runtime 7 本（bridge / grants / logging / runtime / storage / theme / tray）
 + 应用区 2 本（app-model / package）+ 共享 2 本（library / textdecode）+ 应用 12 本
 （ffmpeg / reader / dago / life-game / svg-editor / s3 / icon 各一，wsld 五本）。索引见 [specs/index.md](specs/index.md)。
 
@@ -501,7 +499,8 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
 - 应用自己安装（每用户安装器），自动去 `AIRSHIP_PATH` 或固定目录找 runtime；装完留一枚快捷方式当启动程序。
 - 单 runtime 进程 + second-instance 转发；启动程序是快捷方式（.lnk，不是 stub exe）。
 - 设置页与 runtime 级主题切换整族退场；主题按应用各记各的，由 SDK 标题栏那颗键改（决定 A）。
-- 工具"用户指定"档整档删，发现顺序 `AIRSHIP_<NAME>_PATH` > PATH > 已知位置（决定 B）。
+- 外部程序的发现顺序 `AIRSHIP_<NAME>_PATH` > PATH > 已知位置（决定 B 的三档），落在应用自带的后端里；
+  runtime 侧没有工具登记表，清单里也没有那一栏。
 - clean break：不写旧数据迁移 / 兼容垫片。
 
 **未尽**（细节与理由都在 [todo.md](todo.md)，这里只留状态标记）：
@@ -509,7 +508,7 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
 - TD-001 快捷方式（`.lnk`）上还没有 per-app 的 AUMID；窗口身份那一步已落（SH-010 / SH-034 / SH-035，见 §3）。
 - TD-003 没有代码签名证书；TD-004 没有自动更新链路；TD-005 想要 Inno Setup 那一档观感。
 - TD-006 多窗口的内存回收（现在没有触发这件事的症状）。
-- TD-008~010 airship-wsld 原版有、这期先没有的三块（registry mirror / 拉取实时进度 / 自己的设置页）。
+- TD-008~010 airship-wsld 原版有、这期先没有的三块（registry mirror / 拉取的字节级实时进度 / 自己的设置页）。
   （TD-007 run 编排已于 2026-11-20 落成，册子 `airship-wsld-run.md`，编号 RB-001~053 除显式删除的 026、053。）
 - TD-012 EPUB 翻页延迟没单独采样。
 - TD-013 SDK 独立发布与版本协商；TD-014 装包的来源信任、更新与商店链路。
@@ -521,7 +520,7 @@ jsdom 没有 2D canvas：画布类判据只断言文字、状态与几何数字�
 
 - **runtime**：那个共享的 Electron 运行时（`@airship/runtime`），装一次大家共用，自己没有界面。
 - **包 / airship 包**：一个应用的归档 `<id>.airship`（zip 换了扩展名），自持文档与清单。
-- **边界名单 / sharedNamespaces 与 tools**：清单里两份真名单，越界一律拒并念出该改哪份清单。
+- **边界名单 / sharedNamespaces**：清单里那份共享区真名单，越界一律拒并念出该改清单的哪一处。
 - **桥 / bridge**：`window.airship` 那一面，应用碰系统的唯一入口。
 - **宿主 / host**：SDK 给应用窗口的那份 DOM（标题栏 / 主题 / 留白 / 占位）。
 - **册子 / spec**：用户可见契约的四档结构文档，用例是它的影子。

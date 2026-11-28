@@ -1,10 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 /**
- * SH-006 / SH-007 / SH-010 / SH-033：一个应用一个窗口的规矩。
+ * SH-007 / SH-010 / SH-033：一个应用一个窗口的规矩。
  *
  * 台账（谁有活窗口、归属怎么解除）是抽出来的纯逻辑，这里直接对着它验；
- * "关窗要杀掉这个应用的子进程"用一条**真在跑的子进程**验——观察它真的退场，而不是读代码猜。
  * 窗口尺寸与摆放对着真的 openAppWindow 验，见 appWindowCreate.test.ts。
  */
 
@@ -26,10 +25,7 @@ vi.mock('electron', async () => {
 })
 
 const { WindowLedger, appUserModelIdFor } = await import('../main/services/windowLedger')
-const { proc, setProcEmitter } = await import('../main/services/proc')
-const { allowExecutable, resetToolDiscovery } = await import('../main/services/tools')
 const { ownerOfContents } = await import('../main/windows')
-const events: Array<{ app: string; event: unknown }> = []
 
 describe('窗口台账：一个应用只有一个窗口', () => {
   it('SH-033 同一个应用再指一次，判的是"聚焦已有"而不是"再开一个"', () => {
@@ -74,49 +70,3 @@ describe('窗口台账：一个应用只有一个窗口', () => {
   })
 
 })
-
-describe('关掉应用窗口，它名下的子进程跟着收掉', () => {
-  beforeEach(() => {
-    resetToolDiscovery()
-    events.length = 0
-    setProcEmitter((app, event) => events.push({ app, event }))
-  })
-
-  it('SH-006 只杀这个应用的任务，别人的任务一条都不碰', async () => {
-    // 把 node 自己登记进白名单，才有"真在跑的子进程"可观察
-    allowExecutable(process.execPath)
-
-    const sleeper = ['-e', 'setInterval(() => {}, 5000)']
-    proc.start('airship-ffmpeg', { exe: process.execPath, args: sleeper, jobId: 'mine' })
-    proc.start('airship-s3', { exe: process.execPath, args: sleeper, jobId: 'theirs' })
-
-    await waitFor(() => proc.list('airship-ffmpeg').length === 1 && proc.list('airship-s3').length === 1)
-
-    expect(proc.list('airship-ffmpeg')).toEqual(['mine'])
-
-    const killed = proc.killApp('airship-ffmpeg')
-    expect(killed).toBe(1)
-
-    await waitFor(() => proc.list('airship-ffmpeg').length === 0)
-    expect(proc.list('airship-ffmpeg')).toEqual([])
-    // 别的应用名下的任务一条都不被碰
-    expect(proc.list('airship-s3')).toEqual(['theirs'])
-
-    const exits = events.filter((e) => (e.event as { kind?: string }).kind === 'proc:exit')
-    expect(exits.length).toBe(1)
-    expect(exits[0]!.app).toBe('airship-ffmpeg')
-    expect((exits[0]!.event as { result: { signal: string | null } }).result.signal).toBe('SIGKILL')
-
-    proc.killApp('airship-s3')
-    await waitFor(() => proc.list('airship-s3').length === 0)
-    proc.killAll()
-  })
-})
-
-async function waitFor(check: () => boolean, timeoutMs = 4000): Promise<void> {
-  const started = Date.now()
-  while (!check()) {
-    if (Date.now() - started > timeoutMs) throw new Error('等超时了')
-    await new Promise((r) => setTimeout(r, 20))
-  }
-}

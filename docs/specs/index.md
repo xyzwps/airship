@@ -6,7 +6,7 @@
 ## 册子与用例放在它们管的代码旁边
 
 ```
-src/runtime/specs/*.md        runtime 的册子（窗口与直跑、主题、契约桥、授权、存储、子进程与工具、托盘、日志）
+src/runtime/specs/*.md        runtime 的册子（窗口与直跑、主题、契约桥、授权、存储、自带后端、托盘、日志）
 src/runtime/tests/*.test.*    runtime 的用例；helpers/ 里是包工装与真清单读法
 src/apps/specs/*.md           应用注册、清单与 airship 包的规矩
 src/apps/<id>/specs/*.md      每个应用一本（或多本）
@@ -70,7 +70,7 @@ src/<区>/<名>/tests/fixtures/   真样本跟着用它的用例走（wslc 的�
 可执行侧把 ID 写在用例标题开头：
 
 ```ts
-it('SH-006 关掉应用窗口，它名下的子进程跟着收掉', () => { … })
+it('BE-011 关掉应用窗口，它名下的后端跟着收掉', () => { … })
 ```
 
 ```bash
@@ -93,7 +93,6 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 | BR | 契约桥（信封拆包、中文错误、身份注入与冒充拒绝） | `bridge.md` | 加方法、改错误文案的人 | 自动化 |
 | GR | 路径授权（五条规则、会话内有效） | `grants.md` | 碰 fs/dialog 判定的人 | 自动化 |
 | ST | 设置与数据落盘（分文件、原子写、坏文件 `.bad`） | `storage.md` | 改数据结构与落盘的人 | 自动化 |
-| PT | 子进程与工具白名单（只跑 runtime 发现的东西） | `proc-tools.md` | 碰 proc、加工具的人 | 自动化 |
 | BE | 应用自带的后台程序（有它由包形状判、请求-回话、目录交付、就绪握手、退出与收尾） | `backend.md` | 碰后端通道与其生命周期的人 | 自动化 |
 | TR | 托盘（单占用者、点击只投占用窗口、退出清干净） | `tray.md` | 碰托盘的人 | 自动化（门控：真机看图标） |
 | LG | 日志（按天分文件、行形状、写失败不致命） | `logging.md` | 改日志格式的人 | 自动化 |
@@ -120,7 +119,7 @@ just casecov   # = vitest run spec-coverage，册里编号与用例编号做双�
 | CL | airship-wsld（WSLD）：容器列表与详情 | `airship-wsld-containers.md` | 自动化（替身）+ 门控（`AIRSHIP_WSLD_INTEGRATION=1`） |
 | CA | airship-wsld：容器生命周期操作 | `airship-wsld-container-actions.md` | 同左 |
 | WL | airship-wsld：容器日志（尾部行数、时间戳、实时） | `airship-wsld-logs.md` | 同左 |
-| IM | airship-wsld：镜像列表、拉取、删除与强制删除 | `airship-wsld-images.md` | 同左 |
+| IM | airship-wsld：镜像列表、拉取（含拉取卡片：命令、已等时长、输出原文）、删除与强制删除 | `airship-wsld-images.md` | 同左 |
 | RB | airship-wsld：run 命令编排（拼装、校验、读回、就地执行与历史） | `airship-wsld-run.md` | 同左 |
 | IC | Icon Helper：SVG 进、`icon.png` 与 7 帧 `icon.ico` 出（取景、目录字段、画不动的措辞） | `airship-icon.md` | 自动化 + 截图走查（真画出来的像素） |
 

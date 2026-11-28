@@ -8,7 +8,7 @@ import './CHANGE_ME.css'
  *
  * 三条约束是这个仓库的规矩，不是建议：
  *   1. 只引 `@airship/sdk` 与 `@airship/contract`，不许引 runtime（AP-013）；
- *   2. 碰系统只经 `api.`，共享区与外部工具要在 `app.ts` 的名单里声明（两份真名单）；
+ *   2. 碰系统只经 `api.`，共享区要在 `app.ts` 的名单里声明（那份真名单）；要跑这台机器上的外部程序，随包带一份 `backend.ts` 自己发现与拉起；
  *   3. 配色用宿主给的 CSS 变量（`var(--fg)` 那一族），不自己另调一套（主题三档由标题栏那颗键改，各应用各记各的）。
  */
 export default function ChangeMeApp({ api }: { api: AppApi }): JSX.Element {

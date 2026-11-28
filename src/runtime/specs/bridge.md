@@ -28,8 +28,8 @@
 - **WHEN** 一个不是 runtime 开出来的窗口（或已销毁的窗口）来调
 - **THEN** 拒，原因读得到「调用来源不是 runtime 注册的窗口，拒绝」
 
-### Requirement: 没声明过的名单一律拒绝
-静默降级会让边界形同虚设，所以拒了要说清该改哪份清单。名单只剩两份：共享区看 `sharedNamespaces`，外部工具看 `tools`。
+### Requirement: 没声明过的共享区一律拒绝
+静默降级会让边界形同虚设，所以拒了要说清该改哪份清单。共享区看 `sharedNamespaces` 那一份名单。
 
 #### Scenario: BR-007 共享命名空间没声明就用不了
 - **WHEN** 应用把路径解析到没在自己清单 `sharedNamespaces` 里写过的命名空间
@@ -56,7 +56,7 @@ preload 用 Electron 的 `webUtils.getPathForFile` 读浏览器已经交出来�
 - **AND** 没有任何一处把 `ipcRenderer` 整个交出去
 
 #### Scenario: BR-010 别的应用收不到这个应用的事件
-- **WHEN** airship-ffmpeg 名下子进程的输出回流
+- **WHEN** airship-ffmpeg 名下的后端推出事件
 - **THEN** 只有 airship-ffmpeg 自己的窗口收到；airship-s3 的窗口一条都收不到
 - **AND** airship-ffmpeg 窗口没开时事件被丢弃，不广播兜底
 
@@ -67,5 +67,9 @@ preload 用 Electron 的 `webUtils.getPathForFile` 读浏览器已经交出来�
   此前只有 airship-s3 用过这一位，迁移后没有任何应用需要豁免同源策略。编号不复用、不重排。
   BR-006 于 2026-11-27 删除：capabilities 整族退场（不变量 I-3 随之取消）。渲染进程没有沙箱，
   这族位拦不住真心想绕的人，settings / log / tray / notify 又是个个要用的基础功能——
-  拒绝语料里"没有声明 X 能力"那一句随之消失，闸只剩身份、两份名单与 grants。
+  拒绝语料里"没有声明 X 能力"那一句随之消失，闸只剩身份、那份名单与 grants。
+  proc-tools.md 整本册子（PT-001~PT-008、PT-010）于 2026-11-27 显式删除：外部工具整族从 runtime 退场。
+  闸的强度不及它的承诺——应用随包自带的后端进程本就是无限制的 Node，能跑什么在那里没有边界可言，
+  runtime 侧再摆一张工具表只是让老实人多写一行声明；发现逻辑（哪台机器上 ffmpeg 落在哪）也从来是
+  这台机器的知识，不该由发布出去的契约代管。外部命令改由应用自己的后端进程负责（backend.md）。
 -->

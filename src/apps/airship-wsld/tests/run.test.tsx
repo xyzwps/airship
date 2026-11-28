@@ -7,10 +7,12 @@ import {
   makeFake,
   mountWsld,
   tap,
-  unmountAll
+  unmountAll,
+  type JobCall,
+  type JobCtl,
 } from './support'
 import type { Mount } from '@airship/sdk/testing'
-import type { FakeAirship, StartCall, StreamCtl } from '@airship/sdk/testing'
+import type { FakeAirship } from '@airship/sdk/testing'
 import { imageReference, imageIsTagged } from '../model'
 import { parseImages } from '../parse'
 import { tokenize } from '../run'
@@ -18,21 +20,21 @@ import { tokenize } from '../run'
 /**
  * RB 册子里界面那一半：编排页的表单、复制/读回、就地执行与历史。
  *
- * 命令行看 `fake.procCalls`，话看界面文字；拼装与解析的纯逻辑判据在 run-args.test.tsx 那条腿。
+ * 命令行看 `commands(fake)`，话看界面文字；拼装与解析的纯逻辑判据在 run-args.test.tsx 那条腿。
  */
 
 const CID = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 
 interface Held {
-  call: StartCall
-  ctl: StreamCtl
+  call: JobCall
+  ctl: JobCtl
 }
 
 function stage(setup: { wslc?: string | null } = {}) {
   const held: Held[] = []
   const fake = makeFake({
     wslc: setup.wslc,
-    run: (_exe, args) => {
+    run: (args) => {
       if (args[0] === 'images') return { stdout: imagesNdjson() }
       return { stdout: '' }
     },
@@ -559,5 +561,5 @@ describe('清空与历史', () => {
 })
 
 function countRuns(fake: FakeAirship): number {
-  return fake.procCalls.filter((call) => call.args[0] === 'run').length
+  return commands(fake).filter((line) => line.startsWith('wslc run ')).length
 }

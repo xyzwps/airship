@@ -17,7 +17,7 @@ function reasonOf(e: unknown): string {
  *
  * 配色一律用宿主给的 CSS 变量（`var(--fg)` 那一族），别写死颜色——
  * 主题三档由标题栏那颗键改，`useTheme()` 读到的就是落地后的那一档。
- * 想碰系统就经 `api.` 的对应域，清单里没有要声明的东西（共享区与外部工具那两份名单除外）。
+ * 想碰系统就经 `api.` 的对应域，清单里只有一份要声明的名单（共享区 `sharedNamespaces`）。
  */
 export default function App({ api }: { api: AppApi }): JSX.Element {
   const { resolved } = useTheme()

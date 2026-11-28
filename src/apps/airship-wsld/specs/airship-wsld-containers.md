@@ -158,7 +158,7 @@ wslc 的输出形态不止一种（每行一个对象 / JSON 数组 / 带缩进�
 - **AND** 错误条同时挂出来，下次刷成功它就没了
 
 #### Scenario: CL-027 这台机器上没有 wslc 时告诉用户怎么办
-- **WHEN** runtime 定位不到 wslc.exe，打开 wsld
+- **WHEN** 这台机器上定位不到 wslc.exe，打开 wsld
 - **THEN** 界面读得到一句人话：要安装并启用 WSL 3，或设环境变量 AIRSHIP_WSLC_PATH 指向 wslc.exe 的完整路径
 - **AND** 应用不崩、不弹框，页签与其余部分照常，wslc 那侧一条命令都没收到
 

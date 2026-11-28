@@ -39,10 +39,10 @@ import { log } from './logging'
  *                    `{ seq, ok, value | error }`（回话）、
  *                    `{ event: true, method, payload }`（主动推，转成 backend:event 只给归属窗口）
  *
- * 生命周期跟着窗口走（与 proc 的转码任务同一条纪律）：窗口关了进程就收掉；
- * 它自己崩了不拖累窗口——在途的调用拿到 backendExited 那句，下一次 invoke 再拉起一个新的。
+ * 生命周期跟着窗口走：窗口关了进程就收掉；它自己起的外部程序由它自己负责收。
+ * 它崩了不拖累窗口——在途的调用拿到 backendExited 那句，下一次 invoke 再拉起一个新的。
  *
- * 三道闸里的身份与参数住在 ipc.ts——和 settings、proc 那些频道一样，被调到时就假定
+ * 闸里的身份与参数住在 ipc.ts——和 settings 那些频道一样，被调到时就假定
  * "来的人报得出身份、method 是字符串"已经判过了；"有没有后端"不归闸判，归包形状判（见上）。
  */
 
@@ -307,7 +307,7 @@ export const backendHost = {
     })
   },
 
-  /** 窗口关了：收掉它名下的后端（与 proc.killApp 同一站） */
+  /** 窗口关了：收掉它名下的后端 */
   kill(app: AppId): void {
     starting.delete(app)
     const be = live.get(app)

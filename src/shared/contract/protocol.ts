@@ -60,19 +60,6 @@ export function platformIdOf(nodePlatform: string): PlatformId | 'unknown' {
 }
 
 /**
- * runtime 认识的外部工具登记表。
- *
- * 与共享命名空间同理，这份名单**属于 runtime**：怎么发现、拿什么标志校验它是真的，
- * 是 runtime 的能力，不是应用的说法。应用只能在清单里声明"我要用哪一个"，
- * 声明了 runtime 不认识的、或没声明就想用的，一律拒（措辞见 shared/errors.ts）。
- *
- * proc 白名单的来历因此只有一个：runtime 按这张表发现的（含环境变量显式指的那一档）。
- */
-export const TOOL_NAMES = ['ffmpeg', 'wslc'] as const
-export type ToolName = (typeof TOOL_NAMES)[number]
-
-
-/**
  * 后台程序的界面说法。自带一段 Node 代码是包形状读出来的事实
  * （归档根有没有 `backend.js`，见 packageRules.ts 的 PACKAGE_BACKEND_ENTRY），
  * 安装器欢迎页要念它，措辞只这一处。
@@ -132,24 +119,6 @@ export interface DirEntry {
   size: number
 }
 
-export interface ProcRequest {
-  /** 可执行文件路径，必须是 runtime 允许的（见 main/services/proc.ts 的白名单规则） */
-  exe: string
-  args: string[]
-  cwd?: string
-  /** 交给 runtime 的标识，事件回流时原样带回 */
-  jobId: string
-}
-
-export interface ProcResult {
-  code: number | null
-  /** 结束信号名，如 'SIGKILL'；正常退出为 null。用 string 而不是 NodeJS.Signals，
-   *  因为这是跨进程传过来的值，类型不该依赖主进程那边的 Node 定义。 */
-  signal: string | null
-  stdout: string
-  stderr: string
-}
-
 export interface TrayState {
   /** 悬停提示文字 */
   tooltip: string
@@ -180,8 +149,6 @@ export interface ThemeSnapshot {
 
 /** runtime → 渲染进程的事件频道：只投给归属那个窗口，没有全局广播 */
 export type ShellEvent =
-  | { kind: 'proc:chunk'; jobId: string; stream: 'stdout' | 'stderr'; text: string }
-  | { kind: 'proc:exit'; jobId: string; result: ProcResult }
   | { kind: 'tray:click' }
   | { kind: 'window:maximized'; value: boolean }
   | { kind: 'backend:event'; method: string; payload?: unknown }
@@ -264,21 +231,6 @@ export interface AirshipBridge {
      */
     pathForFile(file: DroppedFile): string
   }
-
-  proc: {
-    /** 一次性跑完拿结果（探测类短命令） */
-    run(request: Omit<ProcRequest, 'jobId'>): Promise<ProcResult>
-    /** 后台跑，进度通过 proc:chunk / proc:exit 事件回流到本窗口 */
-    start(request: ProcRequest): Promise<void>
-    kill(jobId: string): Promise<boolean>
-    list(): Promise<string[]>
-  }
-
-  /**
-   * runtime 已发现的外部工具，**前提**是在自己的清单 `tools` 里声明过这一个。
-   * 应用既不能自己找一个来跑，也不能借 runtime 发现的名义跑没声明的工具。
-   */
-  tools: { path(name: ToolName): Promise<string | null> }
 
   /**
    * 应用自带的后台程序（包根那份 `backend.js`，runtime 为它单独起进程）。

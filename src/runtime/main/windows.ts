@@ -7,7 +7,6 @@ import { targetsFor, type WindowRef } from './services/routing'
 import { WindowLedger, defaultSizeFor } from './services/windowLedger'
 import { applyTaskbarIdentity, taskbarIdentityFor } from './services/taskbarIdentity'
 import { log } from './services/logging'
-import { proc } from './services/proc'
 import { backendHost } from './services/backendHost'
 import { trayService } from './services/tray'
 import type { ShellEvent } from '@airship/contract'
@@ -95,8 +94,8 @@ function wireWindow(window: BrowserWindow, owner: Owner, title: string): void {
   window.on('closed', () => {
     ledger.close(contentsId)
     appWindows.delete(owner)
-    // 应用窗口没了，它名下的摊子要收干净：还在跑的转码/容器命令、它的后端进程、它占着的托盘
-    proc.killApp(owner)
+    // 应用窗口没了，它名下的摊子要收干净：它的后端进程、它占着的托盘
+    // （后端自己起的程序不归这里管——Windows 上 terminate 带不走孙进程，那份后端负责）
     backendHost.kill(owner)
     trayService.clear(owner)
   })

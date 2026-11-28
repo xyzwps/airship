@@ -1,12 +1,9 @@
 import {
   backendAbsent,
-  dupJob,
-  exeDenied,
   needString,
   nsDenied,
   pathEscape,
   readDenied,
-  toolDenied,
   writeDenied
 } from '@airship/contract'
 import type {
@@ -18,15 +15,12 @@ import type {
   FileStat,
   NotifyOptions,
   OpenFilesOptions,
-  ProcRequest,
-  ProcResult,
   SaveFileOptions,
   SharedNamespace,
   ShellEvent,
   ShellEventListener,
   ThemeSnapshot,
-  TrayState,
-  ToolName
+  TrayState
 } from '@airship/contract'
 
 /**
@@ -37,8 +31,8 @@ import type {
  *     所以越界、未声明名单这类场景里用户看到的那句中文，在测试里就是真实界面里的那句；
  *   - 文件走一个内存卷，授权规则与 runtime 一致：自己的 data/cache 自由读写，
  *     声明过的共享命名空间可读写，别的路径必须先用对话框"选中"；
- *   - proc 只跑已解析的工具路径（白名单），命令行全记下来供断言；
- *     `start` 出去的流式任务由用例自己喂 chunk 与 exit，事件走真实订阅通道。
+ *   - 后端程序由 `backend` 那条替身应答，命令行与 payload 全记下来供断言，
+ *     它主动推的事件经 `ctl.event` 走真实订阅通道。
  *
  * 它**不是**主进程的复刻：runtime 自己的规则（授权、越界、路由）另有对真实模块跑的用例
  * （tests/runtime/*）。这里只求给应用一个可信的 runtime，让应用的册子能钉住"用户看得见什么"。
@@ -51,30 +45,13 @@ const ROOT = '/fake/.airship'
 
 type Content = string | Uint8Array
 
-export interface StartCall extends ProcRequest {
-  jobId: string
-}
-
-/** 一条流式任务的控制把手：用例用它把输出一点点推给应用 */
-export interface StreamCtl {
-  chunk(stream: 'stdout' | 'stderr', text: string): void
-  exit(result?: Partial<ProcResult>): void
-}
-
 export interface FakeOptions {
   id: string
   sharedNamespaces?: SharedNamespace[]
-  tools?: ToolName[]
   /** 预置文件：假路径 → 内容 */
   files?: Record<string, Content>
   /** 预置目录 */
   dirs?: string[]
-  /** runtime 已发现的外部工具；null = 这台机器上没有 */
-  toolPaths?: Partial<Record<ToolName, string | null>>
-  /** 一次性调用的应答：按命令行决定，不填就是干净退出 */
-  run?: (exe: string, args: string[]) => Partial<ProcResult>
-  /** 流式调用的应答：不填就立刻成功退出 */
-  start?: (call: StartCall, ctl: StreamCtl) => void
   /** 对话框依次要"选中"的结果，一次一个 */
   picks?: Array<string[] | string | null>
   theme?: ThemeSnapshot
@@ -100,7 +77,6 @@ export interface BackendCtl {
 export class FakeAirship implements AirshipBridge {
   readonly id: string
   readonly sharedNamespaces: SharedNamespace[]
-  readonly declaredTools: ToolName[]
 
   /** 内存卷 */
   readonly vol = new Map<string, Content>()
@@ -110,7 +86,6 @@ export class FakeAirship implements AirshipBridge {
   readonly writeGrants = new Set<string>()
 
   /** 记录与断言用的账本 */
-  readonly procCalls: Array<{ exe: string; args: string[]; jobId?: string }> = []
   readonly backendCalls: Array<{ method: string; payload: unknown }> = []
   readonly settingsLog: Array<['get' | 'set' | 'dump', string]> = []
   readonly notifications: NotifyOptions[] = []
@@ -123,17 +98,13 @@ export class FakeAirship implements AirshipBridge {
   clipboardText = ''
   settingsStore: Record<string, unknown> = {}
 
-  private readonly toolPaths: Partial<Record<ToolName, string | null>>
   private readonly picks: Array<string[] | string | null>
   private readonly listeners = new Set<ShellEventListener>()
-  private readonly jobs = new Map<string, StreamCtl>()
   private pickIndex = 0
 
   constructor(private readonly opts: FakeOptions) {
     this.id = opts.id
     this.sharedNamespaces = opts.sharedNamespaces ?? []
-    this.declaredTools = opts.tools ?? []
-    this.toolPaths = opts.toolPaths ?? {}
     this.picks = [...(opts.picks ?? [])]
     for (const [p, c] of Object.entries(opts.files ?? {})) this.vol.set(p, c)
     for (const d of opts.dirs ?? []) this.dirSet.add(d)
@@ -171,16 +142,9 @@ export class FakeAirship implements AirshipBridge {
     return this.readGrants.has(path)
   }
 
-  /** 把事件推给应用（子进程输出、托盘点击、窗口最大化…） */
+  /** 把事件推给应用（后端主动推的、托盘点击、窗口最大化…） */
   emit(event: ShellEvent): void {
     for (const fn of [...this.listeners]) fn(event)
-  }
-
-  /** 用例主动结束一条流式任务 */
-  finishJob(jobId: string, result: Partial<ProcResult> = {}): void {
-    const ctl = this.jobs.get(jobId)
-    if (!ctl) throw new Error(`没有这个在跑的任务：${jobId}`)
-    ctl.exit(result)
   }
 
   /* ---------------- 闸门 ---------------- */
@@ -415,52 +379,6 @@ export class FakeAirship implements AirshipBridge {
     pathForFile: (file: DroppedFile): string => this.opts.dropPaths?.[file.name] ?? ''
   }
 
-  readonly proc = {
-    run: async (request: Omit<ProcRequest, 'jobId'>): Promise<ProcResult> => {
-      const exe = this.needString(request.exe, 'request.exe')
-      this.assertWhitelisted(exe)
-      this.procCalls.push({ exe, args: request.args })
-      const part = this.opts.run?.(exe, request.args) ?? {}
-      return { code: 0, signal: null, stdout: '', stderr: '', ...part }
-    },
-    start: async (request: ProcRequest): Promise<void> => {
-      const exe = this.needString(request.exe, 'request.exe')
-      const jobId = this.needString(request.jobId, 'request.jobId')
-      this.assertWhitelisted(exe)
-      if (this.jobs.has(jobId)) throw new Error(dupJob(jobId))
-      this.procCalls.push({ exe, args: request.args, jobId })
-      const ctl: StreamCtl = {
-        chunk: (stream, text) => this.emit({ kind: 'proc:chunk', jobId, stream, text }),
-        exit: (result = {}) => {
-          this.jobs.delete(jobId)
-          this.emit({
-            kind: 'proc:exit',
-            jobId,
-            result: { code: 0, signal: null, stdout: '', stderr: '', ...result }
-          })
-        }
-      }
-      this.jobs.set(jobId, ctl)
-      if (this.opts.start) this.opts.start({ ...request, exe, jobId }, ctl)
-      else ctl.exit()
-    },
-    kill: async (jobId: string): Promise<boolean> => {
-      if (!this.jobs.has(jobId)) return false
-      this.finishJob(jobId, { code: null, signal: 'SIGKILL' })
-      return true
-    },
-    list: async (): Promise<string[]> => {
-      return [...this.jobs.keys()]
-    }
-  }
-
-  readonly tools = {
-    path: async (name: ToolName): Promise<string | null> => {
-      if (!this.declaredTools.includes(name)) throw new Error(toolDenied(this.id, name))
-      return this.toolPaths[name] ?? null
-    }
-  }
-
   readonly backend = {
     invoke: async <T,>(method: string, payload?: unknown): Promise<T> => {
       const m = this.needString(method, 'method')
@@ -534,11 +452,6 @@ export class FakeAirship implements AirshipBridge {
   /** 装配成应用真正拿到的 AppApi */
   get api(): AppApi {
     return { ...this, id: this.id }
-  }
-
-  private assertWhitelisted(exe: string): void {
-    const allowed = Object.values(this.toolPaths).filter((v): v is string => Boolean(v))
-    if (!allowed.includes(exe)) throw new Error(exeDenied(exe))
   }
 
   private nextPick(): string[] | string | null {

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { readAppManifest } from '@airship/cli'
 import { iconProblems, manifestProblems } from '@airship/contract'
 import { platformIssue } from '@airship/contract'
-import { PLATFORM_IDS, TOOL_NAMES } from '@airship/contract'
+import { PLATFORM_IDS } from '@airship/contract'
 import { APP_ID_PATTERN } from '@airship/contract'
 import { DEFAULT_ENTRY, MANIFEST_NAME, PACKAGE_SUFFIX } from '@airship/contract'
 import {
@@ -111,19 +111,6 @@ describe('缺一件就在注册期说清', () => {
 })
 
 describe('清单只写应用自己的事实', () => {
-  it('AP-005 清单里不写 runtime 不认识的工具', () => {
-    const bad = manifestProblems(
-      'apps/a/app.ts',
-      meta({ id: 'a', name: 'A', tools: ['ffmpeg', 'nope'] as never }),
-      []
-    )
-    expect(bad[0]).toContain('runtime 不认识的工具')
-    expect(bad[0]).toContain('nope')
-    for (const m of REAL_APPS) {
-      for (const t of m.tools ?? []) expect(TOOL_NAMES).toContain(t)
-    }
-  })
-
   it('AP-006 平台字段只用认识的名字，不写就是全平台', () => {
     expect(manifestProblems('apps/a/app.ts', meta({ id: 'a', name: 'A', platforms: ['win'] as never }), [])).toEqual(
       ['apps/a/app.ts: 不认识的平台 "win"（清单 platforms 只认 windows / macos / linux）']

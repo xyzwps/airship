@@ -39,7 +39,7 @@ import './airship-ffmpeg.css'
  *
  * 与 Avalonia 版的差别：
  *   - 界面从 XAML 换成 React，布局改成"左配置 / 右队列"两栏，宽屏下不用滚来滚去。
- *   - 进程管理交给 runtime 的 proc 服务（白名单只放行 runtime 发现的 ffmpeg），不再自己 Process.Start。
+ *   - ffmpeg 由应用随包自带的后端进程去发现和拉起（`backend.ts`），渲染侧只剩 `api.backend.invoke`。
  *   - 临时字幕落在应用 cache 目录，不再用系统 %TEMP%，卸载/清缓存就干净了。
  *   - 文件浏览从自绘目录树换成系统对话框 + 父目录授权（grantParentDir），
  *     少一整棵树的代码，代价是不能在界面里翻目录——这点是退步，认。
@@ -129,7 +129,7 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
       if (!exe) throw new Error('没找到 ffmpeg')
       const stat = await api.fs.stat(path)
       if (!stat) throw new Error(`读不到文件：${path}`)
-      const res = await api.proc.run({ exe, args: ['-hide_banner', '-i', path] })
+      const res = await runner.run(['-hide_banner', '-i', path])
       const name = path.split(/[\\/]/).pop() ?? path
       const slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
       const dir = slash >= 0 ? path.slice(0, slash) : ''
@@ -197,14 +197,11 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
         map[`s${stream.rel}`] = '（图形字幕，只能原样复制）'
         continue
       }
-      const res = await api.proc
-        .run({
-          exe,
-          args: [
-            '-hide_banner', '-loglevel', 'error', '-i', probe.path,
-            '-map', `0:s:${stream.rel}`, '-t', '60', '-f', 'srt', '-'
-          ]
-        })
+      const res = await runner
+        .run([
+          '-hide_banner', '-loglevel', 'error', '-i', probe.path,
+          '-map', `0:s:${stream.rel}`, '-t', '60', '-f', 'srt', '-'
+        ])
         .catch(() => null)
       if (res && res.code === 0) map[`s${stream.rel}`] = subSnippet(res.stdout)
     }
@@ -241,10 +238,9 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
       if (!probe || !exe || !cacheDir) return null
       const key = `s${rel}`
       const dest = `${cacheDir}/fcb_sub_${Date.now()}_${rel}.srt`
-      const res = await api.proc.run({
-        exe,
-        args: ['-y', '-hide_banner', '-loglevel', 'error', '-i', probe.path, '-map', `0:s:${rel}`, dest]
-      })
+      const res = await runner.run([
+        '-y', '-hide_banner', '-loglevel', 'error', '-i', probe.path, '-map', `0:s:${rel}`, dest
+      ])
       if (res.code === 0) {
         mut((st) => {
           st.extracted[key] = dest
@@ -298,10 +294,9 @@ export default function VcpApp({ api }: { api: AppApi }): JSX.Element {
       const exe = await runner.init()
       if (!exe) continue
       const dest = `${cacheDir}/${req.destName}`
-      const res = await api.proc.run({
-        exe,
-        args: ['-y', '-hide_banner', '-loglevel', 'error', '-i', target.path, '-map', `0:s:${req.rel}`, dest]
-      })
+      const res = await runner.run([
+        '-y', '-hide_banner', '-loglevel', 'error', '-i', target.path, '-map', `0:s:${req.rel}`, dest
+      ])
       if (res.code === 0) extracted[req.key] = dest
       else batchNotes.push('字幕抽取失败，这个任务不带字幕')
     }

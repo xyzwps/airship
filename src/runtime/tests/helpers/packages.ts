@@ -14,7 +14,7 @@ import type { AppMeta } from '@airship/contract'
  * 放进系统临时目录；注册进表那一步在 `setup.ts`（每个用例文件开局逐个 registerPackageAt）。
  *
  * 两条刻意的选择：
- *   1. **清单内容不造假**。用例读到的尺寸、两份名单、平台就是 `app.ts` 里那一份——
+ *   1. **清单内容不造假**。用例读到的尺寸、共享区名单、平台就是 `app.ts` 里那一份——
  *      改了清单，这些用例跟着变，不会出现"测试里的 vcp 和产品里的 vcp 不是同一个东西"。
  *   2. 归档里**不放任何应用代码**。runtime 的册子钉的是 runtime 的判定；
  *      应用真跑起来长什么样归 `just shot`（它吃 `just build-apps` 的真产物）。

@@ -1,16 +1,11 @@
 import { IconButton } from '@airship/sdk'
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react'
-import { loadImages, nextJobId, pullArgs, rmiArgs, type WslcRunner } from './cli'
-import {
-  cleanWslcError,
-  errorMessage,
-  isRemovalConflict,
-  pullIsUpToDate,
-  type RawImage
-} from './parse'
+import { jobEvent, loadImages, nextJobId, pullArgs, rmiArgs, type WslcChunk, type WslcExit, type WslcRunner } from './cli'
+import { cleanWslcError, errorMessage, isRemovalConflict, pullIsUpToDate, type RawImage } from './parse'
 import {
   NEVER_REFRESHED,
   clockOfDay,
+  elapsedText,
   imageContainerCount,
   imageDisplayName,
   imageInUse,
@@ -30,6 +25,9 @@ import { useShellEvents } from './hooks'
  * 这一页**不做自动轮询**：镜像不像容器那样起起停停，待着不动就一条命令都不发。
  * 删除只在"常规删除被引擎以正被使用拒绝"之后才升级出强制删除——
  * 那是真把镜像从磁盘上拿走、留下的容器再也起不来，平时不给。
+ *
+ * 拉取开一张卡片：这台机器上的 wslc 不中途吐输出（管道、文件、伪终端三条路实测都一样），
+ * 所以进行中唯一真的在走的是已等时长，输出的行到达后原样摆在卡片里。
  */
 
 const EMPTY_SEARCH = '没有匹配的镜像'
@@ -37,14 +35,33 @@ const EMPTY_REFERENCE = '请先输入要拉取的镜像引用，例如 docker.1m
 const FORCE_HINT = ' 该镜像正被容器使用，再点一次「强制删除」才能把它从磁盘上移除。'
 const FOOTER_NOTE = '· 镜像不会自动变化，拉取或删除后会自动更新列表'
 const PULL_PLACEHOLDER = '镜像引用，例如 docker.1ms.run/library/redis:7'
+const NO_OUTPUT_YET = '这台机器上的 wslc 要跑完才报详细输出。'
 
 type JobKind = 'pull' | 'rmi'
+type CardState = 'running' | 'done' | 'failed' | 'cancelled'
+
+const CARD_STATE_LABEL: Record<Exclude<CardState, 'running'>, string> = {
+  done: '已结束',
+  failed: '失败',
+  cancelled: '已取消'
+}
 
 interface Pending {
   jobId: string
   kind: JobKind
   reference: string
   forced: boolean
+}
+
+interface PullCard {
+  jobId: string
+  reference: string
+  command: string
+  startedAt: number
+  seconds: number
+  lines: string[]
+  state: CardState
+  outcome: string
 }
 
 export function ImagesView({ runner }: { runner: WslcRunner }): JSX.Element {
@@ -59,11 +76,14 @@ export function ImagesView({ runner }: { runner: WslcRunner }): JSX.Element {
   /** 已经升级到"强制删除"的那些引用：这是用户刚做出来的决定，不该被一次刷新抹平 */
   const [forceFor, setForceFor] = useState<Record<string, boolean>>({})
   const [lastRefresh, setLastRefresh] = useState<number | null>(null)
+  const [card, setCard] = useState<PullCard | null>(null)
 
   const busy = useRef(false)
   const refreshing = useRef(false)
   const job = useRef<Pending | null>(null)
   const cancelled = useRef(false)
+  /** chunk 的尾巴常常是半行，先留着，等下一块拼完再上屏 */
+  const partial = useRef('')
 
   const refresh = useCallback(
     async (clearNotice = false): Promise<void> => {
@@ -95,22 +115,60 @@ export function ImagesView({ runner }: { runner: WslcRunner }): JSX.Element {
     void refresh()
   }, [refresh])
 
+  const jobId = card?.jobId
+  const running = card?.state === 'running'
+  useEffect(() => {
+    if (!running || !jobId) return
+    const timer = setInterval(() => {
+      setCard((prev) =>
+        prev && prev.jobId === jobId && prev.state === 'running'
+          ? { ...prev, seconds: Math.floor((Date.now() - prev.startedAt) / 1000) }
+          : prev
+      )
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [running, jobId])
+
+  /** 卡片收尾：把状态、最后一拍的时长与结果那句一起落定（卡片不自己关） */
+  const closeCard = (ofJob: string, state: CardState, outcome: string): void => {
+    setCard((prev) =>
+      prev && prev.jobId === ofJob
+        ? { ...prev, state, outcome, seconds: Math.floor((Date.now() - prev.startedAt) / 1000) }
+        : prev
+    )
+  }
+
   const begin = (kind: JobKind, args: string[], reference: string, forced: boolean): void => {
-    const jobId = nextJobId(kind)
-    const current: Pending = { jobId, kind, reference, forced }
+    const id = nextJobId(kind)
+    const current: Pending = { jobId: id, kind, reference, forced }
     job.current = current
     busy.current = true
     cancelled.current = false
+    partial.current = ''
     setPending(current)
+    if (kind === 'pull') {
+      setCard({
+        jobId: id,
+        reference,
+        command: `wslc ${args.join(' ')}`,
+        startedAt: Date.now(),
+        seconds: 0,
+        lines: [],
+        state: 'running',
+        outcome: ''
+      })
+    }
     // 开始新动作就清掉旧提示，免得新旧同屏让人误读
     setError(null)
     setNotice(null)
 
-    void runner.start(jobId, args).catch((err: unknown) => {
+    void runner.start(id, args).catch((err: unknown) => {
       job.current = null
       busy.current = false
       setPending(null)
-      setError(errorMessage(err))
+      const message = errorMessage(err)
+      setError(message)
+      if (kind === 'pull') closeCard(id, 'failed', message)
     })
   }
 
@@ -146,36 +204,53 @@ export function ImagesView({ runner }: { runner: WslcRunner }): JSX.Element {
     const current = job.current
     if (!current || current.kind !== 'pull') return
     cancelled.current = true
-    void api.proc.kill(current.jobId).catch(() => undefined)
+    void runner.kill(current.jobId).catch(() => undefined)
   }
 
   useShellEvents(api, (event) => {
-    if (event.kind !== 'proc:exit') return
+    const chunk = jobEvent<WslcChunk>(event, 'job:chunk')
+    if (chunk) {
+      const current = job.current
+      if (current?.kind !== 'pull' || chunk.jobId !== current.jobId) return
+      const pieces = (partial.current + chunk.text).split('\n')
+      partial.current = pieces.pop() ?? ''
+      const fresh = pieces.map((line) => line.replace(/\r$/, '')).filter((line) => line.length > 0)
+      if (fresh.length === 0) return
+      setCard((prev) => (prev && prev.jobId === chunk.jobId ? { ...prev, lines: [...prev.lines, ...fresh] } : prev))
+      return
+    }
+
+    const exit = jobEvent<WslcExit>(event, 'job:exit')
+    if (!exit) return
     const current = job.current
-    if (!current || event.jobId !== current.jobId) return
+    if (!current || exit.jobId !== current.jobId) return
 
     job.current = null
     busy.current = false
     setPending(null)
-    const result = event.result
+    const result = exit
 
     if (current.kind === 'pull') {
       if (cancelled.current) {
         // 实测半途终止不会留下半截镜像：取消之后不必刷新，只需要把"已取消"说清楚
         cancelled.current = false
-        setNotice(`已取消拉取 ${current.reference}`)
+        const line = `已取消拉取 ${current.reference}`
+        setNotice(line)
+        closeCard(current.jobId, 'cancelled', line)
         return
       }
       if (result.code === 0) {
-        setNotice(
-          pullIsUpToDate(result.stdout)
-            ? `${current.reference} 已是最新`
-            : `已拉取 ${current.reference}`
-        )
+        const line = pullIsUpToDate(result.stdout)
+          ? `${current.reference} 已是最新`
+          : `已拉取 ${current.reference}`
+        setNotice(line)
+        closeCard(current.jobId, 'done', line)
         void refresh()
         return
       }
-      setError(cleanWslcError(result.stderr))
+      const message = cleanWslcError(result.stderr)
+      setError(message)
+      closeCard(current.jobId, 'failed', message)
       return
     }
 
@@ -288,6 +363,51 @@ export function ImagesView({ runner }: { runner: WslcRunner }): JSX.Element {
       </div>
 
       <div className="wsld__footer hint">{FOOTER_NOTE}</div>
+
+      {card !== null && (
+        <div className="wsld__modal">
+          {/* 点外面那层不收：这一轮的时长与输出正看着，误点不该把它抹掉 */}
+          <div className="wsld__modal-backdrop" />
+          <section
+            className="wsld__modal-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="拉取进度"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setCard(null)
+            }}
+          >
+            <header className="wsld__card-head row">
+              <span className="wsld__card-title">拉取 {card.reference}</span>
+              <span className="spacer" />
+              {card.state === 'running' && (
+                <button type="button" className="btn" data-test="镜像-卡片-取消" onClick={cancelPull}>
+                  取消
+                </button>
+              )}
+              <button type="button" className="btn" data-test="镜像-卡片-关闭" onClick={() => setCard(null)}>
+                关闭
+              </button>
+            </header>
+            <p className="wsld__card-line mono" data-test="镜像-卡片-命令行">
+              {card.command}
+            </p>
+            <p className="wsld__card-line" data-test="镜像-卡片-状态">
+              {card.state === 'running'
+                ? `进行中 · 已等 ${elapsedText(card.seconds)}`
+                : `${CARD_STATE_LABEL[card.state]} · 已用 ${elapsedText(card.seconds)}`}
+            </p>
+            {card.outcome !== '' && <p className="wsld__card-line">{card.outcome}</p>}
+            <div className="wsld__card-log mono" data-test="镜像-卡片-输出">
+              {card.lines.length === 0 ? (
+                <p className="hint">{NO_OUTPUT_YET}</p>
+              ) : (
+                card.lines.map((line, index) => <p key={index}>{line}</p>)
+              )}
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

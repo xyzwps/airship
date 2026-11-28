@@ -9,9 +9,11 @@ import {
   rows,
   tap,
   twoContainers,
-  unmountAll
+  unmountAll,
+  type JobCall,
+  type JobCtl,
 } from './support'
-import type { FakeAirship, StartCall, StreamCtl } from '@airship/sdk/testing'
+import type { FakeAirship } from '@airship/sdk/testing'
 import type { Mount } from '@airship/sdk/testing'
 
 /**
@@ -26,14 +28,14 @@ const STOPPED_ID = 'aaaa11111111' // alpha，已停
 
 /** 被扣住没放的流式任务 */
 interface Held {
-  call: StartCall
-  ctl: StreamCtl
+  call: JobCall
+  ctl: JobCtl
 }
 
 function stage(stdout = twoContainers()): { fake: FakeAirship; held: Held[] } {
   const held: Held[] = []
   const fake = makeFake({
-    run: (_exe, args) => (args[0] === 'list' ? { stdout } : {}),
+    run: (args) => (args[0] === 'list' ? { stdout } : {}),
     start: (call, ctl) => {
       held.push({ call, ctl })
     }

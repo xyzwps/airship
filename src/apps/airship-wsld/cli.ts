@@ -1,19 +1,36 @@
 import { cleanWslcError, parseContainers, parseImages, type RawContainer, type RawImage } from './parse'
-import type { AppApi, ProcResult } from '@airship/contract'
+import type { AppApi } from '@airship/contract'
 
 /**
  * wslc 那一侧的门。
  *
- * 命令行在这里拼、进程在这里起，界面只管要数据和听结果：
- *   - 一次性读（列表、查看日志、拉取收尾）走 `proc.run`；
- *   - 要看得见"正在做"的动作（起停删、实时日志、删除镜像）走 `proc.start`，
- *     结束由 runtime 推回来的 `proc:exit` 说了算——不然界面没法把"进行中"这段摆出来。
+ * 命令行在这里拼，进程交给应用随包自带的后端（同目录 `backend.ts`）去起，界面只管要数据和听结果：
+ *   - 一次性读（列表、查看日志、拉取收尾）走 `run`；
+ *   - 要看得见"正在做"的动作（起停删、实时日志、删除镜像）走 `start`，
+ *     结束由后端推回来的 `job:exit` 说了算——不然界面没法把"进行中"这段摆出来。
  *
- * 可执行文件一律由 runtime 定位（见 runtime 的 proc-tools 册子）：应用只声明"我要用 wslc"，
- * 拿到 null 就按"这台机器上没有"处理，别自己找一条路径去跑。
+ * 可执行文件由后端定位（三份来路见那个文件）：拿不到就按"这台机器上没有"处理，
+ * 渲染侧从头到尾不知道 wslc 落在哪个目录，也不自己去摸一条路径出来跑。
  */
 
-export const WSLC_TOOL = 'wslc' as const
+/** 后端 run / job:exit 的回话形状（写在这里的是应用自己的读法） */
+export interface WslcResult {
+  code: number | null
+  signal: string | null
+  stdout: string
+  stderr: string
+  /** 起不来时的原因（连进程都没开成，没有退出码） */
+  error?: string
+}
+
+/** 后端推来的一条流式输出 */
+export interface WslcChunk {
+  jobId: string
+  stream: 'stdout' | 'stderr'
+  text: string
+}
+
+export type WslcExit = WslcResult & { jobId: string }
 
 /** 定位不到 wslc 时给用户的句子：说清下一步该怎么办，而不是一堆报错 */
 export const WSLC_MISSING =
@@ -135,38 +152,46 @@ export const nowEpochSeconds = (): number => Math.floor(Date.now() / 1000)
 
 let jobSeq = 0
 
-/** 任务标识在同一应用内要唯一，结束后可复用的那一段由 runtime 负责清理 */
+/** 任务标识在同一应用内要唯一，结束后由后端把那份记录摘掉 */
 export function nextJobId(kind: string): string {
   jobSeq += 1
   return `${kind}-${jobSeq}`
 }
 
 export interface WslcRunner {
-  readonly exe: string
   readonly api: AppApi
   /** 一次性跑完，拿退出码与全文 */
-  run(args: string[]): Promise<ProcResult>
-  /** 后台跑，输出与结束由事件回流 */
-  start(jobId: string, args: string[]): Promise<void>
+  run(args: string[]): Promise<WslcResult>
+  /** 后台跑，输出与结束由事件回流（提交就已应答，不等 wslc 跑完） */
+  start(jobId: string, args: string[]): Promise<unknown>
   kill(jobId: string): Promise<boolean>
 }
 
 export async function locateWslc(api: AppApi): Promise<string | null> {
-  return api.tools.path(WSLC_TOOL)
+  return api.backend.invoke<string | null>('locate')
 }
 
-export function makeRunner(api: AppApi, exe: string): WslcRunner {
+export function makeRunner(api: AppApi): WslcRunner {
   return {
-    exe,
     api,
-    run: (args) => api.proc.run({ exe, args }),
-    start: (jobId, args) => api.proc.start({ exe, args, jobId }),
-    kill: (jobId) => api.proc.kill(jobId)
+    run: (args) => api.backend.invoke<WslcResult>('run', { args }),
+    start: (jobId, args) => api.backend.invoke('start', { jobId, args }),
+    kill: (jobId) => api.backend.invoke<boolean>('kill', { jobId })
   }
 }
 
+/**
+ * 从后端推来的事件里认出某个任务的一条消息（`method` 对不上或没有任务号就给 null）。
+ * 后端的主动消息都裹在 `backend:event` 里，视图层不必各自认这层壳。
+ */
+export function jobEvent<T>(event: { kind: string; method?: string; payload?: unknown }, method: string): T | null {
+  if (event.kind !== 'backend:event' || event.method !== method) return null
+  const hit = event.payload as { jobId?: unknown }
+  return typeof hit?.jobId === 'string' ? (event.payload as T) : null
+}
+
 /** 非 0 退出一律换成清洗过的那句人话（见 parse.ts 的错误清洗） */
-async function mustSucceed(runner: WslcRunner, args: string[], stdoutOf: (r: ProcResult) => string): Promise<string> {
+async function mustSucceed(runner: WslcRunner, args: string[], stdoutOf: (r: WslcResult) => string): Promise<string> {
   const result = await runner.run(args)
   if (result.code !== 0) throw new Error(cleanWslcError(result.stderr))
   return stdoutOf(result)
